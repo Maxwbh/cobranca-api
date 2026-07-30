@@ -1,0 +1,34 @@
+# Mantém o(s) serviço(s) Render free acordado(s) para evitar o cold start, que
+# faz o Render responder HTTP 429 ("Too Many Requests") na janela de ~20-30s do
+# wake — o que o Gestao-Contrato traduz como "API sobrecarregada".
+#
+# Pinga /api/health a cada 10 min (abaixo do limite de 15 min de inatividade do
+# free tier). Use a variavel de repo KEEPALIVE_URLS (lista separada por espaco)
+# para apontar para os seus servicos; ha um default com a URL de producao.
+#
+# OBS: workflows agendados rodam apenas no branch DEFAULT (master) e o cron do
+# GitHub pode atrasar sob carga. Para garantia maior, use tambem um UptimeRobot
+# ou cron-job.org pingando /api/health a cada 5-10 min.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoints (acorda o free tier)
+        run: |
+          URLS="${{ vars.KEEPALIVE_URLS }}"
+          if [ -z "$URLS" ]; then
+            URLS="https://brcobranca-api-m4q9.onrender.com/api/health"
+          fi
+          for url in $URLS; do
+            echo "==> $url"
+            # timeout longo absorve o cold start (~30s); nao falha o job se cair
+            code=$(curl -s -o /dev/null -m 90 -w "%{http_code}" "$url" || echo "000")
+            echo "    HTTP $code"
+          done

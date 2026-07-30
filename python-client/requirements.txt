@@ -1,0 +1,5 @@
+# Dependências de produção
+requests>=2.25.0
+
+# Dependências opcionais de desenvolvimento
+# Instale com: pip install -e ".[dev]"

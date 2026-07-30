@@ -1,0 +1,128 @@
+# Backup files
+*~
+*.swp
+
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+.bundle/
+vendor/bundle
+
+# Ruby version management
+.ruby-version
+.ruby-gemset
+
+# RSpec
+.rspec_status
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# lib/ - Não ignorar lib/ pois contém código Ruby principal
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+*.iml
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Docker
+.dockerignore.bak
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Generated PDFs (exemplos)
+boleto*.pdf
+*.pdf
+*.jpg
+*.png
+*.tif
+
+# CNAB files
+*.rem
+*.ret
+
+# Backup do CHANGELOG
+CHANGELOG.md.bak
+
+# Node modules (se houver frontend)
+node_modules/
+coverage/
+
+# Assets de documentação (galeria de boletos no README) — versionar
+!docs/assets/
+!docs/assets/**/*.png
+
+# Evidências de execução Postman (fora do git — anexadas ao ciclo de HML)
+postman/reports/
+
+# Fixtures de retorno CNAB versionadas (fonte unica RSpec + Postman)
+!spec/fixtures/*.ret
+
+# Fixtures usadas pela coleção Postman
+!postman/fixtures/*.ret

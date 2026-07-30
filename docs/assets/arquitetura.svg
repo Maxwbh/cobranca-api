@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-label="Arquitetura da Cobranca-API: consumidores em qualquer linguagem chamam a API REST, que usa a engine PyCobrança e as APIs dos bancos">
+  <defs>
+    <linearGradient id="api" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F172A"/><stop offset="0.6" stop-color="#1E40AF"/><stop offset="1" stop-color="#3B5A82"/>
+    </linearGradient>
+    <linearGradient id="eng" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#06B6D4"/><stop offset="1" stop-color="#0891B2"/>
+    </linearGradient>
+    <marker id="seta" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#94A3B8"/>
+    </marker>
+    <marker id="setac" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#06B6D4"/>
+    </marker>
+    <style>
+      .t   { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
+      .lbl { font-size: 15px; fill: #0F172A; font-weight: 600; }
+      .sub { font-size: 12.5px; fill: #475569; }
+      .wht { fill: #fff; }
+      .cap { font-size: 12px; fill: #64748B; letter-spacing: .6px; text-transform: uppercase; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="620" fill="#F8FAFC"/>
+
+  <!-- ================= consumidores ================= -->
+  <text x="600" y="34" text-anchor="middle" class="t cap">Sua aplicação — qualquer linguagem</text>
+  <g class="t">
+    <g>
+      <rect x="70"  y="52" width="150" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="145" y="73" text-anchor="middle" class="lbl">Oracle APEX</text>
+      <text x="145" y="89" text-anchor="middle" class="sub">PL/SQL · UTL_HTTP</text>
+    </g>
+    <g>
+      <rect x="240" y="52" width="130" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="305" y="73" text-anchor="middle" class="lbl">ERP</text>
+      <text x="305" y="89" text-anchor="middle" class="sub">TOTVS · SAP · Senior</text>
+    </g>
+    <g>
+      <rect x="390" y="52" width="120" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="450" y="73" text-anchor="middle" class="lbl">Java · C#</text>
+      <text x="450" y="89" text-anchor="middle" class="sub">Spring · .NET</text>
+    </g>
+    <g>
+      <rect x="530" y="52" width="120" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="590" y="73" text-anchor="middle" class="lbl">Node · PHP</text>
+      <text x="590" y="89" text-anchor="middle" class="sub">Laravel · Nest</text>
+    </g>
+    <g>
+      <rect x="670" y="52" width="120" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="730" y="73" text-anchor="middle" class="lbl">Python</text>
+      <text x="730" y="89" text-anchor="middle" class="sub">Django · FastAPI</text>
+    </g>
+    <g>
+      <rect x="810" y="52" width="120" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="870" y="73" text-anchor="middle" class="lbl">Delphi · Go</text>
+      <text x="870" y="89" text-anchor="middle" class="sub">legado ou novo</text>
+    </g>
+    <g>
+      <rect x="950" y="52" width="180" height="46" rx="9" fill="#fff" stroke="#CBD5E1"/>
+      <text x="1040" y="73" text-anchor="middle" class="lbl">n8n · Zapier · cURL</text>
+      <text x="1040" y="89" text-anchor="middle" class="sub">low-code</text>
+    </g>
+  </g>
+
+  <!-- seta consumidores -> API -->
+  <line x1="600" y1="106" x2="600" y2="150" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#seta)"/>
+  <text x="614" y="132" class="t sub">HTTP / REST · OpenAPI 3.0 · 3.1</text>
+
+  <!-- ================= API ================= -->
+  <rect x="150" y="158" width="900" height="112" rx="14" fill="url(#api)"/>
+  <text x="600" y="196" text-anchor="middle" class="t wht" font-size="26" font-weight="700">Cobranca-API</text>
+  <text x="600" y="222" text-anchor="middle" class="t" font-size="14" fill="#A5F3FC">FastAPI · 100% Python · um único container</text>
+  <g class="t" font-size="12.5" fill="#E2E8F0">
+    <text x="600" y="248" text-anchor="middle">token bapi_ (zero-knowledge)  ·  multi-tenant  ·  jobs em lote  ·  webhooks HMAC  ·  Swagger</text>
+  </g>
+
+  <!-- setas API -> engine / bancos -->
+  <line x1="360" y1="276" x2="360" y2="330" stroke="#06B6D4" stroke-width="2.5" marker-end="url(#setac)"/>
+  <text x="372" y="306" class="t sub" fill="#0891B2">offline · in-process</text>
+  <line x1="840" y1="276" x2="840" y2="330" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#seta)"/>
+  <text x="852" y="306" class="t sub">online · OAuth + mTLS</text>
+
+  <!-- ================= engine ================= -->
+  <rect x="110" y="338" width="500" height="104" rx="12" fill="url(#eng)"/>
+  <text x="360" y="374" text-anchor="middle" class="t wht" font-size="20" font-weight="700">PyCobrança</text>
+  <text x="360" y="396" text-anchor="middle" class="t" font-size="13" fill="#0F172A">engine open source · Python puro · sem libs de sistema</text>
+  <text x="360" y="424" text-anchor="middle" class="t" font-size="12.5" fill="#083344">boleto · CNAB 240/400 · carnê · PIX/Bolepix · PDF</text>
+
+  <!-- ================= bancos ================= -->
+  <rect x="640" y="338" width="450" height="104" rx="12" fill="#fff" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="865" y="374" text-anchor="middle" class="t lbl" font-size="20">APIs dos bancos</text>
+  <text x="865" y="396" text-anchor="middle" class="t sub">C6 Bank · Sicoob — Inter e BB no roadmap</text>
+  <text x="865" y="424" text-anchor="middle" class="t sub">boleto registrado · Pix · Pix Automático · conciliação</text>
+
+  <!-- ================= saídas ================= -->
+  <line x1="360" y1="448" x2="360" y2="492" stroke="#06B6D4" stroke-width="2.5" marker-end="url(#setac)"/>
+  <line x1="865" y1="448" x2="865" y2="492" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#seta)"/>
+
+  <g class="t">
+    <rect x="110"  y="500" width="150" height="62" rx="10" fill="#fff" stroke="#06B6D4"/>
+    <text x="185" y="527" text-anchor="middle" class="lbl">Boleto PDF</text>
+    <text x="185" y="546" text-anchor="middle" class="sub">18 bancos</text>
+
+    <rect x="278" y="500" width="150" height="62" rx="10" fill="#fff" stroke="#06B6D4"/>
+    <text x="353" y="527" text-anchor="middle" class="lbl">CNAB 240/400</text>
+    <text x="353" y="546" text-anchor="middle" class="sub">remessa · retorno</text>
+
+    <rect x="446" y="500" width="150" height="62" rx="10" fill="#fff" stroke="#06B6D4"/>
+    <text x="521" y="527" text-anchor="middle" class="lbl">Carnê · OFX</text>
+    <text x="521" y="546" text-anchor="middle" class="sub">3 vias · conciliação</text>
+
+    <rect x="640" y="500" width="200" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
+    <text x="740" y="527" text-anchor="middle" class="lbl">Cobrança registrada</text>
+    <text x="740" y="546" text-anchor="middle" class="sub">CIP em tempo real</text>
+
+    <rect x="858" y="500" width="232" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
+    <text x="974" y="527" text-anchor="middle" class="lbl">Pix · Bolepix · Webhooks</text>
+    <text x="974" y="546" text-anchor="middle" class="sub">BACEN · notificação assinada</text>
+  </g>
+
+  <text x="600" y="594" text-anchor="middle" class="t sub" fill="#94A3B8">Cobranca-API · plataforma open source de cobrança bancária (MIT)</text>
+</svg>

@@ -1,0 +1,45 @@
+# Configuração para Render.com Free Tier
+# Documentação: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: cobranca-api
+    runtime: docker
+    region: oregon
+    plan: free
+
+    # SERVIÇO ÚNICO 100% Python: FastAPI + engine pyCobranca (in-process).
+    # A conexão com o Banking Core BrCobrança (Ruby) foi DESCONTINUADA.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Deploy automático
+    autoDeploy: true
+
+    # Deploy segue a master (v2.0.0 em diante).
+    branch: master
+
+    # Health check do gateway (o /api/health é servido pela engine embutida)
+    healthCheckPath: /health
+
+    # Variáveis de ambiente (free tier 512MB)
+    # IMPORTANTE: valores no Render são strings — sempre entre aspas.
+    envVars:
+      - key: PORT
+        value: "8000"
+
+      - key: LOG_LEVEL
+        value: "info"
+
+      # Cofre de credenciais (SQLite em diretório gravável pelo usuário app).
+      # Para Postgres/Supabase, defina SUPABASE_DB_URL/DATABASE_URL no painel.
+      - key: CREDENTIAL_DB_PATH
+        value: "/app/data/credentials.db"
+
+      # Artefatos de jobs em disco (efêmero no free tier: some a cada deploy —
+      # retenção curta e download logo após a conclusão do job).
+      - key: ARTIFACT_DIR
+        value: "/app/data/jobs"
+
+      - key: ARTIFACT_TTL_DIAS
+        value: "7"
