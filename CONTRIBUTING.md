@@ -16,13 +16,16 @@ Obrigado por considerar contribuir com a Cobranca-API! Este documento fornece di
 
 ## 🤝 Código de Conduta
 
-Este projeto adere a um código de conduta. Ao participar, espera-se que você mantenha este código:
+Este projeto adere ao [Código de Conduta](./CODE_OF_CONDUCT.md). Ao participar, espera-se que você mantenha este código:
 
 - Use linguagem acolhedora e inclusiva
 - Seja respeitoso com diferentes pontos de vista
 - Aceite críticas construtivas com elegância
 - Foque no que é melhor para a comunidade
 - Mostre empatia com outros membros da comunidade
+
+Comportamento inaceitável pode ser reportado em maxwbh@gmail.com. Vulnerabilidades
+de segurança seguem o processo privado de [SECURITY.md](./SECURITY.md) — nunca uma issue pública.
 
 ## 🎯 Como Contribuir
 

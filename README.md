@@ -457,10 +457,11 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 
 ## Contribuindo
 
-Contribuições são bem-vindas! Veja o [guia de contribuição](./CONTRIBUTING.md).
+Contribuições são bem-vindas! Veja o [guia de contribuição](./CONTRIBUTING.md) e o
+[Código de Conduta](./CODE_OF_CONDUCT.md).
 
 ```bash
-# Setup
+# Setup (Python >= 3.12, exigência da engine pyCobrança)
 git clone https://github.com/Maxwbh/cobranca-api.git && cd cobranca-api
 pip install -r gateway/requirements.txt -r gateway/requirements-dev.txt
 
@@ -470,6 +471,16 @@ cd gateway && PYTHONPATH=. pytest -v
 # Servidor local
 uvicorn app.main:app --reload --port 8000
 ```
+
+| | |
+|---|---|
+| Guia de contribuição | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| Código de Conduta | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) |
+| Política de segurança | [SECURITY.md](./SECURITY.md) |
+| Histórico de mudanças | [CHANGELOG.md](./CHANGELOG.md) |
+
+> Encontrou uma vulnerabilidade? **Não abra issue pública** — siga o processo
+> privado descrito em [SECURITY.md](./SECURITY.md).
 
 ## Projetos relacionados
 

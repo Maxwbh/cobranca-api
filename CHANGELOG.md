@@ -7,7 +7,29 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- **CI não rodava**: o workflow `Build` disparava em `master`, mas o branch
+  default do repositório é `main` — nenhum push executava a suíte. O gate do
+  push da imagem tinha o mesmo erro, somado a uma comparação sensível à caixa
+  (`github.repository_owner == 'maxwbh'` nunca casa com `Maxwbh`).
+- **Push da imagem para o ghcr.io responderia 403**: falta de `permissions:
+  packages: write` — em repositório público o `GITHUB_TOKEN` nasce
+  somente-leitura. O login no registry passa a ser pulado em PR de fork, que
+  recebe token sem escrita e derrubaria o build inteiro.
+- **`keepalive` apontava para um host de terceiro**: o default embutido pingava
+  uma instância Render antiga a cada 10 min. Sem a variável de repo
+  `KEEPALIVE_URLS` o job agora sai limpo sem pingar nada — fork nenhum bate no
+  ambiente de outra pessoa.
+- **`regressao-hml` agendada em fork** falharia sempre por credencial ausente:
+  o `schedule` passa a rodar só no repositório de origem; `workflow_dispatch`
+  continua liberado.
+- Template de bug pedia a versão do **Ruby**, removido do projeto na 2.0.0.
+
 ### Adicionado
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 1.4), `.github/pull_request_template.md`
+  e `.github/dependabot.yml` (pip do gateway e do cliente, GitHub Actions e
+  imagem base do Docker) — governança do repositório público.
+- README com os links de contribuição, conduta, segurança e changelog.
 - **`POST /api/render/fatura`** — renderiza a fatura pela engine
   (`render_fatura_pdf`): corpo livre no topo + boleto de pagamento abaixo, num
   só PDF. Passthrough puro (o gateway não soma nem calcula; o `valor` vem no
