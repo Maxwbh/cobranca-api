@@ -24,6 +24,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   o `schedule` passa a rodar só no repositório de origem; `workflow_dispatch`
   continua liberado.
 - Template de bug pedia a versão do **Ruby**, removido do projeto na 2.0.0.
+- **Link quebrado servido pela própria API**: `_DOC_REPO` (`app/main.py`), que
+  aparece na descrição da tag `bancos` do Swagger, apontava para
+  `/tree/master/docs/development` — 404, já que o branch default é `main`.
+  Mesma troca em `DEPLOY.md`, `CONTRIBUTING.md` e `scripts/README.md`, que
+  ainda mandavam `git push origin master`.
 
 ### Adicionado
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 1.4), `.github/pull_request_template.md`
@@ -38,6 +43,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   com `400`.
 
 ### Alterado
+- `CONTRIBUTING.md` documenta o prefixo `hml/` na convenção de branches: o
+  workflow `Build` dispara no push de `hml/**`, o que permite validar a suíte
+  antes de abrir o PR.
 - **Python mínimo 3.14 → 3.12** e **engine `pycobranca` ≥ 1.0.2**: a 1.0.2
   baixou o piso para `>=3.12`, que tem wheels prontos e **elimina a compilação
   a partir do código-fonte** (e o problema do pydantic no `3.14.0rc2`). CI,

@@ -181,9 +181,9 @@ docker-compose run cobranca_api pytest gateway/tests
 ### 1. Criar Branch
 
 ```bash
-# Atualizar master
-git checkout master
-git pull origin master
+# Atualizar main
+git checkout main
+git pull origin main
 
 # Criar branch descritiva
 git checkout -b feature/adicionar-banco-banrisul
@@ -199,6 +199,8 @@ git checkout -b docs/melhorar-readme
 - `docs/` - Mudanças em documentação
 - `test/` - Adicionar/melhorar testes
 - `refactor/` - Refatoração de código
+- `hml/` - Homologação: além do CI de PR, o workflow `Build` também dispara no
+  push dessas branches (`hml/**`), então dá para validar antes de abrir o PR
 
 ### 2. Desenvolver
 
@@ -489,7 +491,7 @@ Checklist:
 - [ ] Documentação foi atualizada
 - [ ] CHANGELOG.md foi atualizado (se aplicável)
 - [ ] Commits seguem convenção
-- [ ] Branch está atualizado com `master`
+- [ ] Branch está atualizado com `main`
 
 ### Criando Pull Request
 

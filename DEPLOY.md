@@ -53,7 +53,7 @@ ls Dockerfile render.yaml gateway/requirements.txt
 # Se estiver tudo ok, fazer push
 git add .
 git commit -m "Deploy para Render"
-git push origin master
+git push origin main
 ```
 
 ### 2. Criar Serviço no Render
@@ -139,7 +139,7 @@ curl https://boleto-cnab-api.onrender.com/api/health
 O `render.yaml` já está configurado com `autoDeploy: true`.
 
 **Isso significa:**
-- ✅ Push para `master` → Deploy automático
+- ✅ Push para `main` → Deploy automático
 - ✅ Pull Request merged → Deploy automático
 - ✅ Não precisa fazer nada manual
 
@@ -330,7 +330,7 @@ Antes de fazer deploy, verifique:
 - [ ] `Dockerfile` presente e testado localmente
 - [ ] `render.yaml` com configurações corretas
 - [ ] `gateway/requirements.txt` atualizado
-- [ ] Código commitado e pushed para `master`
+- [ ] Código commitado e pushed para `main`
 - [ ] Testes passando (`pytest gateway/tests`)
 - [ ] Health check funcionando (`/health` — gateway; `/api/health` — engine offline)
 

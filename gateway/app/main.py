@@ -14,7 +14,7 @@ from app.routers import (bancos, bolepix, carne, cobranca, conciliacao, credenci
 _DOC_C6 = "https://developers.c6bank.com.br"
 _DOC_SICOOB = "https://developers.sicoob.com.br/portal/"
 _DOC_BACEN_PIX = "https://bacen.github.io/pix-api/"
-_DOC_REPO = "https://github.com/Maxwbh/cobranca-api/tree/master/docs/development"
+_DOC_REPO = "https://github.com/Maxwbh/cobranca-api/tree/main/docs/development"
 
 TAGS = [
     {"name": "bancos",

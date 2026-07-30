@@ -64,7 +64,7 @@ git commit --author="Maxwell da Silva Oliveira <maxwbh@gmail.com>" -m "[RELEASE]
 git tag -a v1.0.1 -m "Versão 1.0.1"
 
 # 7. Push com tags
-git push origin master --tags
+git push origin main --tags
 ```
 
 ### Quando usar cada tipo de versão
