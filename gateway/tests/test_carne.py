@@ -59,3 +59,51 @@ def test_carne_offline_gera_pdf_real(client, cobranca_payload):
     r = client.post("/carne", json=body)
     assert r.status_code == 200, r.text
     assert r.json()["carne_pdf_base64"].startswith("JVBER")
+
+
+# O teto de lote valia so para /api/boleto/multi. Como o carne renderiza pelo
+# mesmo pdf_multi e tambem de forma sincrona, dava para passar do limite so
+# trocando de endpoint -- conferido contra a producao: 201 boletos recusados
+# no multi (413) e aceitos no carne (200).
+_DADOS_LOTE = {
+    "valor": 150.0, "cedente": "Aurora Servicos Empresariais LTDA",
+    "documento_cedente": "47816329000199", "sacado": "Vitoria Gabriela Emanuelly Ramos",
+    "sacado_documento": "77044362109", "agencia": "3073", "conta_corrente": "12345678",
+    "convenio": "1234567", "carteira": "18", "data_vencimento": "2027-12-30",
+}
+
+
+def _boletos(n):
+    return [{**_DADOS_LOTE, "nosso_numero": str(30000 + i),
+             "numero_documento": f"CAR-{i:04d}"} for i in range(n)]
+
+
+def test_carne_recusa_lote_acima_do_limite(client):
+    from app.routers.offline import LOTE_MAX  # noqa: PLC0415
+    r = client.post("/api/render/carne",
+                    json={"bank": "banco_brasil", "boletos": _boletos(LOTE_MAX + 1)})
+    assert r.status_code == 413, r.text
+    corpo = r.json()
+    assert corpo["recebidos"] == LOTE_MAX + 1
+    assert str(LOTE_MAX) in corpo["error"]
+
+
+def test_carne_no_limite_continua_aceito(client):
+    from app.routers.offline import LOTE_MAX  # noqa: PLC0415
+    r = client.post("/api/render/carne",
+                    json={"bank": "banco_brasil", "boletos": _boletos(LOTE_MAX)})
+    assert r.status_code == 200, r.text
+    assert r.json()["pdf_base64"]
+
+
+def test_limite_do_carne_e_o_mesmo_do_multi(client, monkeypatch):
+    # Os dois caminhos sincronos leem LOTE_MAX_ITENS: mudar a variavel de
+    # ambiente tem de mover os dois juntos, senao a inconsistencia volta.
+    import importlib
+
+    from app import routers
+    monkeypatch.setenv("LOTE_MAX_ITENS", "3")
+    importlib.reload(routers.offline)
+    assert routers.offline.LOTE_MAX == 3
+    monkeypatch.delenv("LOTE_MAX_ITENS")
+    importlib.reload(routers.offline)

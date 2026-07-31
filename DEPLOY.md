@@ -201,7 +201,25 @@ O Render fornece automaticamente:
 - CREDENTIAL_DB_PATH=/app/data/credentials.db   # cofre SQLite (dir gravável)
 - ARTIFACT_DIR=/app/data/jobs                   # artefatos dos jobs em lote
 - ARTIFACT_TTL_DIAS=7
+- LOTE_MAX_ITENS=200                            # teto dos endpoints síncronos
+- JOB_MAX_ITENS=200                             # teto dos jobs assíncronos
 ```
+
+> **Os dois tetos de lote não escalam igual.** Trocar de plano é editar a
+> variável no painel — sem deploy —, mas o gargalo de cada uma é diferente.
+>
+> **`JOB_MAX_ITENS`** (`/jobs/boletos`, `/jobs/cnab/remessas`) é o barato de
+> subir: a chamada responde **202 em ~1s** e o trabalho segue em background. O
+> custo é memória e tempo de fundo.
+>
+> **`LOTE_MAX_ITENS`** (`/api/boleto/multi` e `/api/render/carne`) segura a
+> conexão HTTP até o PDF ficar pronto. Medido no free tier: **200 boletos =
+> 15,9s** no multi (o carnê é mais rápido, 7,7s, porque agrupa 3 por página).
+> Dobrar põe a requisição perto de 30s, onde proxy, balanceador ou o próprio
+> cliente desistem — e o servidor gasta o tempo inteiro montando um PDF que
+> ninguém recebe. **Acima de ~200 o caminho é o job, não um teto maior.**
+>
+> Acima do teto os dois respondem **413** em ~0,5s, sem processar nada.
 
 > **`CREDENTIAL_DB_PATH` e `ARTIFACT_DIR` apontam para `/app/data` de
 > propósito.** O container roda como usuário `app` (não-root) e `/app` pertence
@@ -290,7 +308,8 @@ curl https://sua-url.onrender.com/api/health
 # Se estourar, otimize:
 
 1. Reduzir a concorrência do uvicorn (`--workers 1`, que já é o default do CMD)
-2. Baixar LOTE_MAX_ITENS (default 200) — lote grande de PDF é o maior consumidor
+2. Baixar LOTE_MAX_ITENS (default 200) — vale para /api/boleto/multi E para
+   /api/render/carne; lote grande de PDF é o maior consumidor
 3. Preferir /jobs/boletos (assíncrono, grava em disco) a /api/boleto/multi
    (monta o PDF inteiro em memória)
 4. Considerar upgrade para Starter ($7/mês, 2GB RAM)
