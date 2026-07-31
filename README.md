@@ -193,7 +193,9 @@ Exemplos **reais gerados pela API** (engine pyCobrança, Python puro), um por ba
 </p>
 
 > 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
-> [demo ao vivo](https://boleto-cnab-api.onrender.com/api/docs).
+> [demo ao vivo](https://boleto-cnab-api.onrender.com/api/docs) — instância de
+> demonstração no plano gratuito do Render. A URL vem do nome do serviço e **não é
+> fixa**: na sua instalação, use a que o Render mostrar (veja [DEPLOY.md](./DEPLOY.md)).
 
 ## Por que usar?
 
@@ -450,7 +452,6 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 | Troubleshooting | [docs/api/troubleshooting.md](./docs/api/troubleshooting.md) |
 | Arquitetura | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Roadmap | [roadmap de providers](./docs/development/roadmap-providers.md) |
-| Cliente Python | [python-client/README.md](./python-client/README.md) |
 | Deploy | [DEPLOY.md](./DEPLOY.md) |
 
 ---
@@ -487,11 +488,10 @@ uvicorn app.main:app --reload --port 8000
 | Projeto | O que é |
 |---|---|
 | **[PyCobrança](https://github.com/Maxwbh/pyCobranca)** | A **engine** desta plataforma — boletos, CNAB, PIX e PDF em Python puro. Use direto se sua app é Python. |
-| **[cliente pip](./python-client/README.md)** | SDK Python para consumir esta API por HTTP. |
 | **[coleção Postman](./postman/README.md)** | 98 requests com IDs de rastreabilidade — smoke (<5 min) e regressão completa. |
 | **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB e lote de dentro do banco. |
 | **[exemplos APEX](./examples/apex/)** | Páginas de emissão e de lote com progresso, download de PDF e zip. |
-| **[exemplos Python](./examples/python/)** | Scripts executáveis (boleto, remessa, multi-bancos). |
+| **[exemplos Python](./examples/python/)** | Scripts executáveis que chamam a API por HTTP (boleto, remessa, lote). |
 
 ---
 

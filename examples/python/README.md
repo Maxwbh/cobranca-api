@@ -1,387 +1,89 @@
-# Exemplos Python - Cliente Boleto CNAB
+# Exemplos Python
 
-Exemplos práticos de uso do cliente Python para geração de boletos bancários.
+Scripts executáveis que chamam a **Cobrança-API por HTTP**, com `requests` ou
+`urllib` da biblioteca padrão. Nenhum SDK: o que está aqui serve de ponto de
+partida para escrever o seu consumidor em qualquer linguagem.
+
+> O consumidor da API é um produto separado e não vive neste repositório — veja
+> [separacao-3-produtos.md](../../docs/development/separacao-3-produtos.md).
 
 ## 📋 Pré-requisitos
 
-### 1. Instalar o cliente Python
+### 1. Subir a API
 
 ```bash
-# Via pip (quando publicado)
-pip install cobranca-api-client
-
-# Ou via repositório local
-cd python-client
-pip install -e .
-```
-
-### 2. Iniciar a API
-
-```bash
-# Usando Docker Compose (recomendado)
-docker-compose up -d
-
-# Ou usando Docker direto
-docker build -t cobranca-api .
-docker run -p 8000:8000 cobranca-api
-
-# Ou localmente com Ruby
-bundle install
 docker compose up --build   # serviço único em http://localhost:8000
 ```
 
-### 3. Verificar se a API está rodando
+### 2. Verificar se está no ar
 
 ```bash
 curl http://localhost:8000/api/health
-# Deve retornar: {"status":"OK","timestamp":"..."}
+# {"status":"OK","timestamp":"..."}
 ```
 
-## 🚀 Exemplos Disponíveis
+### 3. Apontar os scripts
 
-### 1. exemplo_basico.py
+A URL está **no topo de cada arquivo**, fixa em `http://localhost:8000`. Para
+rodar contra outro ambiente, edite a constante do script
+(`API_URL` / `REMESSA_URL`).
 
-**Nível:** Iniciante
+## 🚀 Exemplos disponíveis
 
-Demonstra o fluxo completo básico:
-- Conexão com a API
-- Health check
-- Validação de dados
-- Obtenção de dados do boleto
-- Geração de PDF
+| Script | O que faz | Saída |
+|---|---|---|
+| `generate_test_boletos.py` | 12 boletos de C6 e Sicoob (padrão e PIX) via `GET /api/boleto`, para conferência visual | PDFs em `examples/test_output/` |
+| `generate_remessa.py` | Arquivo de remessa CNAB via `POST /api/remessa`, com upload de JSON | `.txt` de remessa |
+| `generate_boleto.py` | Smoke de container: constrói a imagem, sobe, chama `POST /api/boleto/multi` e derruba | nenhuma — checa status 2xx |
 
-**Como executar:**
 ```bash
-python examples/python/exemplo_basico.py
+python examples/python/generate_test_boletos.py
+python examples/python/generate_remessa.py
 ```
 
-**Saída esperada:**
-```
-✅ API Status: ok
-🔍 Validando dados do boleto...
-✅ Dados válidos!
-📊 Obtendo dados do boleto...
-✅ Nosso Número: 123
-✅ Código de Barras: 00190000000000000000...
-✅ Linha Digitável: 00190.00009 00000.000000...
-📄 Gerando PDF do boleto...
-✅ PDF salvo em: boleto_exemplo.pdf
-🎉 Boleto gerado com sucesso!
-```
-
-**Arquivo gerado:** `boleto_exemplo.pdf`
-
----
-
-### 2. exemplo_sicoob.py
-
-**Nível:** Intermediário
-
-Demonstra particularidades do Sicoob:
-- Campos obrigatórios específicos (variacao, convenio)
-- Campo aceite deve ser 'N'
-- linha_digitavel pode retornar None via API (mas aparece no PDF)
-
-**Como executar:**
-```bash
-python examples/python/exemplo_sicoob.py
-```
-
-**Pontos importantes:**
-- ⚠️ Campo `variacao` é OBRIGATÓRIO
-- ⚠️ Campo `convenio` é OBRIGATÓRIO
-- ⚠️ Campo `aceite` DEVE ser 'N'
-- ⚠️ `linha_digitavel` pode ser None via /data (mas está no PDF)
-
-**Arquivo gerado:** `boleto_sicoob.pdf`
-
----
-
-### 3. exemplo_multiplos_bancos.py
-
-**Nível:** Intermediário
-
-Demonstra geração de boletos para múltiplos bancos:
-- Banco do Brasil (001)
-- Sicoob (756)
-- Bradesco (237)
-- Itaú (341)
-- Caixa (104)
-- Santander (033)
-
-**Como executar:**
-```bash
-python examples/python/exemplo_multiplos_bancos.py
-```
-
-**Saída esperada:**
-```
-🏦 Gerando boletos para múltiplos bancos
-📄 Gerando boleto: BANCO_BRASIL
-✅ PDF salvo: boleto_banco_brasil.pdf
-📄 Gerando boleto: SICOOB
-✅ PDF salvo: boleto_sicoob.pdf
-...
-🎉 Processamento concluído!
-```
-
-**Arquivos gerados:**
-- `boleto_banco_brasil.pdf`
-- `boleto_sicoob.pdf`
-- `boleto_bradesco.pdf`
-- `boleto_itau.pdf`
-- `boleto_caixa.pdf`
-- `boleto_santander.pdf`
-
----
-
-### 4. exemplo_tratamento_erros.py
-
-**Nível:** Avançado
-
-Demonstra tratamento robusto de erros:
-- Erros de validação (`BoletoValidationError`)
-- Erros de conexão (`BoletoConnectionError`)
-- Timeouts (`BoletoTimeoutError`)
-- Retry automático
-- Campos específicos por banco
-
-**Como executar:**
-```bash
-python examples/python/exemplo_tratamento_erros.py
-```
-
-**Cenários cobertos:**
-1. Dados inválidos (campos faltando)
-2. API não disponível (conexão falha)
-3. Retry automático (tentativas múltiplas)
-4. Campos específicos do banco (ex: variacao no Sicoob)
-5. Tratamento completo (todos os passos com error handling)
-
-**Ideal para:**
-- Ambientes de produção
-- Integração com sistemas críticos
-- Logging e monitoramento
-
----
-
-## 🔧 Configurações Comuns
-
-### Timeout e Retries
-
-```python
-from cobranca_api import BoletoClient
-
-# Configuração para produção
-client = BoletoClient(
-    base_url='https://sua-api.onrender.com',
-    timeout=30,  # 30 segundos
-    retries=5    # 5 tentativas com backoff exponencial
-)
-```
-
-### Logging Detalhado
-
-```python
-import logging
-
-# Ver todas as requisições HTTP
-logging.basicConfig(level=logging.DEBUG)
-
-# Ou apenas INFO
-logging.basicConfig(level=logging.INFO)
-```
-
-### URL da API
-
-```python
-# Desenvolvimento local
-client = BoletoClient('http://localhost:8000')
-
-# Produção (Render)
-client = BoletoClient('https://boleto-cnab-api.onrender.com')
-
-# Staging
-client = BoletoClient('https://boleto-api-staging.onrender.com')
-```
-
-## 📚 Dados de Teste por Banco
-
-### Banco do Brasil (001)
-
-```python
-{
-    "agencia": "3073",
-    "conta_corrente": "12345678",
-    "convenio": "01234567",  # OBRIGATÓRIO (4-8 dígitos)
-    "carteira": "18",
-    "nosso_numero": "123"
-}
-```
-
-### Sicoob (756)
-
-```python
-{
-    "agencia": "4327",
-    "conta_corrente": "417270",
-    "carteira": "1",
-    "variacao": "01",  # OBRIGATÓRIO
-    "convenio": "229385",  # OBRIGATÓRIO
-    "aceite": "N",  # DEVE ser 'N'
-    "nosso_numero": "7890"
-}
-```
-
-### Bradesco (237)
-
-```python
-{
-    "agencia": "1234",
-    "conta_corrente": "123456",
-    "digito_conta": "7",  # OBRIGATÓRIO
-    "carteira": "09",
-    "nosso_numero": "12345"
-}
-```
-
-### Itaú (341)
-
-```python
-{
-    "agencia": "0057",
-    "conta_corrente": "12345",
-    "digito_conta": "6",
-    "carteira": "175",
-    "nosso_numero": "12345678"
-}
-```
-
-### Caixa (104)
-
-```python
-{
-    "agencia": "1565",
-    "conta_corrente": "123456789",
-    "digito_conta": "1",      # OBRIGATÓRIO
-    "convenio": "654321",     # OBRIGATÓRIO
-    "carteira": "1",          # '1' ou '2' (não aceita 'RG', 'SR', etc)
-    "nosso_numero": "500000000000000"  # 15 dígitos
-}
-```
-
-### Santander (033)
-
-```python
-{
-    "agencia": "0001",
-    "conta_corrente": "1234567",
-    "digito_conta": "8",
-    "carteira": "102",
-    "convenio": "1234567",    # OBRIGATÓRIO
-    "nosso_numero": "12345678"
-}
-```
-
-### Banco C6 (336) — novo em v1.3.0
-
-```python
-{
-    "agencia": "0001",
-    "conta_corrente": "1234567",
-    "carteira": "10",         # APENAS '10' ou '20'
-    "convenio": "100",        # OBRIGATÓRIO
-    "nosso_numero": "12345678"
-    # NÃO envie digito_conta (a API filtra automaticamente)
-}
-```
-
-## ⚠️ Problemas Comuns
-
-### 1. Erro: "API não disponível"
-
-**Causa:** API não está rodando
-
-**Solução:**
-```bash
-docker-compose up -d
-# ou
-docker compose up --build   # serviço único em http://localhost:8000
-```
-
-### 2. Erro: "Dados inválidos"
-
-**Causa:** Campos obrigatórios faltando
-
-**Solução:** Consulte a documentação do banco específico em `docs/fields/`
-
-### 3. Erro: "linha_digitavel is None" (Sicoob)
-
-**Causa:** Comportamento esperado do Sicoob via endpoint /data
-
-**Solução:** A linha digitável sempre aparece no PDF gerado. Use `generate_boleto()` para obter o PDF completo.
-
-### 4. Erro: "numero_documento not found"
-
-**Causa:** A API usa `documento_numero` internamente
-
-**Solução:** Use `numero_documento` no cliente - a conversão é automática:
-```python
-dados = {
-    "numero_documento": "NF-001",  # ✅ Funciona!
-    # A API converte automaticamente para documento_numero
-}
-```
-
-### 5. Erro: "Connection timeout"
-
-**Causa:** API lenta ou timeout muito curto
-
-**Solução:**
-```python
-client = BoletoClient(
-    'http://localhost:8000',
-    timeout=60,  # Aumentar timeout
-    retries=5    # Mais tentativas
-)
-```
-
-## 📖 Próximos Passos
-
-1. **Leia a documentação completa:**
-   - [Documentação da API](../../docs/api/)
-   - [Documentação de Campos](../../docs/fields/)
-   - [README do Cliente Python](../../python-client/README.md)
-
-2. **Execute os exemplos:**
-   ```bash
-   python examples/python/exemplo_basico.py
-   python examples/python/exemplo_sicoob.py
-   python examples/python/exemplo_multiplos_bancos.py
-   python examples/python/exemplo_tratamento_erros.py
-   ```
-
-3. **Adapte para seu uso:**
-   - Substitua dados de teste por dados reais
-   - Ajuste configurações de timeout/retry
-   - Adicione logging customizado
-   - Integre com seu sistema
-
-## 🤝 Contribuindo
-
-Quer adicionar um exemplo? Por favor:
-
-1. Crie um arquivo `exemplo_seu_caso.py`
-2. Adicione comentários explicativos
-3. Documente neste README
-4. Teste antes de commitar
-5. Abra um Pull Request
+> `generate_boleto.py` roda `docker build`/`docker run`/`docker rm` — precisa de
+> Docker e da porta 8000 livre, e não deve ser apontado para um ambiente que
+> você não queira derrubar.
+
+## 📚 Dados de teste por banco
+
+Os campos obrigatórios variam por banco. Os payloads prontos e validados estão
+em [`postman/fixtures/sample_data.json`](../../postman/fixtures/sample_data.json)
+— sete bancos, com CPF/CNPJ de DV válido, e é a mesma fonte que a coleção
+Postman usa. A referência campo a campo está em
+[`docs/fields/`](../../docs/fields/).
+
+Armadilhas mais comuns:
+
+- **Sicoob (756)** — `variacao` e `convenio` são obrigatórios; `aceite` tem de
+  ser `'N'`; `linha_digitavel` pode voltar `null` em `/api/boleto/data`, mas
+  aparece no PDF.
+- **Caixa (104)** — `carteira` aceita só `'1'` ou `'2'`; `nosso_numero` tem 15
+  dígitos.
+- **C6 (336)** — `carteira` aceita só `'10'` ou `'20'`; não envie
+  `digito_conta`.
+- **Instruções** — `instrucoes` é uma **lista de linhas**, no máximo 7, cada
+  uma com até 100 caracteres. Acima do limite a API responde 422.
+- **`template`** — só `classico` ou `moderno`. Carnê **não** é template: é o
+  endpoint `POST /api/render/carne`, que recebe a lista de parcelas.
+
+## ⚠️ Erros frequentes
+
+| Sintoma | Causa | O que fazer |
+|---|---|---|
+| Conexão recusada | API não está no ar | `docker compose up --build` |
+| `422` com lista de campos | Campo obrigatório do banco faltando | Confira `docs/fields/` |
+| `422 item_id duplicado` | Dois itens do lote com o mesmo identificador | Corrija o payload — seriam o mesmo título emitido duas vezes |
+| `413` | Lote acima de `LOTE_MAX_ITENS` | Quebre o lote ou ajuste a variável de ambiente |
+| Timeout no primeiro request | Free tier do Render hiberna | Repita — a primeira chamada leva ~50s |
+
+## 📖 Próximos passos
+
+- [Documentação da API](../../docs/api/)
+- [Documentação de campos](../../docs/fields/)
+- [Coleção Postman](../../postman/README.md)
+- [Exemplos Oracle PL/SQL](../oracle/) e [Oracle APEX](../apex/)
 
 ## 📝 Licença
 
-MIT License - veja [LICENSE](../../LICENSE)
-
----
-
-**Última atualização:** 2026-06-17
-**Versão:** 1.5.0
+MIT License — veja [LICENSE](../../LICENSE)

@@ -92,9 +92,6 @@ if [ -f CHANGELOG.md ]; then
 fi
 
 echo ""
-echo -e "${YELLOW}⚠️  O cliente pip NÃO foi tocado${NC} — versiona à parte, em"
-echo "   python-client/cobranca_api/__init__.py (veja separacao-3-produtos.md)."
-echo ""
 echo -e "${YELLOW}📝 Próximos passos:${NC}"
 echo "1. Mova as entradas de [Não lançado] para a seção [${NEW_VERSION}] no CHANGELOG.md"
 echo "2. Rode a suíte:"

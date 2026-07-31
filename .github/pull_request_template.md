@@ -31,7 +31,6 @@ Bancos afetados: <!-- ex: C6 (336), Sicoob (756), todos, nenhum -->
 ## ✅ Checklist
 
 - [ ] `cd gateway && PYTHONPATH=. pytest` passa
-- [ ] `cd python-client && pytest` passa (se o cliente mudou)
 - [ ] Endpoint novo/alterado tem cobertura na coleção Postman (`python postman/check_coverage.py` = 100%)
 - [ ] Specs OpenAPI continuam válidas (o CI valida a 3.0 offline e a 3.1 do gateway)
 - [ ] `CHANGELOG.md` atualizado em **[Não lançado]**

@@ -21,7 +21,7 @@ DECLARE
   l_chunk     VARCHAR2(32767);
   l_nome      VARCHAR2(100) := 'CB' || TO_CHAR(SYSDATE, 'DDMM') || '01.REM';
 BEGIN
-  cobranca_api.g_base_url := 'https://boleto-cnab-api.onrender.com';
+  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
 
   ------------------------------------------------------------------------
   -- 1) Cabecalho da remessa + os titulos

@@ -15,7 +15,7 @@ DECLARE
   l_json      CLOB;
   l_baixados  PLS_INTEGER := 0;
 BEGIN
-  cobranca_api.g_base_url := 'https://boleto-cnab-api.onrender.com';
+  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
 
   ------------------------------------------------------------------------
   -- 1) Le o .RET do diretorio do banco

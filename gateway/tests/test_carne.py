@@ -107,3 +107,34 @@ def test_limite_do_carne_e_o_mesmo_do_multi(client, monkeypatch):
     assert routers.offline.LOTE_MAX == 3
     monkeypatch.delenv("LOTE_MAX_ITENS")
     importlib.reload(routers.offline)
+
+
+# O carne ACEITAVA parcela duplicada e imprimia a duplicata: bloco de 12 com a
+# 8a copiando a 5a saia com 12 paginas e 11 documentos distintos. Em reemissao
+# de contrato (blocos de 12/24/36 remontados a cada ciclo) e o erro mais
+# provavel -- e o efeito e a parcela sobrescrita nunca ser cobrada.
+def test_carne_recusa_parcela_duplicada(client):
+    bloco = _boletos(12)
+    bloco[7] = dict(bloco[4])            # parcela 8 vira copia da 5
+    r = client.post("/api/render/carne",
+                    json={"bank": "banco_brasil", "boletos": bloco})
+    assert r.status_code == 422, r.text
+    dup = r.json()["duplicados"]
+    assert dup == [{"item_id": "CAR-0004", "indices": [4, 7]}]
+
+
+def test_carne_sem_duplicata_continua_aceito(client):
+    r = client.post("/api/render/carne",
+                    json={"bank": "banco_brasil", "boletos": _boletos(12)})
+    assert r.status_code == 200, r.text
+    assert r.json()["pdf_base64"]
+
+
+def test_carne_sem_identificador_nao_acusa_duplicidade(client):
+    # Sem external_id/seu_numero/numero_documento o id cai no indice, que nunca
+    # colide. Comportamento anterior, preservado.
+    base = {k: v for k, v in _DADOS_LOTE.items()}
+    r = client.post("/api/render/carne", json={
+        "bank": "banco_brasil",
+        "boletos": [dict(base, nosso_numero=str(40000 + i)) for i in range(3)]})
+    assert r.status_code == 200, r.text

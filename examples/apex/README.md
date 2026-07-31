@@ -15,7 +15,7 @@ dependência externa, sem PL/SQL de baixo nível e sem travar a sessão.
 
 1. **ACL de rede** — ver [`../oracle/acl_setup.sql`](../oracle/acl_setup.sql).
    No **Autonomous Database** a wallet já vem pronta; basta a ACL do host.
-2. **Application Item** `G_COBRANCA_API_URL` = `https://boleto-cnab-api.onrender.com`
+2. **Application Item** `G_COBRANCA_API_URL` = `https://SEU-SERVICO.onrender.com`
    (e `G_TENANT_ID` se for usar as rotas online/lote).
 3. Cole os blocos dos arquivos nos Processes/Regions indicados nos comentários.
 

@@ -71,8 +71,17 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://boleto-cnab-api.onrender.com
-    description: Produção/HML (serviço único no Render.com)
+  # A URL do Render vem do NOME do serviço e muda se ele for renomeado,
+  # recriado ou apontado para domínio próprio — por isso é variável de servidor
+  # e não host fixo. No Swagger UI, edite o valor antes do "Try it out".
+  - url: "{base_url}"
+    description: Sua instância do serviço
+    variables:
+      base_url:
+        default: https://boleto-cnab-api.onrender.com
+        description: >-
+          Base URL da sua instância. O valor padrão é a demo pública, no plano
+          gratuito do Render — hiberna após 15 min e não é ambiente de produção.
   - url: http://localhost:8000
     description: Local — serviço único (docker compose up; FastAPI + pyCobranca)
 

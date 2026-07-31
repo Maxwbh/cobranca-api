@@ -87,17 +87,17 @@ O Render irá:
 
 ## ✅ Verificar Deploy
 
-Após o deploy, você terá uma URL como:
+Após o deploy, você terá uma URL derivada do nome do serviço:
 
 ```
-https://boleto-cnab-api.onrender.com
+https://<nome-do-servico>.onrender.com
 ```
 
 **Testar:**
 
 ```bash
 # Health check
-curl https://boleto-cnab-api.onrender.com/api/health
+curl https://SEU-SERVICO.onrender.com/api/health
 
 # Deve retornar:
 {"status":"OK","timestamp":"2026-06-17T12:00:00-03:00"}
@@ -293,7 +293,7 @@ Dashboard → Deploy Logs
 
 ```bash
 # Verificar se está em sleep
-curl https://sua-url.onrender.com/api/health
+curl https://SEU-SERVICO.onrender.com/api/health
 
 # Primeira requisição ~30-60s = Normal (wake-up)
 # Se sempre lento, verificar:
@@ -348,18 +348,45 @@ Dashboard → Service → Settings → Plan → Starter
 
 ---
 
+## 🌐 A URL do Render não é fixa
+
+O Render deriva o hostname do **nome do serviço**: `<nome>.onrender.com`. Ela
+muda quando você renomeia o serviço, quando o recria (blueprint novo, conta
+nova) e quando aponta um domínio próprio. Não há garantia de estabilidade — o
+`render.yaml` deste repositório declara `name: cobranca-api`, e a instância de
+demonstração citada no README responde por outro nome, criado antes de o projeto
+ser renomeado.
+
+Por isso **a URL não está cravada em lugar nenhum que quebre em silêncio**. Onde
+ela é necessária, sai de configuração:
+
+| Onde | Como definir |
+|---|---|
+| Regressão HML (Actions) | Variável de repo `HML_BASE_URL`, ou `base_url` no dispatch. Sem ela, o job falha explicando. |
+| Keepalive (Actions) | Variável de repo `KEEPALIVE_URLS` (lista separada por espaço) |
+| Coleção Postman | `base_url` do environment, ou `COB_BASE_URL` via `--env-var` |
+| `scripts/benchmark_lote.py` | `COB_BASE_URL`, ou `--base-url`. Padrão: `http://localhost:8000` |
+| Swagger UI (`docs/openapi.yaml`) | Variável de servidor `base_url`, editável na própria página |
+| Oracle PL/SQL | `cobranca_api.g_base_url` + o host no ACL (`acl_setup.sql`) |
+| Oracle APEX | Application Item `G_COBRANCA_API_URL` |
+
+Nos exemplos e guias, `https://SEU-SERVICO.onrender.com` é **placeholder** —
+troque pelo hostname que o Render mostrar no topo do seu serviço.
+
+---
+
 ## 🔗 URLs Úteis
 
 Após deploy, você terá:
 
 ```bash
 # URL pública
-https://boleto-cnab-api.onrender.com
+https://SEU-SERVICO.onrender.com
 
 # Endpoints
-https://boleto-cnab-api.onrender.com/api/health
-https://boleto-cnab-api.onrender.com/api/boleto
-https://boleto-cnab-api.onrender.com/api/boleto/data
+https://SEU-SERVICO.onrender.com/api/health
+https://SEU-SERVICO.onrender.com/api/boleto
+https://SEU-SERVICO.onrender.com/api/boleto/data
 
 # Dashboard
 https://dashboard.render.com/web/[seu-service-id]

@@ -232,7 +232,6 @@ postman/               # 98 requests com IDs de rastreabilidade
 | Guias por banco | [development/](./development/) |
 | Jobs em lote | [development/plano-jobs-lote.md](./development/plano-jobs-lote.md) |
 | Campos do boleto | [fields/README.md](./fields/README.md) |
-| Cliente Python | [../python-client/README.md](../python-client/README.md) |
 | Engine | [PyCobrança](https://github.com/Maxwbh/pyCobranca) |
 
 ---
