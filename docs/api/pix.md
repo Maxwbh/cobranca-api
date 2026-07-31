@@ -1,6 +1,6 @@
 # PIX Híbrido no Boleto
 
-> **Versão:** 2.0.0 (engine pyCobrança)
+> **Versão:** 2.1.0 (engine pyCobrança)
 
 ## Campos PIX do boleto
 

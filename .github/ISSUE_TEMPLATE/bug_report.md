@@ -27,7 +27,7 @@ Uma descrição clara do que acontece atualmente.
 ## 📋 Informações do Ambiente
 
 **API:**
-- Versão: [ex: 2.0.0] (veja o arquivo `VERSION` ou `GET /api/metadata`)
+- Versão: [ex: 2.1.0] (veja o arquivo `VERSION` ou `GET /api/metadata`)
 - Ambiente: [ex: Docker, local, Render]
 - Python: [ex: 3.12.3]
 - Engine pyCobrança: [ex: 1.0.2] (veja `GET /api/metadata`)

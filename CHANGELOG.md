@@ -7,6 +7,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [2.1.0] - 2026-07-31
+
 ### Corrigido
 - **CI não rodava**: o workflow `Build` disparava em `master`, mas o branch
   default do repositório é `main` — nenhum push executava a suíte. O gate do
@@ -29,6 +31,19 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `/tree/master/docs/development` — 404, já que o branch default é `main`.
   Mesma troca em `DEPLOY.md`, `CONTRIBUTING.md` e `scripts/README.md`, que
   ainda mandavam `git push origin master`.
+- **`render.yaml` fazia deploy de um branch inexistente** (`branch: master`),
+  então o `autoDeploy: true` nunca disparava.
+- **5 links `/blob/master/` e `/tree/master/` no `docs/openapi.yaml`** —
+  CHANGELOG, guias por banco, validação de campos e encargos. Todos 404, e
+  todos servidos no Swagger público.
+- **`scripts/bump-version.sh` não funcionava**: escrevia em
+  `python-client/boleto_cnab_client/__init__.py` (pacote que não existe — é
+  `cobranca_api`), procurava `## [Unreleased]` num CHANGELOG que usa
+  `## [Não lançado]`, e não tocava em `app.version` nem na spec OpenAPI. Na
+  prática só alterava o arquivo `VERSION`. Reescrito para cobrir os quatro
+  pontos e falhar em vez de seguir em silêncio.
+- Exemplo de issue no `CONTRIBUTING.md` mostrava um erro **Ruby**
+  (`NoMethodError`), linguagem removida do projeto na 2.0.0.
 
 ### Adicionado
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 1.4), `.github/pull_request_template.md`

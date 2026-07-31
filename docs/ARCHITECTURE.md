@@ -1,6 +1,6 @@
 # Arquitetura da Cobranca-API
 
-> **Versão:** 2.0.0 — serviço único, 100% Python.
+> **Versão:** 2.1.0 — serviço único, 100% Python.
 
 Como o serviço é montado por dentro: camadas, módulos, fluxo de uma
 requisição e as decisões que explicam por que está assim.
@@ -212,7 +212,7 @@ postman/               # 98 requests com IDs de rastreabilidade
 
 ## Números
 
-| | v2.0.0 |
+| | v2.1.0 |
 |---|---|
 | Linguagem | 100% Python |
 | Processos no container | 1 |

@@ -16,8 +16,8 @@ services:
     # Deploy automático
     autoDeploy: true
 
-    # Deploy segue a master (v2.0.0 em diante).
-    branch: master
+    # Deploy segue a main (v2.0.0 em diante).
+    branch: main
 
     # Health check do gateway (o /api/health é servido pela engine embutida)
     healthCheckPath: /health

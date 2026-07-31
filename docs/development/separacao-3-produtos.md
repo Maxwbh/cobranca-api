@@ -11,7 +11,7 @@ nomes que existia até a v1.5.0.
 
 | # | Produto | Onde vive | Papel | Versão |
 |---|---|---|---|---|
-| 1 | **Cobranca-API** (Python/FastAPI) | `gateway/` | O **serviço**: gateway online (C6, Sicoob), cofre de credenciais multi-tenant, jobs em lote, webhooks — e a superfície offline `/api/*`, servida **in-process** | `app.version` (2.0.0) |
+| 1 | **Cobranca-API** (Python/FastAPI) | `gateway/` | O **serviço**: gateway online (C6, Sicoob), cofre de credenciais multi-tenant, jobs em lote, webhooks — e a superfície offline `/api/*`, servida **in-process** | `app.version` (2.1.0) |
 | 2 | **Cliente pip** (Python) | `python-client/` | SDK para consumir a **API** por HTTP a partir de qualquer app Python | `cobranca_api.__version__` |
 | 3 | **PyCobrança** (engine) | [repositório próprio](https://github.com/Maxwbh/pyCobranca) | **Renderização e formato**: boleto PDF, carnê 3 vias, remessa/retorno CNAB 240/400, PIX-QR — 18 bancos, offline | dependência em `gateway/requirements.txt` |
 

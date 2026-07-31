@@ -35,8 +35,8 @@ info:
     ```
 
     **Links:** [Repositório](https://github.com/Maxwbh/cobranca-api) ·
-    [CHANGELOG](https://github.com/Maxwbh/cobranca-api/blob/master/CHANGELOG.md) ·
-    [Guias por banco](https://github.com/Maxwbh/cobranca-api/tree/master/docs/development)
+    [CHANGELOG](https://github.com/Maxwbh/cobranca-api/blob/main/CHANGELOG.md) ·
+    [Guias por banco](https://github.com/Maxwbh/cobranca-api/tree/main/docs/development)
 
     ## Funcionalidades
 
@@ -61,7 +61,7 @@ info:
     | Unicred | 136 | ✅ | ✅ | ✅ | — |
     | Ailos | 085 | ✅ | ✅ | ❌ | — |
 
-  version: 2.0.0
+  version: 2.1.0
   contact:
     name: Maxwell da Silva Oliveira
     email: maxwbh@gmail.com
@@ -185,7 +185,7 @@ paths:
         Valida os dados sem gerar o arquivo. Em erro devolve **400** com
         `validation_errors` — uma **lista**, um item por campo violado.
         Regras por banco (tipos/tamanhos/carteiras/especiais) em
-        [validacao-campos.md](https://github.com/Maxwbh/cobranca-api/blob/master/docs/api/validacao-campos.md).
+        [validacao-campos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/validacao-campos.md).
       operationId: validateBoleto
       parameters:
         - name: bank
@@ -605,7 +605,7 @@ paths:
         > cobrados na unidade errada — R\$ 50 lido como 50%). Bancos onde a
         > multa vai por instrução (BB e Itaú no 400) não têm posição de multa.
 
-        📖 **Guia completo com a matriz por banco:** [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/master/docs/api/encargos.md)
+        📖 **Guia completo com a matriz por banco:** [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/encargos.md)
 
         > **Campo não reconhecido responde 400** com a dica do trio correto.
         > Antes era descartado em silêncio: a API devolvia 200 e o arquivo ia
@@ -1134,7 +1134,7 @@ components:
             version:
               type: string
               description: Versão da Cobranca-API
-              example: '2.0.0'
+              example: '2.1.0'
             engine:
               type: string
               example: python
@@ -1564,7 +1564,7 @@ components:
         **Encargos** (multa, juros/mora, desconto, IOF, abatimento) são
         opcionais e seguem o modelo de **trio** código/tipo → valor → data.
         A unidade (% ou R$) e o suporte variam por banco/layout: veja o guia
-        [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/master/docs/api/encargos.md).
+        [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/encargos.md).
       required:
         - nosso_numero
         - data_vencimento

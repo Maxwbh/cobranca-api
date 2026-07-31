@@ -58,7 +58,7 @@ TAGS = [
 
 app = FastAPI(
     title="Cobranca-API",
-    version="2.0.0",
+    version="2.1.0",
     docs_url=None,  # /docs customizado abaixo (tema visual da plataforma)
     openapi_tags=TAGS,
     description=(

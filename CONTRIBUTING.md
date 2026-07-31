@@ -47,20 +47,22 @@ Encontrou um bug? Por favor:
 
 **Exemplo de boa issue:**
 ```
-Título: NoMethodError ao gerar boleto Bradesco
+Título: 500 ao gerar boleto Bradesco com carteira 09
 
 Descrição:
-Ao tentar gerar boleto do Bradesco, recebo NoMethodError.
+Ao gerar boleto do Bradesco na carteira 09, a API responde 500
+em vez de um erro de validação.
 
 Passos para reproduzir:
 1. POST /api/boleto
-2. bank=bradesco
+2. banco=bradesco, carteira=09
 3. Dados: {...}
 
 Erro:
-NoMethodError: undefined method 'xyz'
+AttributeError: 'BradescoProvider' object has no attribute 'xyz'
 
-Versão da API: 2.0.0   (GET /api/metadata)
+Versão da API: 2.1.0   (GET /api/metadata)
+Engine pyCobrança: 1.0.2
 Python: 3.12
 Docker: Sim
 ```

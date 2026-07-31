@@ -1,6 +1,6 @@
 # Documentação — Cobranca-API
 
-> **Versão:** 2.0.0 — plataforma **100% Python** (engine [pyCobrança](https://github.com/Maxwbh/pyCobranca))
+> **Versão:** 2.1.0 — plataforma **100% Python** (engine [pyCobrança](https://github.com/Maxwbh/pyCobranca))
 
 Documentação técnica da **Cobranca-API** — plataforma REST de cobrança bancária: gateway para as APIs dos bancos, emissão de boletos, CNAB (remessa/retorno), Pix e parsing de extratos OFX.
 
