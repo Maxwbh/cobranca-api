@@ -1,0 +1,29 @@
+# GitHub Pages (Jekyll) — fonte: branch `main`, pasta `/docs`.
+#
+# Serve a documentação que já existe como Markdown num endereço público
+# (maxwbh.github.io/cobranca-api). O ganho não é estético: página HTML em
+# domínio próprio é indexada pelo Google, enquanto `.md` dentro de repo
+# praticamente não aparece em busca.
+title: Cobranca-API
+description: >-
+  Cobrança bancária brasileira em API REST: boleto, CNAB 240/400, Pix,
+  Pix Automático e OFX. 18 bancos, 100% Python, um container.
+theme: jekyll-theme-cayman
+lang: pt-BR
+
+# `development/` são notas internas de planejamento (roadmaps, planos de
+# migração, estudos por banco). Ficam versionadas e legíveis no repositório,
+# mas não entram no site: documentação pública que mistura plano interno com
+# referência de uso confunde quem chega para integrar.
+exclude:
+  - development/
+  - openapi.yaml
+
+# Sem Gemfile: o Pages usa a versão hospedada do Jekyll. Se um dia o site
+# precisar de plugin fora da allowlist do GitHub, aí sim entra build próprio
+# via Actions.
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: false
