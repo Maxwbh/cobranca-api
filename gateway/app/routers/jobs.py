@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
@@ -149,6 +150,35 @@ def _item_id(item: dict[str, Any], indice: int) -> str:
                or item.get("numero_documento") or indice)
 
 
+def _itens_e_duplicados(
+    itens_brutos: list[dict[str, Any]],
+    id_de: Callable[[dict[str, Any], int], str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Monta os itens do job e denuncia identificadores repetidos.
+
+    `item_id` é a identidade do item na API (`/items/{item_id}`) e metade da
+    chave primária de `job_items`. Dois itens com o mesmo identificador não são
+    endereçáveis individualmente — e, antes desta checagem, o INSERT estourava
+    `IntegrityError` e o cliente recebia **500** sem saber o que corrigir.
+
+    A colisão é fácil de não notar: `_item_id` só cai no índice (sempre único)
+    quando o item não traz `external_id`, `seu_numero` nem `numero_documento`.
+    Lote real costuma trazer o número do documento — e repeti-lo é plausível.
+    """
+    itens: list[dict[str, Any]] = []
+    primeiro_indice: dict[str, int] = {}
+    repetidos: dict[str, list[int]] = {}
+    for indice, bruto in enumerate(itens_brutos):
+        item_id = id_de(bruto, indice)
+        if item_id in primeiro_indice:
+            repetidos.setdefault(item_id, [primeiro_indice[item_id]]).append(indice)
+        else:
+            primeiro_indice[item_id] = indice
+        itens.append({"item_id": item_id, "indice": indice})
+    duplicados = [{"item_id": k, "indices": v} for k, v in sorted(repetidos.items())]
+    return itens, duplicados
+
+
 def _processar(job_id: str, tenant_id: str, boletos: list[dict[str, Any]],
                template: str) -> None:
     """Worker (BackgroundTasks): renderiza item a item e persiste o resultado."""
@@ -224,8 +254,15 @@ async def criar_job_boletos(
                 "job_id": existente, "status": job["status"], "total": job["total"],
                 "idempotent_replay": True, "self": f"/jobs/boletos/{existente}"})
 
+    itens, duplicados = _itens_e_duplicados(boletos, _item_id)
+    if duplicados:
+        return JSONResponse(status_code=422, content={
+            "error": "Itens com identificador duplicado no lote",
+            "hint": "o item_id vem de external_id, seu_numero ou numero_documento —"
+                    " cada item do lote precisa de um valor distinto",
+            "duplicados": duplicados})
+
     job_id = js.novo_job_id()
-    itens = [{"item_id": _item_id(b, i), "indice": i} for i, b in enumerate(boletos)]
     store.criar({"job_id": job_id, "tenant_id": tenant_id, "tipo": "boletos",
                  "status": js.JOB_RECEIVED, "total": len(boletos),
                  "idempotency_key": idempotency_key, "criado_em": js.agora(),
@@ -394,8 +431,17 @@ async def criar_job_remessas(
                 "idempotent_replay": True, "self": f"/jobs/cnab/remessas/{existente}"})
 
     sublotes = pycob.agrupar_sublotes(titulos)
+    # `sublote_id` sai do agrupamento e deve ser único por construção. A
+    # checagem fica como rede: se o agrupamento mudar e passar a repetir, o
+    # cliente recebe 422 explicando, em vez de 500 vindo do banco.
+    itens, duplicados = _itens_e_duplicados(sublotes, lambda s, _i: str(s["sublote_id"]))
+    if duplicados:
+        return JSONResponse(status_code=422, content={
+            "error": "Sublotes com identificador duplicado",
+            "hint": "falha no agrupamento determinístico de títulos — reporte o caso",
+            "duplicados": duplicados})
+
     job_id = js.novo_job_id()
-    itens = [{"item_id": s["sublote_id"], "indice": i} for i, s in enumerate(sublotes)]
     store.criar({"job_id": job_id, "tenant_id": tenant_id, "tipo": "cnab_remessas",
                  "status": js.JOB_RECEIVED, "total": len(sublotes),
                  "idempotency_key": idempotency_key, "criado_em": js.agora(),

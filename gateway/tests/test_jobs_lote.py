@@ -248,3 +248,47 @@ def test_metricas_do_job(client):
     j = client.get(f"/jobs/boletos/{job_id}", params={"tenant_id": "empresa1"}).json()
     assert j["metricas"]["duracao_ms"] >= 0
     assert j["metricas"]["ms_por_item"] >= 0
+
+
+# O payload que derrubou a produção: itens distintos (nosso_numero diferente)
+# mas com o MESMO numero_documento. O `_item_id` deriva de numero_documento
+# quando não há external_id/seu_numero, os dois itens colidem na chave primária
+# de job_items e o INSERT estourava IntegrityError -> 500.
+#
+# O DADOS_BB dos testes acima não tem numero_documento, então cai no índice
+# (sempre único) — foi por isso que a suíte não pegou.
+DADOS_COM_DOC = {**DADOS_BB, "numero_documento": "CTR-2025-001"}
+
+
+def test_lote_com_numero_documento_repetido_responde_422_e_nao_500(client):
+    body = {"tenant_id": "empresa1", "boletos": [
+        DADOS_COM_DOC, {**DADOS_COM_DOC, "nosso_numero": "124"}]}
+    r = client.post("/jobs/boletos", json=body)
+    assert r.status_code == 422, r.text
+    corpo = r.json()
+    assert corpo["duplicados"] == [{"item_id": "CTR-2025-001", "indices": [0, 1]}]
+
+
+def test_lote_com_external_id_repetido_responde_422(client):
+    # external_id tem precedência sobre numero_documento na derivação do id.
+    body = {"tenant_id": "empresa1", "boletos": [
+        {**DADOS_BB, "external_id": "x"}, {**DADOS_BB, "external_id": "x"}]}
+    r = client.post("/jobs/boletos", json=body)
+    assert r.status_code == 422, r.text
+    assert r.json()["duplicados"] == [{"item_id": "x", "indices": [0, 1]}]
+
+
+def test_lote_com_numero_documento_distinto_segue_aceito(client):
+    body = {"tenant_id": "empresa1", "boletos": [
+        DADOS_COM_DOC, {**DADOS_COM_DOC, "numero_documento": "CTR-2025-002"}]}
+    r = client.post("/jobs/boletos", json=body)
+    assert r.status_code == 202, r.text
+    assert r.json()["recebidos"] == 2
+
+
+def test_item_sem_identificador_continua_caindo_no_indice(client):
+    # Dois itens idênticos e sem external_id/seu_numero/numero_documento não
+    # colidem: o id vira o índice. Comportamento anterior, preservado.
+    body = {"tenant_id": "empresa1", "boletos": [DADOS_BB, DADOS_BB]}
+    r = client.post("/jobs/boletos", json=body)
+    assert r.status_code == 202, r.text
