@@ -7,5 +7,5 @@ cryptography>=42.0
 psycopg[binary]>=3.1
 pycobranca>=1.0.2,<2  # engine offline (100% Python) — PyPI, não git@main: build reprodutível
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
-pyyaml>=6.0       # spec OpenAPI do offline
+pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)
