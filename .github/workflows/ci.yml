@@ -19,6 +19,16 @@ permissions:
   contents: read
   packages: write
 
+# Push seguido de push na mesma ref: o run anterior seguia até o fim à toa,
+# ocupando runner por um commit que já não é o topo.
+#
+# `main` fica de fora do cancelamento de propósito: lá o job publica a imagem
+# no ghcr.io, e cancelar no meio deixaria a tag `latest` valendo um commit
+# antigo sem ninguém perceber.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,6 +38,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          # O passo de instalação levava ~19s dos ~70s do job baixando sempre
+          # as mesmas rodas. O cache é o do pip (`~/.cache/pip`), não o dos
+          # pacotes instalados: o `pip install` continua rodando, mas resolve
+          # do disco em vez da rede.
+          #
+          # A chave sai do hash destes arquivos — precisam ser TODOS os que
+          # alimentam o passo de instalação, senão o cache invalida de menos.
+          cache: pip
+          cache-dependency-path: |
+            gateway/requirements.txt
+            gateway/requirements-dev.txt
+            python-client/pyproject.toml
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to ghcr.io
