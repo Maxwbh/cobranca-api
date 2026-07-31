@@ -213,6 +213,31 @@ O Render fornece automaticamente:
 > os artefatos logo após a conclusão do job. Para persistir o cofre, aponte
 > `SUPABASE_DB_URL`/`DATABASE_URL` para um Postgres.
 
+> **`LOG_LEVEL`** vira o `--log-level` do uvicorn. Valores aceitos:
+> `critical`, `error`, `warning`, `info` (default), `debug`, `trace` — a caixa
+> não importa, `INFO` e `info` dão no mesmo. Valor fora dessa lista **não
+> derruba o serviço**: o container avisa no log e assume `info`.
+
+### Sobras de configuração da v1 (Ruby)
+
+Serviço que existe desde antes da 2.0.0 pode ter, no painel, variáveis do
+runtime Ruby que **não fazem mais nada** — o container hoje é uvicorn, não
+Puma:
+
+| Variável | Era de |
+|---|---|
+| `PUMA_WORKERS`, `PUMA_MAX_THREADS`, `PUMA_MIN_THREADS` | Puma, o servidor web do Ruby |
+| `RACK_ENV` | Rack |
+| `RUBY_GC_HEAP_GROWTH_FACTOR` | GC do Ruby |
+
+Pode apagar todas. `MALLOC_ARENA_MAX` **não** entra nessa lista: é do glibc,
+vale para qualquer processo (inclusive Python) e ajuda a segurar o RSS nos
+512 MB do free tier.
+
+Confira também o `PORT`: um serviço herdado da v1 costuma estar em `9292`,
+a porta do antigo Banking Core Ruby. Qualquer porta funciona — o Render roteia
+para a que o processo escuta — mas `8000` é o que este blueprint declara.
+
 ### Adicionar Novas:
 
 **Via Dashboard:**
