@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Cobranca-API — plataforma open source de cobrança bancária: boleto, Pix, CNAB e OFX para 18 bancos brasileiros, 100% Python">
+  <!--
+    Social preview do GitHub (Settings > General > Social preview): 1280x640.
+    O banner.svg tem 1200x270 e não serve reescalado — o GitHub recorta para
+    2:1 e cortaria o texto. Mesma paleta e mesmos motivos, recompostos.
+
+    Sem cantos arredondados de propósito: o preview é recortado como retângulo
+    cheio pelo GitHub, Slack e Twitter/X, e o raio viraria uma borda estranha.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="0.55" stop-color="#1E40AF"/>
+      <stop offset="1" stop-color="#3B5A82"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#fade)"/>
+
+  <!-- código de barras (boleto), à direita e sangrando para baixo -->
+  <g opacity="0.4">
+    <rect x="968"  y="404" width="6"  height="236" fill="#FFFFFF" opacity="0.85"/>
+    <rect x="980"  y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.55"/>
+    <rect x="989"  y="404" width="10" height="236" fill="#FFFFFF" opacity="0.9"/>
+    <rect x="1005" y="404" width="4"  height="236" fill="#06B6D4"/>
+    <rect x="1015" y="404" width="7"  height="236" fill="#FFFFFF" opacity="0.75"/>
+    <rect x="1028" y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="1037" y="404" width="12" height="236" fill="#FFFFFF" opacity="0.9"/>
+    <rect x="1055" y="404" width="5"  height="236" fill="#06B6D4"/>
+    <rect x="1066" y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.6"/>
+    <rect x="1075" y="404" width="8"  height="236" fill="#FFFFFF" opacity="0.85"/>
+    <rect x="1089" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="1099" y="404" width="10" height="236" fill="#FFFFFF" opacity="0.9"/>
+    <rect x="1115" y="404" width="3"  height="236" fill="#06B6D4"/>
+    <rect x="1124" y="404" width="6"  height="236" fill="#FFFFFF" opacity="0.7"/>
+    <rect x="1136" y="404" width="12" height="236" fill="#FFFFFF" opacity="0.9"/>
+    <rect x="1154" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.55"/>
+    <rect x="1164" y="404" width="8"  height="236" fill="#FFFFFF" opacity="0.8"/>
+    <rect x="1178" y="404" width="3"  height="236" fill="#06B6D4"/>
+    <rect x="1187" y="404" width="7"  height="236" fill="#FFFFFF" opacity="0.85"/>
+    <rect x="1200" y="404" width="10" height="236" fill="#FFFFFF" opacity="0.75"/>
+    <rect x="1216" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.5"/>
+    <rect x="1226" y="404" width="9"  height="236" fill="#FFFFFF" opacity="0.9"/>
+  </g>
+
+  <!-- losango Pix -->
+  <g transform="translate(1090,168) rotate(45)" opacity="0.9">
+    <rect x="-44" y="-44" width="88" height="88" rx="16" fill="none" stroke="#06B6D4" stroke-width="9"/>
+    <rect x="-15" y="-15" width="30" height="30" rx="6" fill="#06B6D4"/>
+  </g>
+
+  <text x="96" y="212" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="96" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">Cobranca-API</text>
+
+  <rect x="99" y="248" width="250" height="8" rx="4" fill="#06B6D4"/>
+
+  <text x="96" y="330" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="600" fill="#E2E8F0">Cobrança bancária brasileira</text>
+  <text x="96" y="382" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="34" font-weight="400" fill="#CBD5E1">Boleto · Pix · Pix Automático · CNAB · OFX</text>
+
+  <!-- números: o que diferencia, em vez de adjetivo -->
+  <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
+    <text x="96"  y="486" font-size="52" font-weight="700" fill="#FFFFFF">18</text>
+    <text x="96"  y="520" font-size="20" font-weight="400" fill="#94A3B8">bancos</text>
+
+    <text x="250" y="486" font-size="52" font-weight="700" fill="#FFFFFF">100%</text>
+    <text x="250" y="520" font-size="20" font-weight="400" fill="#94A3B8">Python</text>
+
+    <text x="446" y="486" font-size="52" font-weight="700" fill="#FFFFFF">1</text>
+    <text x="446" y="520" font-size="20" font-weight="400" fill="#94A3B8">container</text>
+
+    <text x="606" y="486" font-size="52" font-weight="700" fill="#06B6D4">MIT</text>
+    <text x="606" y="520" font-size="20" font-weight="400" fill="#94A3B8">open source</text>
+  </g>
+
+  <text x="96" y="586" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="22" font-weight="400" fill="#94A3B8">REST via HTTP — consuma de Python, Java, Node, PHP, C#, Go, Delphi ou PL/SQL</text>
+</svg>
