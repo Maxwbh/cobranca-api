@@ -22,6 +22,20 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   listando os identificadores repetidos e os índices em que aparecem**. Item
   sem nenhum dos três campos continua caindo no índice, que nunca colide.
   Mesma proteção aplicada a `POST /jobs/cnab/remessas`.
+- **`template` continuava ignorado em `POST /jobs/boletos` e
+  `POST /api/render/boleto`.** A correção anterior cobriu só dois dos quatro
+  caminhos. No job era o pior caso: o valor era aceito, **gravado em
+  `meta.template`** e descartado pelo worker — quem consultasse o job lia
+  `"classico"` num artefato que era `moderno`. Agora o modelo é aplicado de
+  verdade nos quatro, e valor inválido responde **`422`** no job (era aceito
+  com `202`) e **`400`** no síncrono.
+  - O enum do job perdeu **`carne`**: o job gera **um PDF por item** e carnê é
+    3 boletos por página — era opção impossível por construção, oferecida no
+    contrato. Pedir `carne` ali agora responde `422` apontando
+    `POST /api/render/carne`.
+  - `POST /api/render/boleto` **passa a aceitar `template`**; antes nem
+    declarava o campo, então quem migrava do `GET /api/boleto` para ele perdia
+    a escolha do modelo em silêncio.
 - **`instrucoes` enviado como texto virava um caractere por linha no boleto.**
   A engine desenha o campo linha a linha e espera uma **lista**; recebendo a
   string que o JSON naturalmente carrega, iterava os caracteres — o boleto saía

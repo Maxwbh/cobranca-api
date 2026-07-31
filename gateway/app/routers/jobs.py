@@ -62,7 +62,10 @@ _CORPO_JOB_BOLETOS = {
             "tenant_id": {"type": "string", "example": "empresa_hml"},
             "boletos": {"type": "array", "minItems": 1, "maxItems": JOB_MAX_ITENS,
                         "items": _ITEM_BOLETO},
-            "template": {"type": "string", "enum": ["moderno", "carne"],
+            # `carne` saiu do enum: o job renderiza UM PDF por item, e carnê é
+            # 3 boletos numa página. Era opção impossível por construção,
+            # oferecida no contrato. Para carnê use POST /api/render/carne.
+            "template": {"type": "string", "enum": list(pycob.MODELOS_BOLETO),
                          "default": "moderno"},
         },
     }}},
@@ -192,7 +195,7 @@ def _processar(job_id: str, tenant_id: str, boletos: list[dict[str, Any]],
         dados = {k: v for k, v in item.items() if k not in ("bank", "banco", "external_id")}
         try:
             info = pycob.dados_boleto(bank, dados)
-            pdf = pycob.pdf_boleto(bank, dados)
+            pdf = pycob.pdf_boleto(bank, dados, template)
         except pycob.DadosInvalidos as e:
             falhos += 1
             store.concluir_item(job_id, item_id, js.ITEM_FAILED,
@@ -245,6 +248,17 @@ async def criar_job_boletos(
             "error": f"Job acima do limite de {JOB_MAX_ITENS} itens",
             "recebidos": len(boletos)})
 
+    # O template era aceito, gravado em meta e DESCARTADO pelo worker: o job
+    # registrava um modelo que nunca foi aplicado. Validar aqui é o que impede
+    # o job de rodar inteiro para só então o metadado mentir sobre o resultado.
+    template = corpo.get("template", "moderno")
+    if template not in pycob.MODELOS_BOLETO:
+        extra = (" — carnê é 3 boletos por página e não cabe no job, que gera um"
+                 " PDF por item; use POST /api/render/carne") if template == "carne" else ""
+        return JSONResponse(status_code=422, content={
+            "error": f"template '{template}' inválido",
+            "validation_errors": [f"use um de: {', '.join(pycob.MODELOS_BOLETO)}{extra}"]})
+
     store = _store()
     if idempotency_key:
         existente = store.por_idempotencia(tenant_id, idempotency_key)
@@ -266,9 +280,8 @@ async def criar_job_boletos(
     store.criar({"job_id": job_id, "tenant_id": tenant_id, "tipo": "boletos",
                  "status": js.JOB_RECEIVED, "total": len(boletos),
                  "idempotency_key": idempotency_key, "criado_em": js.agora(),
-                 "meta": {"template": corpo.get("template", "moderno")}}, itens)
-    background.add_task(_processar, job_id, tenant_id, boletos,
-                        corpo.get("template", "moderno"))
+                 "meta": {"template": template}}, itens)
+    background.add_task(_processar, job_id, tenant_id, boletos, template)
     return {"job_id": job_id, "status": js.JOB_RECEIVED, "recebidos": len(boletos),
             "self": f"/jobs/boletos/{job_id}",
             "items": f"/jobs/boletos/{job_id}/items"}

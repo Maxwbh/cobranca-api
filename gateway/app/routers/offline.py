@@ -307,8 +307,11 @@ async def ofx_parse(file: UploadFile = File(...), somente_creditos: str = Form("
 async def render_boleto(body: dict) -> Any:
     try:
         bank, valores = body.get("bank", ""), body.get("data") or {}
+        # `template` nao era nem declarado aqui: o irmao GET /api/boleto aceita,
+        # entao quem migrava de um para o outro perdia a escolha do modelo em
+        # silencio. Os dois caminhos passam a se comportar igual.
         info = pycob.dados_boleto(bank, valores)
-        pdf = pycob.pdf_boleto(bank, valores)
+        pdf = pycob.pdf_boleto(bank, valores, body.get("template", "moderno"))
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
     return {"nosso_numero": info["nosso_numero"], "linha_digitavel": info["linha_digitavel"],

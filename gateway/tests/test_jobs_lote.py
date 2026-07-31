@@ -292,3 +292,54 @@ def test_item_sem_identificador_continua_caindo_no_indice(client):
     body = {"tenant_id": "empresa1", "boletos": [DADOS_BB, DADOS_BB]}
     r = client.post("/jobs/boletos", json=body)
     assert r.status_code == 202, r.text
+
+
+# O template era aceito, gravado em `meta` e DESCARTADO pelo worker: _processar
+# recebia o parametro e chamava pdf_boleto(bank, dados) sem repassar. O job
+# registrava um modelo que nunca foi aplicado -- metadado que mente e pior que
+# metadado ausente. Conferido contra a producao: moderno, classico e carne
+# produziam artefato do MESMO tamanho (o do moderno).
+def _um_job(client, template=None, tenant="tpl"):
+    corpo = {"tenant_id": tenant, "boletos": [DADOS_BB]}
+    if template:
+        corpo["template"] = template
+    return client.post("/jobs/boletos", json=corpo)
+
+
+def _bytes_do_artefato(client, r, tenant):
+    jid = r.json()["job_id"]
+    itens = client.get(f"/jobs/boletos/{jid}/items", params={"tenant_id": tenant}).json()
+    return itens["items"][0]["resultado"]["artifact"]["bytes"]
+
+
+def test_job_respeita_o_template_no_artefato(client):
+    a = _bytes_do_artefato(client, _um_job(client, "moderno", "t1"), "t1")
+    b = _bytes_do_artefato(client, _um_job(client, "classico", "t2"), "t2")
+    assert a != b, "template ignorado: classico saiu do tamanho do moderno"
+
+
+def test_job_grava_no_meta_o_template_que_aplicou(client):
+    r = _um_job(client, "classico", "t3")
+    jid = r.json()["job_id"]
+    job = client.get(f"/jobs/boletos/{jid}", params={"tenant_id": "t3"}).json()
+    assert job["meta"]["template"] == "classico"
+
+
+def test_job_recusa_template_invalido(client):
+    r = _um_job(client, "xpto", "t4")
+    assert r.status_code == 422, r.text
+    assert "xpto" in r.json()["error"]
+
+
+def test_job_recusa_carne_apontando_o_endpoint_certo(client):
+    # Carne e 3 boletos por pagina; o job gera um PDF por item. Era opcao
+    # impossivel por construcao, oferecida no enum do contrato.
+    r = _um_job(client, "carne", "t5")
+    assert r.status_code == 422, r.text
+    assert "/api/render/carne" in r.json()["validation_errors"][0]
+
+
+def test_job_sem_template_continua_moderno(client):
+    a = _bytes_do_artefato(client, _um_job(client, None, "t6"), "t6")
+    b = _bytes_do_artefato(client, _um_job(client, "moderno", "t7"), "t7")
+    assert a == b

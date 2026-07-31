@@ -578,3 +578,18 @@ def test_instrucoes_no_limite_continuam_aceitas():
                           for i in range(pycob.MAX_LINHAS_INSTRUCAO))
     pdf = pycob.pdf_boleto("banco_brasil", {**DADOS_BB, "instrucoes": no_limite})
     assert pdf[:4] == b"%PDF"
+
+
+def test_render_boleto_aceita_template(client):
+    # O irmao GET /api/boleto aceitava; este nem declarava o parametro, entao
+    # quem migrava de um para o outro perdia a escolha do modelo em silencio.
+    import base64 as _b64
+    def _tam(tpl):
+        corpo = {"bank": "banco_brasil", "data": DADOS_BB}
+        if tpl:
+            corpo["template"] = tpl
+        r = client.post("/api/render/boleto", json=corpo)
+        assert r.status_code == 200, r.text
+        return len(_b64.b64decode(r.json()["pdf_base64"]))
+    assert _tam("classico") != _tam("moderno")
+    assert _tam(None) == _tam("moderno")
