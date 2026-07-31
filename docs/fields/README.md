@@ -359,4 +359,4 @@ boleto_sicoob = {
 ---
 
 **Engine:** [PyCobrança](https://github.com/Maxwbh/pyCobranca) (Python) — versão em uso: `GET /api/metadata`
-**Versão da API:** 2.0.0
+**Versão da API:** 2.1.0

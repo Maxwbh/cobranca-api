@@ -1,106 +1,109 @@
 #!/bin/bash
-# Script para incrementar versão automaticamente
-# Uso: ./scripts/bump-version.sh [patch|minor|major]
-# Padrão: patch (1.0.0 -> 1.0.1)
+# Incrementa a versão do SERVIÇO (Cobranca-API) seguindo Semantic Versioning.
+# Uso: ./scripts/bump-version.sh [patch|minor|major]   (padrão: patch)
+#
+# Escopo — o repositório abriga dois artefatos com versionamentos
+# INDEPENDENTES (docs/development/separacao-3-produtos.md):
+#
+#   1. o serviço FastAPI  -> VERSION, app.version, info.version da spec
+#   2. o cliente pip      -> cobranca_api.__version__, versionado à parte
+#
+# Este script mexe SÓ no serviço. O cliente se publica no PyPI no ritmo dele;
+# sincronizar os dois criaria releases falsas de um SDK que não mudou.
 
-set -e
+set -euo pipefail
 
-# Cores para output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Tipo de bump (patch por padrão)
+cd "$(dirname "$0")/.."
+
 BUMP_TYPE=${1:-patch}
 
-# Ler versão atual
-if [ ! -f "VERSION" ]; then
-    echo "❌ Arquivo VERSION não encontrado!"
-    exit 1
-fi
+[ -f VERSION ] || { echo -e "${RED}❌ Arquivo VERSION não encontrado!${NC}"; exit 1; }
 
-CURRENT_VERSION=$(cat VERSION)
+CURRENT_VERSION=$(tr -d '[:space:]' < VERSION)
 echo -e "${BLUE}📦 Versão atual: ${CURRENT_VERSION}${NC}"
 
-# Separar major.minor.patch
+[[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo -e "${RED}❌ VERSION não está em MAJOR.MINOR.PATCH: '${CURRENT_VERSION}'${NC}"; exit 1; }
+
 IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
 MAJOR=${VERSION_PARTS[0]}
 MINOR=${VERSION_PARTS[1]}
 PATCH=${VERSION_PARTS[2]}
 
-# Incrementar versão
 case $BUMP_TYPE in
-    major)
-        MAJOR=$((MAJOR + 1))
-        MINOR=0
-        PATCH=0
-        CHANGE_TYPE="MAJOR"
-        ;;
-    minor)
-        MINOR=$((MINOR + 1))
-        PATCH=0
-        CHANGE_TYPE="MINOR"
-        ;;
-    patch)
-        PATCH=$((PATCH + 1))
-        CHANGE_TYPE="PATCH"
-        ;;
-    *)
-        echo "❌ Tipo inválido: $BUMP_TYPE (use: patch, minor, ou major)"
-        exit 1
-        ;;
+    major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0; CHANGE_TYPE="MAJOR" ;;
+    minor) MINOR=$((MINOR + 1)); PATCH=0;          CHANGE_TYPE="MINOR" ;;
+    patch) PATCH=$((PATCH + 1));                   CHANGE_TYPE="PATCH" ;;
+    *) echo -e "${RED}❌ Tipo inválido: $BUMP_TYPE (use: patch, minor, ou major)${NC}"; exit 1 ;;
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 echo -e "${GREEN}✨ Nova versão: ${NEW_VERSION} (${CHANGE_TYPE})${NC}"
 
-# Atualizar arquivo VERSION
+# Cada substituição é conferida: uma versão que sobra num arquivo é pior que um
+# erro, porque só aparece depois, em produção, no /api/metadata ou no Swagger.
+substituir() {
+    local arquivo="$1" expressao="$2" confirmacao="$3"
+    [ -f "$arquivo" ] || { echo -e "${RED}❌ $arquivo não encontrado${NC}"; exit 1; }
+    sed -i "$expressao" "$arquivo"
+    grep -q "$confirmacao" "$arquivo" || {
+        echo -e "${RED}❌ $arquivo continuou na versão antiga — o padrão do sed não casou.${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✅ ${arquivo}${NC}"
+}
+
 echo "$NEW_VERSION" > VERSION
-echo -e "${GREEN}✅ VERSION atualizado${NC}"
+echo -e "${GREEN}✅ VERSION${NC}"
 
-# Atualizar __init__.py do cliente Python
-if [ -f "python-client/boleto_cnab_client/__init__.py" ]; then
-    sed -i "s/__version__ = '.*'/__version__ = '${NEW_VERSION}'/" python-client/boleto_cnab_client/__init__.py
-    echo -e "${GREEN}✅ Cliente Python atualizado${NC}"
-fi
+# app.version — é o que GET /api/metadata devolve
+substituir gateway/app/main.py \
+    "s/^    version=\"${CURRENT_VERSION}\",$/    version=\"${NEW_VERSION}\",/" \
+    "version=\"${NEW_VERSION}\","
 
-# Data atual
-TODAY=$(date +%Y-%m-%d)
+# info.version da spec OpenAPI da superfície offline
+substituir docs/openapi.yaml \
+    "s/^  version: ${CURRENT_VERSION}$/  version: ${NEW_VERSION}/" \
+    "^  version: ${NEW_VERSION}$"
 
-# Adicionar entrada no CHANGELOG
-if [ -f "CHANGELOG.md" ]; then
-    # Criar backup
-    cp CHANGELOG.md CHANGELOG.md.bak
+# CHANGELOG: abre a seção da versão logo abaixo de [Não lançado], que segue
+# existindo, vazia, para o próximo ciclo.
+if [ -f CHANGELOG.md ]; then
+    grep -q '^## \[Não lançado\]' CHANGELOG.md || {
+        echo -e "${RED}❌ CHANGELOG.md sem a seção '## [Não lançado]'${NC}"; exit 1; }
 
-    # Inserir nova versão após o cabeçalho
+    TODAY=$(date +%Y-%m-%d)
     awk -v version="$NEW_VERSION" -v date="$TODAY" '
-    /^## \[Unreleased\]/ {
-        print $0
-        print ""
+    /^## \[Não lançado\]/ && !feito {
+        print $0; print ""
         print "## [" version "] - " date
-        print ""
-        print "### Alterado"
-        print "- Atualização de versão"
-        print ""
+        feito = 1
         next
     }
     { print }
-    ' CHANGELOG.md.bak > CHANGELOG.md
-
-    rm CHANGELOG.md.bak
-    echo -e "${GREEN}✅ CHANGELOG.md atualizado${NC}"
+    ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+    echo -e "${GREEN}✅ CHANGELOG.md${NC}"
 fi
 
 echo ""
+echo -e "${YELLOW}⚠️  O cliente pip NÃO foi tocado${NC} — versiona à parte, em"
+echo "   python-client/cobranca_api/__init__.py (veja separacao-3-produtos.md)."
+echo ""
 echo -e "${YELLOW}📝 Próximos passos:${NC}"
-echo "1. Edite CHANGELOG.md e adicione as mudanças desta versão"
-echo "2. Commit as alterações:"
-echo -e "   ${BLUE}git add VERSION CHANGELOG.md python-client/boleto_cnab_client/__init__.py${NC}"
+echo "1. Mova as entradas de [Não lançado] para a seção [${NEW_VERSION}] no CHANGELOG.md"
+echo "2. Rode a suíte:"
+echo -e "   ${BLUE}cd gateway && PYTHONPATH=. pytest && cd ..${NC}"
+echo "3. Commit:"
+echo -e "   ${BLUE}git add VERSION CHANGELOG.md gateway/app/main.py docs/openapi.yaml${NC}"
 echo -e "   ${BLUE}git commit -m \"[RELEASE] Versão ${NEW_VERSION}\"${NC}"
-echo "3. Crie uma tag:"
+echo "4. Tag (só depois do merge em main):"
 echo -e "   ${BLUE}git tag -a v${NEW_VERSION} -m \"Versão ${NEW_VERSION}\"${NC}"
-echo "4. Push com tags:"
-echo -e "   ${BLUE}git push origin $(git branch --show-current) --tags${NC}"
+echo -e "   ${BLUE}git push origin main --tags${NC}"
 echo ""
 echo -e "${GREEN}🎉 Versão ${NEW_VERSION} pronta!${NC}"

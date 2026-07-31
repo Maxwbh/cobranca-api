@@ -37,15 +37,25 @@ MAJOR.MINOR.PATCH
 1. ✅ Lê a versão atual do arquivo `VERSION`
 2. ✅ Incrementa conforme o tipo (patch/minor/major)
 3. ✅ Atualiza `VERSION`
-4. ✅ Atualiza `python-client/cobranca_api/__init__.py`
-5. ✅ Adiciona entrada no `CHANGELOG.md`
-6. ✅ Mostra próximos passos
+4. ✅ Atualiza `app.version` em `gateway/app/main.py` — é o que `GET /api/metadata` devolve
+5. ✅ Atualiza `info.version` em `docs/openapi.yaml`
+6. ✅ Abre a seção da versão no `CHANGELOG.md`, logo abaixo de `[Não lançado]`
+7. ✅ Mostra próximos passos
+
+Cada substituição é conferida depois de aplicada: se um padrão não casar, o
+script **falha** em vez de deixar um arquivo para trás na versão antiga.
+
+> **O cliente pip não é tocado.** O repositório abriga dois artefatos com
+> versionamentos **independentes** ([separacao-3-produtos.md](../docs/development/separacao-3-produtos.md)):
+> o serviço (`VERSION` / `app.version`) e o SDK (`cobranca_api.__version__`).
+> Sincronizar os dois criaria release falsa de um SDK que não mudou — por isso
+> o cliente se versiona à mão, no ritmo do PyPI.
 
 ### Exemplo Completo
 
 ```bash
 # 1. Fazer alterações no código
-vim lib/boleto_api.rb
+vim gateway/app/providers/sicoob.py
 
 # 2. Executar testes
 cd gateway && PYTHONPATH=. pytest
@@ -57,14 +67,14 @@ cd gateway && PYTHONPATH=. pytest
 vim CHANGELOG.md
 
 # 5. Commit
-git add VERSION CHANGELOG.md python-client/cobranca_api/__init__.py
+git add VERSION CHANGELOG.md gateway/app/main.py docs/openapi.yaml
 git commit --author="Maxwell da Silva Oliveira <maxwbh@gmail.com>" -m "[RELEASE] Versão 1.0.1"
 
-# 6. Criar tag
+# 6. Criar tag — só depois do merge em main
 git tag -a v1.0.1 -m "Versão 1.0.1"
 
 # 7. Push com tags
-git push origin master --tags
+git push origin main --tags
 ```
 
 ### Quando usar cada tipo de versão

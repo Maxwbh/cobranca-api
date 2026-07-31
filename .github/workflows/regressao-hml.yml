@@ -5,9 +5,11 @@
 # 424 com credencial presente — o relatório encheria de falhas de HORÁRIO, não
 # de defeito. O cron abaixo cai em segunda 10:00 BRT, bem dentro da janela.
 #
-# O `schedule` roda no branch DEFAULT (master) — já em vigor após o cutover
-# v2.0.0. Para disparar fora da hora, use "Run workflow" (workflow_dispatch)
-# na aba Actions.
+# O `schedule` roda no branch DEFAULT (main). Para disparar fora da hora, use
+# "Run workflow" (workflow_dispatch) na aba Actions.
+#
+# Em fork o agendado não roda: sem os secrets do sandbox a suíte falharia por
+# credencial ausente, não por defeito. Rode manualmente depois de cadastrá-los.
 #
 # Secrets necessários (Settings > Secrets and variables > Actions):
 #   C6: COB_C6_CLIENT_ID, COB_C6_CLIENT_SECRET, COB_C6_PFX_BASE64,
@@ -44,6 +46,7 @@ permissions:
 jobs:
   regressao:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.repository == 'Maxwbh/cobranca-api' }}
     steps:
       - uses: actions/checkout@v4
 

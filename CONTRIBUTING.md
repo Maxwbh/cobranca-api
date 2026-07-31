@@ -16,13 +16,16 @@ Obrigado por considerar contribuir com a Cobranca-API! Este documento fornece di
 
 ## 🤝 Código de Conduta
 
-Este projeto adere a um código de conduta. Ao participar, espera-se que você mantenha este código:
+Este projeto adere ao [Código de Conduta](./CODE_OF_CONDUCT.md). Ao participar, espera-se que você mantenha este código:
 
 - Use linguagem acolhedora e inclusiva
 - Seja respeitoso com diferentes pontos de vista
 - Aceite críticas construtivas com elegância
 - Foque no que é melhor para a comunidade
 - Mostre empatia com outros membros da comunidade
+
+Comportamento inaceitável pode ser reportado em maxwbh@gmail.com. Vulnerabilidades
+de segurança seguem o processo privado de [SECURITY.md](./SECURITY.md) — nunca uma issue pública.
 
 ## 🎯 Como Contribuir
 
@@ -44,20 +47,22 @@ Encontrou um bug? Por favor:
 
 **Exemplo de boa issue:**
 ```
-Título: NoMethodError ao gerar boleto Bradesco
+Título: 500 ao gerar boleto Bradesco com carteira 09
 
 Descrição:
-Ao tentar gerar boleto do Bradesco, recebo NoMethodError.
+Ao gerar boleto do Bradesco na carteira 09, a API responde 500
+em vez de um erro de validação.
 
 Passos para reproduzir:
 1. POST /api/boleto
-2. bank=bradesco
+2. banco=bradesco, carteira=09
 3. Dados: {...}
 
 Erro:
-NoMethodError: undefined method 'xyz'
+AttributeError: 'BradescoProvider' object has no attribute 'xyz'
 
-Versão da API: 2.0.0   (GET /api/metadata)
+Versão da API: 2.1.0   (GET /api/metadata)
+Engine pyCobrança: 1.0.2
 Python: 3.12
 Docker: Sim
 ```
@@ -178,9 +183,9 @@ docker-compose run cobranca_api pytest gateway/tests
 ### 1. Criar Branch
 
 ```bash
-# Atualizar master
-git checkout master
-git pull origin master
+# Atualizar main
+git checkout main
+git pull origin main
 
 # Criar branch descritiva
 git checkout -b feature/adicionar-banco-banrisul
@@ -196,6 +201,8 @@ git checkout -b docs/melhorar-readme
 - `docs/` - Mudanças em documentação
 - `test/` - Adicionar/melhorar testes
 - `refactor/` - Refatoração de código
+- `hml/` - Homologação: além do CI de PR, o workflow `Build` também dispara no
+  push dessas branches (`hml/**`), então dá para validar antes de abrir o PR
 
 ### 2. Desenvolver
 
@@ -486,7 +493,7 @@ Checklist:
 - [ ] Documentação foi atualizada
 - [ ] CHANGELOG.md foi atualizado (se aplicável)
 - [ ] Commits seguem convenção
-- [ ] Branch está atualizado com `master`
+- [ ] Branch está atualizado com `main`
 
 ### Criando Pull Request
 

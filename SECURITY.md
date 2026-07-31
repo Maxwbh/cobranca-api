@@ -6,7 +6,8 @@ Mantemos ativamente as seguintes versões:
 
 | Versão | Suportada | Observação |
 | ------ | --------- | ---------- |
-| 2.0.x  | ✅ Sim    | Atual (recomendada) — serviço único, 100% Python |
+| 2.1.x  | ✅ Sim    | Atual (recomendada) — serviço único, 100% Python |
+| 2.0.x  | ⚠️ Só correções críticas | Migre para a 2.1.x: mesma arquitetura, sem quebra de contrato |
 | 1.x    | ❌ Não    | Descontinuada: dependia do Banking Core BrCobrança (Ruby), que não existe mais |
 
 > A linha 1.x **não recebe correções**, nem críticas: a arquitetura em que ela
@@ -44,7 +45,7 @@ Vulnerabilidades de segurança devem ser reportadas de forma privada.
 
    Tipo: Path Traversal
    Localização: gateway/app/core/artifacts.py:120
-   Versão afetada: 2.0.0
+   Versão afetada: 2.1.0
 
    Descrição:
    O parâmetro 'arquivo' não é validado antes de compor o caminho

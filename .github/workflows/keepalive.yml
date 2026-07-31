@@ -3,10 +3,12 @@
 # wake — o que o Gestao-Contrato traduz como "API sobrecarregada".
 #
 # Pinga /api/health a cada 10 min (abaixo do limite de 15 min de inatividade do
-# free tier). Use a variavel de repo KEEPALIVE_URLS (lista separada por espaco)
-# para apontar para os seus servicos; ha um default com a URL de producao.
+# free tier). Aponte para os SEUS servicos pela variavel de repo KEEPALIVE_URLS
+# (lista separada por espaco, em Settings > Secrets and variables > Actions).
+# Sem essa variavel o job nao pinga nada e sai limpo — nao ha URL default, para
+# que um fork nunca fique batendo no ambiente de outra pessoa.
 #
-# OBS: workflows agendados rodam apenas no branch DEFAULT (master) e o cron do
+# OBS: workflows agendados rodam apenas no branch DEFAULT (main) e o cron do
 # GitHub pode atrasar sob carga. Para garantia maior, use tambem um UptimeRobot
 # ou cron-job.org pingando /api/health a cada 5-10 min.
 name: keepalive
@@ -16,6 +18,9 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -24,7 +29,9 @@ jobs:
         run: |
           URLS="${{ vars.KEEPALIVE_URLS }}"
           if [ -z "$URLS" ]; then
-            URLS="https://brcobranca-api-m4q9.onrender.com/api/health"
+            echo "KEEPALIVE_URLS nao definida — nada a pingar. Defina a variavel"
+            echo "de repo para ativar o keepalive no seu proprio ambiente."
+            exit 0
           fi
           for url in $URLS; do
             echo "==> $url"

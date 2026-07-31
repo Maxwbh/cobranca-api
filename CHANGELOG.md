@@ -7,7 +7,49 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [2.1.0] - 2026-07-31
+
+### Corrigido
+- **CI não rodava**: o workflow `Build` disparava em `master`, mas o branch
+  default do repositório é `main` — nenhum push executava a suíte. O gate do
+  push da imagem tinha o mesmo erro, somado a uma comparação sensível à caixa
+  (`github.repository_owner == 'maxwbh'` nunca casa com `Maxwbh`).
+- **Push da imagem para o ghcr.io responderia 403**: falta de `permissions:
+  packages: write` — em repositório público o `GITHUB_TOKEN` nasce
+  somente-leitura. O login no registry passa a ser pulado em PR de fork, que
+  recebe token sem escrita e derrubaria o build inteiro.
+- **`keepalive` apontava para um host de terceiro**: o default embutido pingava
+  uma instância Render antiga a cada 10 min. Sem a variável de repo
+  `KEEPALIVE_URLS` o job agora sai limpo sem pingar nada — fork nenhum bate no
+  ambiente de outra pessoa.
+- **`regressao-hml` agendada em fork** falharia sempre por credencial ausente:
+  o `schedule` passa a rodar só no repositório de origem; `workflow_dispatch`
+  continua liberado.
+- Template de bug pedia a versão do **Ruby**, removido do projeto na 2.0.0.
+- **Link quebrado servido pela própria API**: `_DOC_REPO` (`app/main.py`), que
+  aparece na descrição da tag `bancos` do Swagger, apontava para
+  `/tree/master/docs/development` — 404, já que o branch default é `main`.
+  Mesma troca em `DEPLOY.md`, `CONTRIBUTING.md` e `scripts/README.md`, que
+  ainda mandavam `git push origin master`.
+- **`render.yaml` fazia deploy de um branch inexistente** (`branch: master`),
+  então o `autoDeploy: true` nunca disparava.
+- **5 links `/blob/master/` e `/tree/master/` no `docs/openapi.yaml`** —
+  CHANGELOG, guias por banco, validação de campos e encargos. Todos 404, e
+  todos servidos no Swagger público.
+- **`scripts/bump-version.sh` não funcionava**: escrevia em
+  `python-client/boleto_cnab_client/__init__.py` (pacote que não existe — é
+  `cobranca_api`), procurava `## [Unreleased]` num CHANGELOG que usa
+  `## [Não lançado]`, e não tocava em `app.version` nem na spec OpenAPI. Na
+  prática só alterava o arquivo `VERSION`. Reescrito para cobrir os quatro
+  pontos e falhar em vez de seguir em silêncio.
+- Exemplo de issue no `CONTRIBUTING.md` mostrava um erro **Ruby**
+  (`NoMethodError`), linguagem removida do projeto na 2.0.0.
+
 ### Adicionado
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 1.4), `.github/pull_request_template.md`
+  e `.github/dependabot.yml` (pip do gateway e do cliente, GitHub Actions e
+  imagem base do Docker) — governança do repositório público.
+- README com os links de contribuição, conduta, segurança e changelog.
 - **`POST /api/render/fatura`** — renderiza a fatura pela engine
   (`render_fatura_pdf`): corpo livre no topo + boleto de pagamento abaixo, num
   só PDF. Passthrough puro (o gateway não soma nem calcula; o `valor` vem no
@@ -16,6 +58,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   com `400`.
 
 ### Alterado
+- `CONTRIBUTING.md` documenta o prefixo `hml/` na convenção de branches: o
+  workflow `Build` dispara no push de `hml/**`, o que permite validar a suíte
+  antes de abrir o PR.
 - **Python mínimo 3.14 → 3.12** e **engine `pycobranca` ≥ 1.0.2**: a 1.0.2
   baixou o piso para `>=3.12`, que tem wheels prontos e **elimina a compilação
   a partir do código-fonte** (e o problema do pydantic no `3.14.0rc2`). CI,

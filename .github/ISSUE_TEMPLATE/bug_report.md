@@ -27,9 +27,10 @@ Uma descrição clara do que acontece atualmente.
 ## 📋 Informações do Ambiente
 
 **API:**
-- Versão: [ex: 1.0.0] (veja arquivo `VERSION`)
+- Versão: [ex: 2.1.0] (veja o arquivo `VERSION` ou `GET /api/metadata`)
 - Ambiente: [ex: Docker, local, Render]
-- Ruby: [ex: 3.1.2]
+- Python: [ex: 3.12.3]
+- Engine pyCobrança: [ex: 1.0.2] (veja `GET /api/metadata`)
 
 **Cliente (se aplicável):**
 - Cliente Python versão: [ex: 1.0.0]
