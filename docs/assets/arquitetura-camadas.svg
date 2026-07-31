@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-label="Camadas da Cobranca-API: routers HTTP sobre registry, sobre providers e core, com a engine pyCobranca embutida">
+  <defs>
+    <linearGradient id="cRouter" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1E40AF"/><stop offset="1" stop-color="#3B5A82"/>
+    </linearGradient>
+    <linearGradient id="cCore" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0F172A"/><stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+    <marker id="s1" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#94A3B8"/>
+    </marker>
+    <style>
+      .t    { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
+      .cap  { font-size: 11.5px; fill: #64748B; letter-spacing: .7px; font-weight: 700; }
+      .h    { font-size: 17px; font-weight: 700; }
+      .s    { font-size: 12.5px; fill: #475569; }
+      .w    { fill: #fff; }
+      .chip { font-size: 12px; fill: #0F172A; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="640" fill="#F8FAFC"/>
+  <text x="600" y="30" text-anchor="middle" class="t cap">COBRANCA-API — CAMADAS (UM PROCESSO)</text>
+
+  <!-- consumidor -->
+  <rect x="380" y="46" width="440" height="40" rx="9" fill="#fff" stroke="#CBD5E1"/>
+  <text x="600" y="72" text-anchor="middle" class="t h" fill="#0F172A">Aplicação consumidora — qualquer linguagem</text>
+  <line x1="600" y1="90" x2="600" y2="116" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#s1)"/>
+
+  <!-- routers -->
+  <rect x="60" y="124" width="1080" height="96" rx="12" fill="url(#cRouter)"/>
+  <text x="86" y="152" class="t h w">routers/ — superfície HTTP</text>
+  <text x="86" y="172" class="t" font-size="12.5" fill="#BFDBFE">valida entrada · traduz erro do banco · monta a resposta</text>
+  <g class="t" font-size="11.5" fill="#0F172A">
+    <rect x="86"  y="184" width="88"  height="24" rx="12" fill="#DBEAFE"/><text x="130" y="200" text-anchor="middle">cobranca</text>
+    <rect x="182" y="184" width="96"  height="24" rx="12" fill="#DBEAFE"/><text x="230" y="200" text-anchor="middle">credenciais</text>
+    <rect x="286" y="184" width="60"  height="24" rx="12" fill="#DBEAFE"/><text x="316" y="200" text-anchor="middle">pix</text>
+    <rect x="354" y="184" width="74"  height="24" rx="12" fill="#DBEAFE"/><text x="391" y="200" text-anchor="middle">bolepix</text>
+    <rect x="436" y="184" width="110" height="24" rx="12" fill="#DBEAFE"/><text x="491" y="200" text-anchor="middle">pix-automatico</text>
+    <rect x="554" y="184" width="64"  height="24" rx="12" fill="#DBEAFE"/><text x="586" y="200" text-anchor="middle">jobs</text>
+    <rect x="626" y="184" width="74"  height="24" rx="12" fill="#DBEAFE"/><text x="663" y="200" text-anchor="middle">extrato</text>
+    <rect x="708" y="184" width="94"  height="24" rx="12" fill="#DBEAFE"/><text x="755" y="200" text-anchor="middle">conciliacao</text>
+    <rect x="810" y="184" width="88"  height="24" rx="12" fill="#DBEAFE"/><text x="854" y="200" text-anchor="middle">webhooks</text>
+    <rect x="906" y="184" width="64"  height="24" rx="12" fill="#DBEAFE"/><text x="938" y="200" text-anchor="middle">carne</text>
+    <rect x="978" y="184" width="136" height="24" rx="12" fill="#A5F3FC"/><text x="1046" y="200" text-anchor="middle">offline · /api/*</text>
+  </g>
+
+  <line x1="600" y1="224" x2="600" y2="250" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#s1)"/>
+
+  <!-- registry -->
+  <rect x="230" y="258" width="740" height="72" rx="12" fill="#fff" stroke="#1E40AF" stroke-width="2"/>
+  <text x="600" y="285" text-anchor="middle" class="t h" fill="#1E40AF">registry.py — escolhe o provider e resolve credenciais</text>
+  <text x="600" y="308" text-anchor="middle" class="t s">build_provider (com fallback offline) · build_rest_provider (sem fallback) · registered_ready</text>
+
+  <line x1="360" y1="334" x2="360" y2="368" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#s1)"/>
+  <line x1="840" y1="334" x2="840" y2="368" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#s1)"/>
+
+  <!-- providers -->
+  <rect x="60" y="376" width="600" height="120" rx="12" fill="#fff" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="86" y="404" class="t h" fill="#0F172A">providers/ — um dialeto por banco</text>
+  <text x="86" y="424" class="t s">interface comum: obrigatórios + capacidades opcionais (introspecção)</text>
+  <g class="t chip">
+    <rect x="86"  y="438" width="120" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="146" y="456" text-anchor="middle" font-weight="700">c6.py</text>
+    <text x="146" y="472" text-anchor="middle" font-size="11" fill="#475569">REST · mTLS</text>
+    <rect x="218" y="438" width="120" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="278" y="456" text-anchor="middle" font-weight="700">sicoob.py</text>
+    <text x="278" y="472" text-anchor="middle" font-size="11" fill="#475569">REST · mTLS</text>
+    <rect x="350" y="438" width="140" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="420" y="456" text-anchor="middle" font-weight="700">bacen_pix.py</text>
+    <text x="420" y="472" text-anchor="middle" font-size="11" fill="#475569">dialeto Pix comum</text>
+    <rect x="502" y="438" width="140" height="44" rx="9" fill="#CFFAFE" stroke="#06B6D4"/>
+    <text x="572" y="456" text-anchor="middle" font-weight="700">offline_engine</text>
+    <text x="572" y="472" text-anchor="middle" font-size="11" fill="#475569">sem credencial</text>
+  </g>
+
+  <!-- core -->
+  <rect x="684" y="376" width="456" height="120" rx="12" fill="url(#cCore)"/>
+  <text x="710" y="404" class="t h w">core/ — nem HTTP, nem banco</text>
+  <g class="t" font-size="11.5" fill="#E2E8F0">
+    <text x="710" y="428">credential_store · vault — token bapi_, AES-256-GCM</text>
+    <text x="710" y="448">job_store · artifacts — lote assíncrono, sha256, expiração</text>
+    <text x="710" y="468">forwarder · subscriptions — push de evento assinado (HMAC)</text>
+    <text x="710" y="488" fill="#67E8F9">pycob — adaptador da engine ↔ contrato REST</text>
+  </g>
+
+  <line x1="572" y1="500" x2="572" y2="534" stroke="#06B6D4" stroke-width="2.5" marker-end="url(#s1)"/>
+
+  <!-- engine -->
+  <rect x="330" y="542" width="490" height="60" rx="11" fill="#06B6D4"/>
+  <text x="575" y="568" text-anchor="middle" class="t h w">PyCobrança — engine in-process</text>
+  <text x="575" y="590" text-anchor="middle" class="t" font-size="12" fill="#083344">boleto · CNAB 240/400 · carnê · PIX/Bolepix · PDF — 18 bancos</text>
+
+  <!-- conector: providers REST -> APIs dos bancos -->
+  <path d="M200,496 L200,520 L1000,520 L1000,536" fill="none" stroke="#94A3B8"
+        stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#s1)"/>
+  <text x="880" y="514" text-anchor="end" class="t s" font-size="11.5">c6 · sicoob → online</text>
+
+  <!-- bancos -->
+  <rect x="860" y="542" width="280" height="60" rx="11" fill="#fff" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="1000" y="568" text-anchor="middle" class="t h" fill="#0F172A">APIs dos bancos</text>
+  <text x="1000" y="590" text-anchor="middle" class="t s">OAuth + mTLS · online</text>
+
+  <text x="600" y="626" text-anchor="middle" class="t s" fill="#94A3B8">um único container · sem sidecar · sem segundo runtime</text>
+</svg>

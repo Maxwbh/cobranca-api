@@ -1,0 +1,363 @@
+--------------------------------------------------------------------------------
+-- COBRANCA_API — pacote PL/SQL para consumir a Cobranca-API
+--
+-- Emite boleto (PDF), gera remessa CNAB, processa retorno e cria jobs em lote
+-- direto do Oracle Database, sem instalar nada além do que já existe no banco
+-- (UTL_HTTP + APEX_JSON, ou APEX_WEB_SERVICE quando houver APEX instalado).
+--
+-- Pré-requisitos (uma vez, como DBA):
+--   1) ACL de rede para o host da API (ver acl_setup.sql)
+--   2) Wallet com o certificado do host, se a API for HTTPS (ver acl_setup.sql)
+--
+-- Testado contra: https://boleto-cnab-api.onrender.com
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PACKAGE cobranca_api AS
+
+  -- URL base da API (troque para a sua instância)
+  g_base_url  VARCHAR2(500) := 'https://boleto-cnab-api.onrender.com';
+  -- Wallet (obrigatório para HTTPS no UTL_HTTP; vazio se usar APEX_WEB_SERVICE)
+  g_wallet    VARCHAR2(500) := 'file:/u01/app/oracle/wallet';
+  g_wallet_pw VARCHAR2(100) := NULL;
+
+  -- Token bapi_ da cobrança online (opcional; só para rotas de banco)
+  g_token     VARCHAR2(200);
+
+  TYPE t_boleto IS RECORD (
+    banco               VARCHAR2(30)   := 'banco_brasil',
+    agencia             VARCHAR2(10),
+    conta_corrente      VARCHAR2(20),
+    convenio            VARCHAR2(20),
+    carteira            VARCHAR2(10),
+    nosso_numero        VARCHAR2(30),
+    cedente             VARCHAR2(200),
+    documento_cedente   VARCHAR2(20),
+    sacado              VARCHAR2(200),
+    sacado_documento    VARCHAR2(20),
+    valor               NUMBER,
+    data_vencimento     DATE
+  );
+
+  TYPE t_dados_boleto IS RECORD (
+    nosso_numero            VARCHAR2(30),
+    nosso_numero_formatado  VARCHAR2(50),
+    nosso_numero_dv         VARCHAR2(5),
+    codigo_barras           VARCHAR2(60),
+    linha_digitavel         VARCHAR2(80)
+  );
+
+  -- Dados calculados (sem gerar PDF) — GET /api/boleto/data
+  FUNCTION dados_boleto(p_boleto IN t_boleto) RETURN t_dados_boleto;
+
+  -- PDF do boleto em BLOB — GET /api/boleto
+  FUNCTION gerar_boleto_pdf(p_boleto IN t_boleto) RETURN BLOB;
+
+  -- Resultado da cobranca REGISTRADA (online, API do banco)
+  TYPE t_cobranca IS RECORD (
+    id               VARCHAR2(100),
+    status           VARCHAR2(30),
+    linha_digitavel  VARCHAR2(80),
+    codigo_barras    VARCHAR2(60),
+    pix_copia_cola   VARCHAR2(1000)
+  );
+
+  -- Cadastra as credenciais do banco UMA vez e guarda o token bapi_ em g_token.
+  -- O token so e devolvido nesta chamada: guarde-o se for reusar entre sessoes.
+  --   POST /credenciais
+  FUNCTION cadastrar_credenciais(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
+                                 p_credenciais_json IN CLOB) RETURN VARCHAR2;
+
+  -- Cobranca REGISTRADA na API do banco (c6 | sicoob) — POST /cobranca.
+  -- Exige g_token do MESMO tenant+provider (o token e amarrado aos dois).
+  FUNCTION registrar_cobranca(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
+                              p_boleto IN t_boleto,
+                              p_account_config_json IN VARCHAR2 DEFAULT '{}')
+    RETURN t_cobranca;
+
+  -- Remessa CNAB (texto) — POST /api/remessa
+  FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
+                         p_payload IN CLOB) RETURN CLOB;
+
+  -- Retorno CNAB -> JSON — POST /api/retorno
+  FUNCTION processar_retorno(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
+                             p_arquivo IN CLOB) RETURN CLOB;
+
+  -- Lote assíncrono: cria o job e devolve o job_id — POST /jobs/boletos
+  FUNCTION criar_job_lote(p_tenant IN VARCHAR2, p_boletos_json IN CLOB,
+                          p_idempotency_key IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2;
+
+  -- Estado do job (JSON) — GET /jobs/boletos/{job_id}
+  FUNCTION consultar_job(p_tenant IN VARCHAR2, p_job_id IN VARCHAR2) RETURN CLOB;
+
+  -- Saúde da API
+  FUNCTION healthcheck RETURN BOOLEAN;
+
+END cobranca_api;
+/
+
+CREATE OR REPLACE PACKAGE BODY cobranca_api AS
+
+  --------------------------------------------------------------------------
+  -- Helpers HTTP (UTL_HTTP — funciona com ou sem APEX instalado)
+  --------------------------------------------------------------------------
+  PROCEDURE p_config_wallet IS
+  BEGIN
+    IF g_base_url LIKE 'https:%' AND g_wallet IS NOT NULL THEN
+      UTL_HTTP.set_wallet(g_wallet, g_wallet_pw);
+    END IF;
+  END p_config_wallet;
+
+  FUNCTION f_get_clob(p_path IN VARCHAR2) RETURN CLOB IS
+    l_req   UTL_HTTP.req;
+    l_resp  UTL_HTTP.resp;
+    l_buf   VARCHAR2(32767);
+    l_out   CLOB;
+  BEGIN
+    p_config_wallet;
+    DBMS_LOB.createtemporary(l_out, TRUE);
+    l_req := UTL_HTTP.begin_request(g_base_url || p_path, 'GET');
+    UTL_HTTP.set_header(l_req, 'Accept', 'application/json');
+    IF g_token IS NOT NULL THEN
+      UTL_HTTP.set_header(l_req, 'Authorization', 'Bearer ' || g_token);
+    END IF;
+    l_resp := UTL_HTTP.get_response(l_req);
+    BEGIN
+      LOOP
+        UTL_HTTP.read_text(l_resp, l_buf, 32767);
+        DBMS_LOB.writeappend(l_out, LENGTH(l_buf), l_buf);
+      END LOOP;
+    EXCEPTION
+      WHEN UTL_HTTP.end_of_body THEN NULL;
+    END;
+    UTL_HTTP.end_response(l_resp);
+    RETURN l_out;
+  END f_get_clob;
+
+  FUNCTION f_get_blob(p_path IN VARCHAR2) RETURN BLOB IS
+    l_req   UTL_HTTP.req;
+    l_resp  UTL_HTTP.resp;
+    l_raw   RAW(32767);
+    l_out   BLOB;
+  BEGIN
+    p_config_wallet;
+    DBMS_LOB.createtemporary(l_out, TRUE);
+    l_req := UTL_HTTP.begin_request(g_base_url || p_path, 'GET');
+    UTL_HTTP.set_header(l_req, 'Accept', 'application/pdf');
+    l_resp := UTL_HTTP.get_response(l_req);
+    BEGIN
+      LOOP
+        UTL_HTTP.read_raw(l_resp, l_raw, 32767);
+        DBMS_LOB.writeappend(l_out, UTL_RAW.length(l_raw), l_raw);
+      END LOOP;
+    EXCEPTION
+      WHEN UTL_HTTP.end_of_body THEN NULL;
+    END;
+    UTL_HTTP.end_response(l_resp);
+    RETURN l_out;
+  END f_get_blob;
+
+  FUNCTION f_post_json(p_path IN VARCHAR2, p_body IN CLOB,
+                       p_extra_header IN VARCHAR2 DEFAULT NULL,
+                       p_extra_value  IN VARCHAR2 DEFAULT NULL) RETURN CLOB IS
+    l_req   UTL_HTTP.req;
+    l_resp  UTL_HTTP.resp;
+    l_buf   VARCHAR2(32767);
+    l_out   CLOB;
+    l_off   NUMBER := 1;
+    l_amt   NUMBER := 8000;
+    l_chunk VARCHAR2(32767);
+  BEGIN
+    p_config_wallet;
+    DBMS_LOB.createtemporary(l_out, TRUE);
+    l_req := UTL_HTTP.begin_request(g_base_url || p_path, 'POST');
+    UTL_HTTP.set_header(l_req, 'Content-Type', 'application/json; charset=utf-8');
+    UTL_HTTP.set_header(l_req, 'Transfer-Encoding', 'chunked');
+    IF g_token IS NOT NULL THEN
+      UTL_HTTP.set_header(l_req, 'Authorization', 'Bearer ' || g_token);
+    END IF;
+    IF p_extra_header IS NOT NULL THEN
+      UTL_HTTP.set_header(l_req, p_extra_header, p_extra_value);
+    END IF;
+
+    WHILE l_off <= DBMS_LOB.getlength(p_body) LOOP
+      l_chunk := DBMS_LOB.substr(p_body, l_amt, l_off);
+      UTL_HTTP.write_text(l_req, l_chunk);
+      l_off := l_off + l_amt;
+    END LOOP;
+
+    l_resp := UTL_HTTP.get_response(l_req);
+    BEGIN
+      LOOP
+        UTL_HTTP.read_text(l_resp, l_buf, 32767);
+        DBMS_LOB.writeappend(l_out, LENGTH(l_buf), l_buf);
+      END LOOP;
+    EXCEPTION
+      WHEN UTL_HTTP.end_of_body THEN NULL;
+    END;
+    UTL_HTTP.end_response(l_resp);
+    RETURN l_out;
+  END f_post_json;
+
+  --------------------------------------------------------------------------
+  -- Escapa um valor para dentro de string JSON.
+  -- Sem isto, um nome com aspas (ex.: EMPRESA "X" LTDA) quebra o payload
+  -- inteiro — a API recusa com 400 e a causa nao e obvia.
+  --------------------------------------------------------------------------
+  FUNCTION f_esc(p_txt IN VARCHAR2) RETURN VARCHAR2 IS
+    l VARCHAR2(32767) := p_txt;
+  BEGIN
+    IF l IS NULL THEN RETURN ''; END IF;
+    l := REPLACE(l, '\', '\\');   -- barra primeiro, senao duplica as demais
+    l := REPLACE(l, '"',  '\"');
+    l := REPLACE(l, CHR(13), '\r');
+    l := REPLACE(l, CHR(10), '\n');
+    l := REPLACE(l, CHR(9),  '\t');
+    RETURN l;
+  END f_esc;
+
+  --------------------------------------------------------------------------
+  -- Monta o parâmetro `data` (JSON) do contrato offline
+  --------------------------------------------------------------------------
+  FUNCTION f_json_boleto(p_boleto IN t_boleto) RETURN VARCHAR2 IS
+  BEGIN
+    RETURN '{'
+      || '"agencia":"'           || p_boleto.agencia           || '",'
+      || '"conta_corrente":"'    || p_boleto.conta_corrente    || '",'
+      || CASE WHEN p_boleto.convenio IS NOT NULL
+              THEN '"convenio":"' || p_boleto.convenio || '",' END
+      || '"carteira":"'          || p_boleto.carteira          || '",'
+      || '"nosso_numero":"'      || p_boleto.nosso_numero      || '",'
+      || '"cedente":"' || f_esc(p_boleto.cedente) || '",'
+      || '"documento_cedente":"' || p_boleto.documento_cedente || '",'
+      || '"sacado":"' || f_esc(p_boleto.sacado) || '",'
+      || '"sacado_documento":"'  || p_boleto.sacado_documento  || '",'
+      || '"valor":'              || TO_CHAR(p_boleto.valor, 'FM9999999990.00',
+                                            'NLS_NUMERIC_CHARACTERS=''.,''') || ','
+      || '"data_vencimento":"'   || TO_CHAR(p_boleto.data_vencimento, 'YYYY-MM-DD') || '"'
+      || '}';
+  END f_json_boleto;
+
+  --------------------------------------------------------------------------
+  -- API pública
+  --------------------------------------------------------------------------
+  FUNCTION dados_boleto(p_boleto IN t_boleto) RETURN t_dados_boleto IS
+    l_json CLOB;
+    l_out  t_dados_boleto;
+  BEGIN
+    l_json := f_get_clob('/api/boleto/data'
+                || '?bank=' || p_boleto.banco
+                || '&data=' || UTL_URL.escape(f_json_boleto(p_boleto), TRUE));
+    APEX_JSON.parse(l_json);
+    l_out.nosso_numero           := APEX_JSON.get_varchar2('nosso_numero');
+    l_out.nosso_numero_formatado := APEX_JSON.get_varchar2('nosso_numero_formatado');
+    l_out.nosso_numero_dv        := APEX_JSON.get_varchar2('nosso_numero_dv');
+    l_out.codigo_barras          := APEX_JSON.get_varchar2('codigo_barras');
+    l_out.linha_digitavel        := APEX_JSON.get_varchar2('linha_digitavel');
+    RETURN l_out;
+  END dados_boleto;
+
+  FUNCTION gerar_boleto_pdf(p_boleto IN t_boleto) RETURN BLOB IS
+  BEGIN
+    RETURN f_get_blob('/api/boleto'
+             || '?bank=' || p_boleto.banco
+             || '&type=pdf'
+             || '&data=' || UTL_URL.escape(f_json_boleto(p_boleto), TRUE));
+  END gerar_boleto_pdf;
+
+  --------------------------------------------------------------------------
+  -- Cobranca ONLINE (API do banco): credencial -> token bapi_ -> cobranca
+  --------------------------------------------------------------------------
+  FUNCTION cadastrar_credenciais(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
+                                 p_credenciais_json IN CLOB) RETURN VARCHAR2 IS
+    l_resp CLOB;
+  BEGIN
+    l_resp := f_post_json('/credenciais',
+                TO_CLOB('{"tenant_id":"' || f_esc(p_tenant) || '",'
+                        || '"provider":"' || f_esc(p_provider) || '",'
+                        || '"credentials":') || p_credenciais_json || TO_CLOB('}'));
+    APEX_JSON.parse(l_resp);
+    g_token := APEX_JSON.get_varchar2('token');
+    RETURN g_token;
+  END cadastrar_credenciais;
+
+  FUNCTION registrar_cobranca(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
+                              p_boleto IN t_boleto,
+                              p_account_config_json IN VARCHAR2 DEFAULT '{}')
+    RETURN t_cobranca IS
+    l_resp CLOB;
+    l_out  t_cobranca;
+    l_val  VARCHAR2(40);
+  BEGIN
+    -- 424 = o BANCO recusou a credencial (nao e erro do servico).
+    -- 403 = o token nao pertence a este tenant+provider: o bapi_ e amarrado
+    --       aos dois, entao token do C6 em rota Sicoob e recusado de proposito.
+    l_val := TO_CHAR(p_boleto.valor, 'FM9999999990.00',
+                     'NLS_NUMERIC_CHARACTERS=''.,''');
+    l_resp := f_post_json('/cobranca',
+      TO_CLOB('{'
+        || '"tenant_id":"' || f_esc(p_tenant)   || '",'
+        || '"provider":"'  || f_esc(p_provider) || '",'
+        || '"account_config":' || p_account_config_json || ','
+        || '"cobranca":{'
+        ||   '"valor":' || l_val || ','
+        ||   '"vencimento":"' || TO_CHAR(p_boleto.data_vencimento, 'YYYY-MM-DD') || '",'
+        ||   '"seu_numero":"' || f_esc(p_boleto.nosso_numero) || '",'
+        ||   '"pagador":{"nome":"' || f_esc(p_boleto.sacado) || '",'
+        ||                '"documento":"' || f_esc(p_boleto.sacado_documento) || '"}'
+        || '}}'));
+    APEX_JSON.parse(l_resp);
+    l_out.id              := APEX_JSON.get_varchar2('id');
+    l_out.status          := APEX_JSON.get_varchar2('status');
+    l_out.linha_digitavel := APEX_JSON.get_varchar2('linha_digitavel');
+    l_out.codigo_barras   := APEX_JSON.get_varchar2('codigo_barras');
+    l_out.pix_copia_cola  := APEX_JSON.get_varchar2('pix_copia_cola');
+    RETURN l_out;
+  END registrar_cobranca;
+
+  FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
+                         p_payload IN CLOB) RETURN CLOB IS
+  BEGIN
+    -- /api/remessa espera multipart; via JSON use /api/render/remessa
+    RETURN f_post_json('/api/render/remessa',
+             TO_CLOB('{"bank":"' || p_bank || '","type":"' || p_tipo || '","data":')
+             || p_payload || TO_CLOB('}'));
+  END gerar_remessa;
+
+  FUNCTION processar_retorno(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
+                             p_arquivo IN CLOB) RETURN CLOB IS
+  BEGIN
+    -- Requer multipart: em PL/SQL puro, prefira APEX_WEB_SERVICE.make_rest_request
+    -- com p_body_blob (ver README). Mantido aqui para referência de contrato.
+    RAISE_APPLICATION_ERROR(-20001,
+      'Use APEX_WEB_SERVICE.make_rest_request (multipart) — ver examples/oracle/README.md');
+  END processar_retorno;
+
+  FUNCTION criar_job_lote(p_tenant IN VARCHAR2, p_boletos_json IN CLOB,
+                          p_idempotency_key IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+    l_resp CLOB;
+  BEGIN
+    l_resp := f_post_json('/jobs/boletos',
+                TO_CLOB('{"tenant_id":"' || p_tenant || '","boletos":')
+                || p_boletos_json || TO_CLOB('}'),
+                CASE WHEN p_idempotency_key IS NOT NULL THEN 'Idempotency-Key' END,
+                p_idempotency_key);
+    APEX_JSON.parse(l_resp);
+    RETURN APEX_JSON.get_varchar2('job_id');
+  END criar_job_lote;
+
+  FUNCTION consultar_job(p_tenant IN VARCHAR2, p_job_id IN VARCHAR2) RETURN CLOB IS
+  BEGIN
+    RETURN f_get_clob('/jobs/boletos/' || p_job_id || '?tenant_id=' || p_tenant);
+  END consultar_job;
+
+  FUNCTION healthcheck RETURN BOOLEAN IS
+    l_json CLOB;
+  BEGIN
+    l_json := f_get_clob('/health');
+    APEX_JSON.parse(l_json);
+    RETURN APEX_JSON.get_varchar2('status') = 'ok';
+  EXCEPTION
+    WHEN OTHERS THEN RETURN FALSE;
+  END healthcheck;
+
+END cobranca_api;
+/

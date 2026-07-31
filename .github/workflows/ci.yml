@@ -1,0 +1,100 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - "hml/**"
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 0"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Repositório público: o GITHUB_TOKEN nasce somente-leitura. Sem `packages:
+# write` o push da imagem para o ghcr.io responde 403.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12 (exigido pela engine pyCobrança)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ghcr.io
+        # PR de fork recebe token somente-leitura: o login falharia e derrubaria
+        # o build inteiro. Contribuição externa não precisa do registry.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Normalize image name to lowercase
+        id: image
+        run: echo "name=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          load: true
+      - name: Install test pre-requisites
+        run: |
+          pip install -e "./python-client[dev]"
+          pip install -r gateway/requirements.txt -r gateway/requirements-dev.txt
+          pip install openapi-spec-validator pyyaml
+      - name: Validate OpenAPI specs (Core 3.0 + Gateway 3.1)
+        run: |
+          python - <<'EOF'
+          import sys, yaml
+          from openapi_spec_validator.validation import (openapi_v30_spec_validator,
+                                                          openapi_v31_spec_validator)
+
+          core = yaml.safe_load(open('docs/openapi.yaml'))
+          errs = list(openapi_v30_spec_validator.iter_errors(core))
+          for e in errs:
+              print('CORE:', '/'.join(map(str, e.absolute_path)), '->', e.message[:160])
+
+          sys.path.insert(0, 'gateway')
+          from app.main import app
+          gw = app.openapi()
+          errs2 = list(openapi_v31_spec_validator.iter_errors(gw))
+          for e in errs2:
+              print('GATEWAY:', '/'.join(map(str, e.absolute_path)), '->', e.message[:160])
+
+          if errs or errs2:
+              sys.exit(1)
+          print(f"OK: Core OAS 3.0 valida ({len(core['paths'])} paths) | "
+                f"Gateway OAS 3.1 valida ({len(gw['paths'])} paths)")
+          EOF
+      - name: Postman coverage (endpoint sem BC-xxx quebra o build)
+        run: python postman/check_coverage.py
+      - name: Test (gateway Python/FastAPI)
+        run: cd gateway && PYTHONPATH=. pytest -v
+      - name: Test (python-client)
+        run: cd python-client && pytest -v
+      - name: Push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=inline
+          push: true
+        # `repository_owner` preserva a caixa do login ("Maxwbh") — comparar em
+        # minúsculas evita o falso negativo que deixava o push nunca acontecer.
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(steps.image.outputs.name, 'maxwbh/') }}

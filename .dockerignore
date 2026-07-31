@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentação (não vai para a imagem)
+*.md
+docs/
+# EXCEÇÃO: o openapi.yaml é asset de RUNTIME (servido em /api/openapi.* e /api/docs),
+# então precisa ir para a imagem mesmo com docs/ ignorado.
+!docs/openapi.yaml
+DEPLOY.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+README.md
+LICENSE
+
+# Testes
+spec/
+.rspec
+coverage/
+test_run.py
+*.pyc
+__pycache__
+
+# Exemplos e clientes auxiliares
+examples/
+python-client/
+
+# Editores
+*~
+*.swp
+*.swo
+.vscode
+.idea
+
+# Logs e temporários
+*.log
+log/
+tmp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arquivos Docker / infra (não precisam ir para dentro da imagem)
+Dockerfile
+Dockerfile.rghost
+.dockerignore
+docker-compose.yml
+render.yaml
+start.sh
+scripts/
+
+# Ruby local
+.bundle/
+vendor/bundle/

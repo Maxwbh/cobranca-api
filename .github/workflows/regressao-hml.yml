@@ -1,0 +1,121 @@
+# Regressão Postman completa no HML, dentro da JANELA do sandbox C6.
+#
+# Por que agendado: o sandbox do C6 só autentica seg-sex, 7h-23h (BRT). Fora
+# disso a auth devolve 403, a API traduz para 424 e — como a suíte não tolera
+# 424 com credencial presente — o relatório encheria de falhas de HORÁRIO, não
+# de defeito. O cron abaixo cai em segunda 10:00 BRT, bem dentro da janela.
+#
+# O `schedule` roda no branch DEFAULT (main). Para disparar fora da hora, use
+# "Run workflow" (workflow_dispatch) na aba Actions.
+#
+# Em fork o agendado não roda: sem os secrets do sandbox a suíte falharia por
+# credencial ausente, não por defeito. Rode manualmente depois de cadastrá-los.
+#
+# Secrets necessários (Settings > Secrets and variables > Actions):
+#   C6: COB_C6_CLIENT_ID, COB_C6_CLIENT_SECRET, COB_C6_PFX_BASE64,
+#       COB_C6_PFX_PASSWORD
+#   Sicoob — client_id + UMA das duas vias:
+#       COB_SICOOB_CLIENT_ID
+#       (a) COB_SICOOB_ACCESS_TOKEN
+#       (b) COB_SICOOB_CLIENT_SECRET + COB_SICOOB_PFX_BASE64 + COB_SICOOB_PFX_PASSWORD
+#   Conta: COB_CHAVE_PIX, COB_AGENCIA, COB_CONTA, COB_CONVENIO
+# Faltando C6 por completo, ou o Sicoob sem NENHUMA das duas vias, o pré-flight
+# da coleção acusa GRAVE e o job falha — de propósito.
+name: Regressão HML (janela C6)
+
+on:
+  schedule:
+    # Segunda, 13:00 UTC = 10:00 BRT — dentro da janela (7h-23h BRT).
+    # O cron do GitHub pode atrasar sob carga; 10h dá folga larga até as 23h.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL do ambiente alvo"
+        required: false
+        default: "https://boleto-cnab-api.onrender.com"
+      smoke:
+        description: "Só o smoke (< 5 min)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  regressao:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.repository == 'Maxwbh/cobranca-api' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar newman
+        run: npm i -g newman newman-reporter-htmlextra
+
+      - name: Conferir a janela do sandbox C6
+        run: |
+          HORA=$(TZ=America/Sao_Paulo date +%H)
+          DIA=$(TZ=America/Sao_Paulo date +%u)
+          echo "Agora: $(TZ=America/Sao_Paulo date '+%a %d/%m %H:%M') BRT"
+          if [ "$DIA" -gt 5 ] || [ "$((10#$HORA))" -lt 7 ] || [ "$((10#$HORA))" -ge 23 ]; then
+            echo "::warning::Fora da janela do sandbox C6 (seg-sex 7h-23h BRT) —"\
+                 "os requests online do C6 vão responder 424 por HORÁRIO, não por credencial."
+          else
+            echo "Dentro da janela do sandbox C6."
+          fi
+
+      - name: Regressão (segredos por --env-var, nunca em arquivo)
+        env:
+          COB_BASE_URL: ${{ inputs.base_url || 'https://boleto-cnab-api.onrender.com' }}
+          COB_C6_CLIENT_ID: ${{ secrets.COB_C6_CLIENT_ID }}
+          COB_C6_CLIENT_SECRET: ${{ secrets.COB_C6_CLIENT_SECRET }}
+          COB_C6_PFX_BASE64: ${{ secrets.COB_C6_PFX_BASE64 }}
+          COB_C6_PFX_PASSWORD: ${{ secrets.COB_C6_PFX_PASSWORD }}
+          COB_SICOOB_CLIENT_ID: ${{ secrets.COB_SICOOB_CLIENT_ID }}
+          COB_SICOOB_ACCESS_TOKEN: ${{ secrets.COB_SICOOB_ACCESS_TOKEN }}
+          COB_SICOOB_CLIENT_SECRET: ${{ secrets.COB_SICOOB_CLIENT_SECRET }}
+          COB_SICOOB_PFX_BASE64: ${{ secrets.COB_SICOOB_PFX_BASE64 }}
+          COB_SICOOB_PFX_PASSWORD: ${{ secrets.COB_SICOOB_PFX_PASSWORD }}
+          COB_CHAVE_PIX: ${{ secrets.COB_CHAVE_PIX }}
+          COB_AGENCIA: ${{ secrets.COB_AGENCIA }}
+          COB_CONTA: ${{ secrets.COB_CONTA }}
+          COB_CONVENIO: ${{ secrets.COB_CONVENIO }}
+          COB_E2EID: ${{ secrets.COB_E2EID }}
+        run: |
+          if [ "${{ inputs.smoke }}" = "true" ]; then
+            ./postman/run-regressao.sh --smoke
+          else
+            ./postman/run-regressao.sh
+          fi
+
+      - name: Resumo no Summary do job
+        if: always()
+        run: |
+          [ -f postman/reports/regressao.json ] || exit 0
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("postman/reports/regressao.json"))
+          r = d["run"]
+          falhas = {}
+          for f in r["failures"]:
+              n = f["source"]["name"] if f.get("source") else "?"
+              falhas[n] = falhas.get(n, 0) + 1
+          print("## Regressão HML\n")
+          print(f"- **{len(r['executions'])}** requests executados")
+          print(f"- **{len(r['failures'])}** assertions falharam em **{len(falhas)}** requests\n")
+          if falhas:
+              print("| Request | Falhas |\n|---|---|")
+              for n, q in falhas.items():
+                  print(f"| {n} | {q} |")
+          else:
+              print("Sem falhas.")
+          PY
+
+      - name: Guardar evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regressao-hml
+          path: postman/reports/
+          retention-days: 30

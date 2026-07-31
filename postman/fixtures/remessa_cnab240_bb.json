@@ -1,0 +1,26 @@
+{
+  "empresa_mae": "Empresa Teste LTDA",
+  "documento_cedente": "11222333000181",
+  "agencia": "3073",
+  "conta_corrente": "12345678",
+  "digito_conta": "0",
+  "convenio": "1234567",
+  "carteira": "18",
+  "variacao_carteira": "017",
+  "sequencial_remessa": 1,
+  "pagamentos": [
+    {
+      "nosso_numero": "123456789",
+      "numero_documento": "DOC-2026-001",
+      "data_vencimento": "2027-12-31",
+      "valor": 1500.0,
+      "sacado": "Joao da Silva",
+      "sacado_documento": "52998224725",
+      "sacado_endereco": "Rua Teste, 100",
+      "sacado_bairro": "Centro",
+      "sacado_cidade": "Sao Paulo",
+      "sacado_uf": "SP",
+      "sacado_cep": "01000000"
+    }
+  ]
+}
