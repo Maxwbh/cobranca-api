@@ -1,6 +1,12 @@
 # Changelog
 
-Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
+Mudanças **do produto** — o que muda para quem consome a API, roda a imagem ou
+instala o cliente.
+
+Mudança de **processo** não entra aqui: CI, workflows, templates de issue e PR,
+scripts de release, configuração de deploy e convenção de branches vivem no
+histórico do git e nos próprios arquivos. O critério é uma pergunta só: *isso
+muda alguma coisa para quem usa o serviço?* Se a resposta for não, fica fora.
 
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
@@ -18,55 +24,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   boot) e valor inválido cai para `info` com aviso, em vez de virar
   crash-loop. `LOG_LEVEL=info` entra como default no `ENV` da imagem.
 
-### Adicionado
-- `DEPLOY.md` documenta o `LOG_LEVEL` e lista as variáveis do runtime **Ruby**
-  (`PUMA_*`, `RACK_ENV`, `RUBY_GC_HEAP_GROWTH_FACTOR`) que sobram no painel de
-  serviços criados antes da 2.0.0 e hoje não fazem nada — junto do `PORT`
-  herdado em `9292`, a porta do antigo Banking Core.
-
 ## [2.1.0] - 2026-07-31
 
 ### Corrigido
-- **CI não rodava**: o workflow `Build` disparava em `master`, mas o branch
-  default do repositório é `main` — nenhum push executava a suíte. O gate do
-  push da imagem tinha o mesmo erro, somado a uma comparação sensível à caixa
-  (`github.repository_owner == 'maxwbh'` nunca casa com `Maxwbh`).
-- **Push da imagem para o ghcr.io responderia 403**: falta de `permissions:
-  packages: write` — em repositório público o `GITHUB_TOKEN` nasce
-  somente-leitura. O login no registry passa a ser pulado em PR de fork, que
-  recebe token sem escrita e derrubaria o build inteiro.
-- **`keepalive` apontava para um host de terceiro**: o default embutido pingava
-  uma instância Render antiga a cada 10 min. Sem a variável de repo
-  `KEEPALIVE_URLS` o job agora sai limpo sem pingar nada — fork nenhum bate no
-  ambiente de outra pessoa.
-- **`regressao-hml` agendada em fork** falharia sempre por credencial ausente:
-  o `schedule` passa a rodar só no repositório de origem; `workflow_dispatch`
-  continua liberado.
-- Template de bug pedia a versão do **Ruby**, removido do projeto na 2.0.0.
 - **Link quebrado servido pela própria API**: `_DOC_REPO` (`app/main.py`), que
   aparece na descrição da tag `bancos` do Swagger, apontava para
   `/tree/master/docs/development` — 404, já que o branch default é `main`.
-  Mesma troca em `DEPLOY.md`, `CONTRIBUTING.md` e `scripts/README.md`, que
-  ainda mandavam `git push origin master`.
-- **`render.yaml` fazia deploy de um branch inexistente** (`branch: master`),
-  então o `autoDeploy: true` nunca disparava.
 - **5 links `/blob/master/` e `/tree/master/` no `docs/openapi.yaml`** —
   CHANGELOG, guias por banco, validação de campos e encargos. Todos 404, e
   todos servidos no Swagger público.
-- **`scripts/bump-version.sh` não funcionava**: escrevia em
-  `python-client/boleto_cnab_client/__init__.py` (pacote que não existe — é
-  `cobranca_api`), procurava `## [Unreleased]` num CHANGELOG que usa
-  `## [Não lançado]`, e não tocava em `app.version` nem na spec OpenAPI. Na
-  prática só alterava o arquivo `VERSION`. Reescrito para cobrir os quatro
-  pontos e falhar em vez de seguir em silêncio.
-- Exemplo de issue no `CONTRIBUTING.md` mostrava um erro **Ruby**
-  (`NoMethodError`), linguagem removida do projeto na 2.0.0.
 
 ### Adicionado
-- `CODE_OF_CONDUCT.md` (Contributor Covenant 1.4), `.github/pull_request_template.md`
-  e `.github/dependabot.yml` (pip do gateway e do cliente, GitHub Actions e
-  imagem base do Docker) — governança do repositório público.
-- README com os links de contribuição, conduta, segurança e changelog.
 - **`POST /api/render/fatura`** — renderiza a fatura pela engine
   (`render_fatura_pdf`): corpo livre no topo + boleto de pagamento abaixo, num
   só PDF. Passthrough puro (o gateway não soma nem calcula; o `valor` vem no
@@ -75,13 +43,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   com `400`.
 
 ### Alterado
-- `CONTRIBUTING.md` documenta o prefixo `hml/` na convenção de branches: o
-  workflow `Build` dispara no push de `hml/**`, o que permite validar a suíte
-  antes de abrir o PR.
 - **Python mínimo 3.14 → 3.12** e **engine `pycobranca` ≥ 1.0.2**: a 1.0.2
   baixou o piso para `>=3.12`, que tem wheels prontos e **elimina a compilação
-  a partir do código-fonte** (e o problema do pydantic no `3.14.0rc2`). CI,
-  Dockerfile (`python:3.12-slim`) e docs atualizados.
+  a partir do código-fonte** (e o problema do pydantic no `3.14.0rc2`).
+  Dockerfile passa a `python:3.12-slim`.
 
 ## [2.0.0] - 2026-07-28
 
@@ -112,16 +77,12 @@ foi removido (ver "Removido").
   tamanhos, formatos, carteiras válidas, nosso número e campos especiais;
   os erros vêm em **lista** (`validation_errors`), um por campo. Inclui
   **CNPJ alfanumérico** (formato 2026). Guia: `docs/api/validacao-campos.md`.
-- Suítes de teste do gateway (offline, jobs, providers) e coleção Postman com
-  regressão de contrato; CI valida as duas specs OpenAPI (3.0 offline, 3.1
-  gateway) e a cobertura Postman.
 
 ### Alterado
 - Imagem Docker `python:3.14-slim` (exigência da engine), processo único,
   usuário não-root; `git` sai da imagem (a engine vem do PyPI, não de git).
 - Dependência da engine: `pycobranca>=1.0.1,<2` (PyPI) — build reprodutível.
 - OFX passa a ser lido pela engine (regra de nosso número **por banco**).
-- Docs, Swagger, README, CI e deploy alinhados ao serviço 100% Python.
 
 ### Removido
 - Engine Ruby (`lib/`, `spec/`, `config/`, `config.ru`, `Gemfile*`), variantes
