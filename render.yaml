@@ -28,6 +28,9 @@ services:
       - key: PORT
         value: "8000"
 
+      # Vira --log-level do uvicorn. critical|error|warning|info|debug|trace
+      # (a caixa não importa). Valor inválido não derruba o serviço: o
+      # container avisa e assume "info".
       - key: LOG_LEVEL
         value: "info"
 

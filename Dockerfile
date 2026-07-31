@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PORT=8000 \
+    LOG_LEVEL=info \
     CREDENTIAL_DB_PATH=/app/data/credentials.db \
     ARTIFACT_DIR=/app/data/jobs \
     PYTHONUNBUFFERED=1 \
@@ -45,4 +46,19 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/health" || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+
+# LOG_LEVEL vira --log-level do uvicorn. Duas defesas, porque essa variavel
+# costuma vir de painel (Render, Docker Compose) e nao de arquivo revisado:
+#   - caixa alta e normalizada: o uvicorn so aceita os valores em minusculas e
+#     aborta em "INFO", derrubando o container no boot;
+#   - valor invalido cai para "info" com aviso, em vez de virar crash-loop --
+#     um typo em variavel de ambiente nao deveria tirar a API do ar.
+# `exec` mantem o uvicorn como PID do processo, para o tini repassar os sinais.
+CMD ["sh", "-c", "\
+NIVEL=$(printf '%s' \"${LOG_LEVEL:-info}\" | tr '[:upper:]' '[:lower:]'); \
+case \"$NIVEL\" in \
+  critical|error|warning|info|debug|trace) ;; \
+  *) echo \"[entrypoint] LOG_LEVEL='${LOG_LEVEL}' invalido (use: critical, error, warning, info, debug, trace) - assumindo 'info'\" >&2; NIVEL=info ;; \
+esac; \
+exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT}\" --log-level \"$NIVEL\"\
+"]

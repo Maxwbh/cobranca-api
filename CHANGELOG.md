@@ -7,6 +7,23 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- **`LOG_LEVEL` não tinha efeito nenhum.** A variável era declarada no
+  `render.yaml` desde sempre, mas nada a lia: o código não configura logging e
+  o `CMD` do Dockerfile não passava `--log-level` (o uvicorn lê
+  `UVICORN_LOG_LEVEL`, não `LOG_LEVEL`). Quem subia o serviço com
+  `LOG_LEVEL=debug` continuava com log em `info`, sem aviso. O `CMD` agora
+  mapeia a variável para o `--log-level` do uvicorn, com dois cuidados: a
+  caixa é normalizada (o uvicorn aborta em `INFO` e derrubaria o container no
+  boot) e valor inválido cai para `info` com aviso, em vez de virar
+  crash-loop. `LOG_LEVEL=info` entra como default no `ENV` da imagem.
+
+### Adicionado
+- `DEPLOY.md` documenta o `LOG_LEVEL` e lista as variáveis do runtime **Ruby**
+  (`PUMA_*`, `RACK_ENV`, `RUBY_GC_HEAP_GROWTH_FACTOR`) que sobram no painel de
+  serviços criados antes da 2.0.0 e hoje não fazem nada — junto do `PORT`
+  herdado em `9292`, a porta do antigo Banking Core.
+
 ## [2.1.0] - 2026-07-31
 
 ### Corrigido

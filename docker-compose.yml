@@ -10,6 +10,8 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
+      # critical|error|warning|info|debug|trace — use debug para ver cada request
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
