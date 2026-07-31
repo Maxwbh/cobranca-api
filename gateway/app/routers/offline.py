@@ -184,7 +184,7 @@ def boleto(bank: str, data: str, type: str = "pdf",
     try:
         valores = _data_param(data)
         info = pycob.dados_boleto(bank, valores)
-        pdf = pycob.pdf_boleto(bank, valores)
+        pdf = pycob.pdf_boleto(bank, valores, template)
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
     if include_data.lower() == "true":

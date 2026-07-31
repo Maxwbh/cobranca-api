@@ -14,6 +14,30 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Corrigido
+- **`POST /jobs/boletos` respondia `500` quando dois itens do lote tinham o
+  mesmo identificador.** O `item_id` deriva de `external_id`, `seu_numero` ou
+  `numero_documento` e é chave primária junto com o `job_id` — dois itens com o
+  mesmo valor violavam a restrição e o `IntegrityError` do banco vazava como
+  erro interno, sem dizer ao cliente o que corrigir. Agora responde **`422`
+  listando os identificadores repetidos e os índices em que aparecem**. Item
+  sem nenhum dos três campos continua caindo no índice, que nunca colide.
+  Mesma proteção aplicada a `POST /jobs/cnab/remessas`.
+- **`instrucoes` enviado como texto virava um caractere por linha no boleto.**
+  A engine desenha o campo linha a linha e espera uma **lista**; recebendo a
+  string que o JSON naturalmente carrega, iterava os caracteres — o boleto saía
+  com `A`, `p`, `o`, `s`… um por linha, até estourar a caixa, sem erro e com o
+  texto perdido. O gateway passa a separar por `\n` antes de entregar; cada
+  linha chega ao PDF **exatamente como enviada**, sem reformatação.
+  - Os tamanhos passam a ser **validados**: no máximo **7 linhas de 100
+    caracteres**, medidos na área impressa (idêntica com e sem PIX). Exceder
+    responde **`400`** dizendo qual linha e com quantos caracteres. Antes, linha
+    comprida atravessava a coluna de Desconto/Mora/Valor cobrado e linha além
+    da sétima simplesmente não era desenhada — nos dois casos, em silêncio.
+- **`template` era aceito e ignorado em `GET /api/boleto` e
+  `POST /api/boleto/multi`.** O parâmetro nunca chegava à engine, então
+  `template=classico` devolvia um PDF idêntico ao `moderno` — o modelo clássico
+  era inalcançável pela API. Agora o modelo é repassado, e valor fora de
+  `moderno`/`classico` responde **`400`** em vez de cair no default em silêncio.
 - **`LOG_LEVEL` não tinha efeito nenhum.** A variável era declarada no
   `render.yaml` desde sempre, mas nada a lia: o código não configura logging e
   o `CMD` do Dockerfile não passava `--log-level` (o uvicorn lê

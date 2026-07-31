@@ -69,19 +69,19 @@
     },
     {
       "key": "pagador_nome",
-      "value": "Fulano de Tal HML"
+      "value": "Vitória Gabriela Emanuelly Ramos"
     },
     {
       "key": "pagador_documento",
-      "value": "52998224725"
+      "value": "77044362109"
     },
     {
       "key": "cedente",
-      "value": "Empresa Teste LTDA"
+      "value": "Aurora Servicos Empresariais LTDA"
     },
     {
       "key": "documento_cedente",
-      "value": "11222333000181"
+      "value": "47816329000199"
     },
     {
       "key": "agencia_offline",
@@ -101,7 +101,12 @@
     },
     {
       "key": "boleto_data_json",
-      "value": "{\"valor\": 150.0, \"cedente\": \"Empresa Teste LTDA\", \"documento_cedente\": \"11222333000181\", \"sacado\": \"João da Silva\", \"sacado_documento\": \"52998224725\", \"agencia\": \"3073\", \"conta_corrente\": \"12345678\", \"convenio\": \"1234567\", \"carteira\": \"18\", \"nosso_numero\": \"123\", \"data_vencimento\": \"2027-12-30\"}"
+      "value": "{\"valor\": 1500.0, \"cedente\": \"Aurora Servicos Empresariais LTDA\", \"documento_cedente\": \"47816329000199\", \"sacado\": \"Vitória Gabriela Emanuelly Ramos\", \"sacado_documento\": \"77044362109\", \"sacado_endereco\": \"Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia, GO, CEP 74360390\", \"agencia\": \"3073\", \"conta_corrente\": \"12345678\", \"convenio\": \"1234567\", \"carteira\": \"18\", \"nosso_numero\": \"123\", \"numero_documento\": \"CTR-2025-001\", \"data_vencimento\": \"2027-12-30\", \"instrucoes\": \"Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento.\"}"
+    },
+    {
+      "key": "cnpj_alfanumerico",
+      "value": "BRPPH4JW000140",
+      "type": "string"
     }
   ],
   "item": [

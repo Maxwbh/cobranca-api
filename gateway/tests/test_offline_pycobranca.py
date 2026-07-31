@@ -7,6 +7,8 @@ import json
 import pytest
 from pathlib import Path
 
+from app.core import pycob
+
 # Fixtures resolvidas a partir DESTE arquivo, nao do cwd: o CI roda
 # `cd gateway && pytest`, mas rodar da raiz do repo tambem tem de funcionar.
 FIXTURES = Path(__file__).resolve().parents[2] / "postman" / "fixtures"
@@ -466,3 +468,113 @@ def test_iof_e_abatimento_gravam_o_valor(client):
         bruto = arq[fim - 12:fim + 1]
         assert bruto == format_valor(valor, 13)
         assert int(bruto) / 100 == valor
+
+
+# O parametro `template` existia na rota, era aceito sem erro e nunca chegava
+# na engine: `pdf_boleto` chamava render_boleto_pdf sem `modelo`. Resultado —
+# `classico` saia pixel a pixel igual a `moderno`, e o modelo classico da
+# engine era inalcancavel pela API. Detectado comparando os PDFs do servico em
+# producao: PNG renderizado com sha256 identico para os dois templates.
+#
+# O teste compara TAMANHO, nao bytes: o PDF carrega metadados variaveis, entao
+# duas chamadas com o mesmo modelo diferem nos bytes. O tamanho e estavel por
+# modelo (moderno ~5427, classico ~5013). Comparar pixels seria mais forte,
+# mas exigiria um renderizador que nao esta nas dependencias de teste.
+def _pdf(client, template=None):
+    import json as _json
+    q = {"bank": "banco_brasil", "type": "pdf", "data": _json.dumps(DADOS_BB)}
+    if template:
+        q["template"] = template
+    r = client.get("/api/boleto", params=q)
+    assert r.status_code == 200, r.text
+    assert r.content[:4] == b"%PDF"
+    return r.content
+
+
+def test_mesmo_template_gera_pdf_do_mesmo_tamanho(client):
+    # Ancora do teste seguinte: sem isto, uma diferenca de tamanho entre
+    # modelos poderia ser so ruido de geracao.
+    assert len(_pdf(client, "moderno")) == len(_pdf(client, "moderno"))
+
+
+def test_template_classico_gera_pdf_diferente_do_moderno(client):
+    assert len(_pdf(client, "classico")) != len(_pdf(client, "moderno")), \
+        "template ignorado: classico saiu igual a moderno"
+
+
+def test_template_default_continua_moderno(client):
+    assert len(_pdf(client)) == len(_pdf(client, "moderno"))
+
+
+def test_template_invalido_responde_400(client):
+    import json as _json
+    r = client.get("/api/boleto", params={
+        "bank": "banco_brasil", "type": "pdf", "template": "inexistente",
+        "data": _json.dumps(DADOS_BB)})
+    assert r.status_code == 400, r.text
+    assert "template" in r.text
+
+
+# `instrucoes` chegava crua na engine, que espera LISTA de linhas. Com string,
+# ela iterava os CARACTERES: o boleto saia com "A", "p", "o", "s"... um por
+# linha, ate estourar a caixa -- sem erro e com o texto perdido.
+#
+# A asercao e sobre a NORMALIZACAO e sobre os limites, nao sobre o desenho do
+# PDF: inspecionar o conteudo renderizado exigiria um leitor de PDF, que nao
+# tem por que virar dependencia do produto.
+INSTRUCOES_6 = (
+    "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\n"
+    "Conceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\n"
+    "Nao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\n"
+    "Havendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\n"
+    "Duvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\n"
+    "Pagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+)
+
+
+def test_instrucoes_string_vira_lista_de_linhas_e_nao_de_caracteres():
+    linhas = pycob._linhas(INSTRUCOES_6, "instrucoes")
+    assert linhas == INSTRUCOES_6.splitlines()
+    assert len(linhas) == 6, "string iterada caractere a caractere"
+
+
+def test_instrucoes_chegam_sem_reformatacao():
+    # Validar, nunca reescrever: cada linha sai igual ao que entrou.
+    for original, normalizada in zip(INSTRUCOES_6.splitlines(),
+                                     pycob._linhas(INSTRUCOES_6, "instrucoes")):
+        assert original == normalizada
+
+
+def test_instrucoes_string_e_lista_produzem_o_mesmo_pdf():
+    a = pycob.pdf_boleto("banco_brasil", {**DADOS_BB, "instrucoes": INSTRUCOES_6})
+    b = pycob.pdf_boleto("banco_brasil",
+                         {**DADOS_BB, "instrucoes": INSTRUCOES_6.splitlines()})
+    assert len(a) == len(b)
+
+
+def test_linha_longa_e_recusada_e_nao_reformatada():
+    # 178 caracteres numa linha so: atravessava a coluna de Desconto/Mora/Valor
+    # cobrado, deixando as duas ilegiveis. O gateway NAO quebra a linha por
+    # conta propria -- reescrever texto de cobranca e do cliente.
+    longa = ("Apos o vencimento, cobrar multa de 2% sobre o valor do titulo e juros de mora"
+             " de 1% ao mes, calculados pro rata die a partir do primeiro dia util.")
+    assert len(longa) > pycob.LARGURA_INSTRUCAO
+    with pytest.raises(pycob.DadosInvalidos) as exc:
+        pycob.pdf_boleto("banco_brasil", {**DADOS_BB, "instrucoes": longa})
+    assert f"linha 1 com {len(longa)}" in exc.value.erros[0]
+
+
+def test_instrucoes_que_nao_cabem_sao_recusadas_em_vez_de_sumir():
+    # A engine simplesmente NAO desenha a partir da oitava linha. Em documento
+    # de cobranca, perder clausula em silencio e pior que recusar.
+    with pytest.raises(pycob.DadosInvalidos) as exc:
+        pycob.pdf_boleto("banco_brasil",
+                         {**DADOS_BB, "instrucoes": "\n".join(["ok"] * 20)})
+    assert "máximo 7" in exc.value.erros[0]
+
+
+def test_instrucoes_no_limite_continuam_aceitas():
+    no_limite = "\n".join(f"Linha {i + 1} de instrucao do beneficiario"
+                          for i in range(pycob.MAX_LINHAS_INSTRUCAO))
+    pdf = pycob.pdf_boleto("banco_brasil", {**DADOS_BB, "instrucoes": no_limite})
+    assert pdf[:4] == b"%PDF"

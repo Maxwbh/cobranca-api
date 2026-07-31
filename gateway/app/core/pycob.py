@@ -19,6 +19,7 @@ from pycobranca.contracts import SLUG_POR_CODIGO
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
                                    OFXInvalido, PyCobrancaError, RetornoInvalido)
 from pycobranca.render import render_boleto_pdf, render_carne_pdf, render_fatura_pdf
+from pycobranca.render.modelos import MODELOS_BOLETO
 from pycobranca import cnab as _cnab
 from pycobranca.cnab import Pagamento, PagamentoPix, Retorno
 from pycobranca.contracts.contrato_rest import retorno_item_para_api
@@ -80,6 +81,60 @@ _MAPA_CAMPOS = {
     "txid": "pix_txid",
 }
 _CAMPOS_DATA = {"data_vencimento", "data_documento", "data_processamento"}
+# A engine desenha estes campos linha a linha e espera uma LISTA. Recebendo
+# string ela itera os caracteres: o boleto sai com "A", "p", "o", "s"... um por
+# linha, até estourar a caixa — sem erro, sem aviso, com o texto perdido.
+#
+# JSON não tem tipo "várias linhas", então o cliente naturalmente manda string
+# com `\n`. Normalizar aqui é o que torna as duas formas equivalentes.
+_CAMPOS_MULTILINHA = {"instrucoes", "demonstrativo"}
+
+# Medidos no PDF gerado pela engine: a caixa de instruções tem 404pt de largura
+# e comporta exatamente 7 linhas — **idêntico com e sem PIX**. O QR do Bolepix
+# não encolhe a área de instruções (conferido gerando as duas variantes).
+#
+# Exceder cada limite falha de um jeito diferente, e nenhum dos dois avisa:
+# linha comprida ATRAVESSA a coluna de Desconto/Mora/Valor cobrado, deixando as
+# duas ilegíveis; linha além da sétima simplesmente NÃO é desenhada.
+#
+# O gateway NÃO reformata o texto — quebrar linha por conta própria mudaria o
+# conteúdo de um documento de cobrança. Ele mede e recusa; reescrever é do
+# cliente, que sabe onde a frase pode ser cortada.
+LARGURA_INSTRUCAO = 100
+MAX_LINHAS_INSTRUCAO = 7
+
+
+def _linhas(valor: Any, campo: str) -> Any:
+    """Campo multilinha: string vira lista de linhas e os tamanhos são validados.
+
+    A separação por `\\n` não é reformatação — é adaptação de tipo. JSON não tem
+    "várias linhas", então o cliente manda string; a engine espera lista e,
+    recebendo string, iterava os CARACTERES (o boleto saía com "A", "p", "o",
+    "s"… um por linha). Cada linha chega ao PDF exatamente como foi enviada.
+
+    O que não couber é **recusado**, não ajustado: em documento de cobrança,
+    perder cláusula em silêncio é pior que devolver erro.
+    """
+    if isinstance(valor, str):
+        linhas = [linha.rstrip() for linha in valor.splitlines() if linha.strip()]
+    elif isinstance(valor, (list, tuple)):
+        linhas = [str(item).rstrip() for item in valor if str(item).strip()]
+    else:
+        return valor
+
+    erros: list[str] = []
+    if len(linhas) > MAX_LINHAS_INSTRUCAO:
+        erros.append(f"{campo}: {len(linhas)} linhas, máximo {MAX_LINHAS_INSTRUCAO}"
+                     f" (a partir da {MAX_LINHAS_INSTRUCAO + 1}ª a engine não imprime)")
+    compridas = [(i + 1, len(linha)) for i, linha in enumerate(linhas)
+                 if len(linha) > LARGURA_INSTRUCAO]
+    if compridas:
+        detalhe = ", ".join(f"linha {n} com {c}" for n, c in compridas)
+        erros.append(f"{campo}: máximo {LARGURA_INSTRUCAO} caracteres por linha"
+                     f" ({detalhe}) — texto mais longo invade a coluna de valores")
+    if erros:
+        raise DadosInvalidos(erros)
+    return linhas
 
 
 def construir_boleto(bank: str, data: dict[str, Any]):
@@ -91,7 +146,12 @@ def construir_boleto(bank: str, data: dict[str, Any]):
         destino = _MAPA_CAMPOS.get(chave, chave)
         if destino not in aceitos or valor in (None, ""):
             continue
-        kwargs[destino] = _para_date(valor) if chave in _CAMPOS_DATA else valor
+        if chave in _CAMPOS_DATA:
+            kwargs[destino] = _para_date(valor)
+        elif chave in _CAMPOS_MULTILINHA:
+            kwargs[destino] = _linhas(valor, chave)
+        else:
+            kwargs[destino] = valor
     try:
         boleto = klass(**kwargs)
     except (PyCobrancaError, ValueError, TypeError) as e:
@@ -131,13 +191,22 @@ def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def pdf_boleto(bank: str, data: dict[str, Any]) -> bytes:
+def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> bytes:
+    """PDF de um boleto. `template` escolhe o modelo visual da engine.
+
+    O modelo era fixo em `moderno`: o parâmetro existia na rota, era aceito
+    sem erro e nunca chegava aqui, então `classico` — que a engine sempre
+    ofereceu — era inalcançável pela API.
+    """
+    if template not in MODELOS_BOLETO:
+        raise DadosInvalidos([f"template '{template}' inválido"
+                              f" (use: {', '.join(MODELOS_BOLETO)})"])
     boleto = construir_boleto(bank, data)
     try:
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
-    return render_boleto_pdf(boleto.contexto_render())
+    return render_boleto_pdf(boleto.contexto_render(), modelo=template)
 
 
 def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = None) -> bytes:
@@ -207,9 +276,13 @@ def pdf_multi(
 
     from pypdf import PdfWriter
 
+    # `template` aqui vale duas coisas: escolhe carnê (acima) ou, no caminho
+    # de 1 boleto por página, o modelo visual. Antes o modelo era descartado e
+    # o lote saía sempre em `moderno`, mesmo com `template=classico`.
+    modelo = template if template in MODELOS_BOLETO else "moderno"
     writer = PdfWriter()
     for ctx in contextos:
-        writer.append(io.BytesIO(render_boleto_pdf(ctx)))
+        writer.append(io.BytesIO(render_boleto_pdf(ctx, modelo=modelo)))
     saida = io.BytesIO()
     writer.write(saida)
     return saida.getvalue(), itens
