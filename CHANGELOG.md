@@ -13,6 +13,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+_Nada ainda._
+
+## [2.1.0] - 2026-07-31
+
 ### Corrigido
 - **`POST /jobs/boletos` respondia `500` quando dois itens do lote tinham o
   mesmo identificador.** O `item_id` deriva de `external_id`, `seu_numero` ou
@@ -61,10 +65,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   caixa é normalizada (o uvicorn aborta em `INFO` e derrubaria o container no
   boot) e valor inválido cai para `info` com aviso, em vez de virar
   crash-loop. `LOG_LEVEL=info` entra como default no `ENV` da imagem.
-
-## [2.1.0] - 2026-07-31
-
-### Corrigido
 - **Link quebrado servido pela própria API**: `_DOC_REPO` (`app/main.py`), que
   aparece na descrição da tag `bancos` do Swagger, apontava para
   `/tree/master/docs/development` — 404, já que o branch default é `main`.
