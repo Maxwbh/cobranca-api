@@ -46,3 +46,24 @@ services:
 
       - key: ARTIFACT_TTL_DIAS
         value: "7"
+
+      # Teto de itens por lote. Declarados aqui para aparecerem no painel: num
+      # plano maior, trocar o número é editar a variável — não precisa deploy.
+      #
+      # As duas NÃO escalam igual, e o gargalo de cada uma é diferente:
+      #
+      # JOB_MAX_ITENS (assíncrono) é o barato de subir. A chamada responde 202
+      # em ~1s e o trabalho segue em background; o custo é memória e tempo de
+      # fundo.
+      #
+      # LOTE_MAX_ITENS (síncrono, /api/boleto/multi e /api/render/carne) segura
+      # a conexão HTTP até o PDF ficar pronto. Medido no free tier: 200 boletos
+      # = 15,9s no multi. Dobrar põe a requisição perto de 30s, onde proxy,
+      # balanceador ou o próprio cliente desistem — e o servidor gasta o tempo
+      # inteiro gerando um PDF que ninguém recebe. Acima de ~200 o caminho é o
+      # job, não um teto maior.
+      - key: LOTE_MAX_ITENS
+        value: "200"
+
+      - key: JOB_MAX_ITENS
+        value: "200"

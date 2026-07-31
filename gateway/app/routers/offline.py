@@ -319,6 +319,15 @@ async def render_boleto(body: dict) -> Any:
 async def render_carne(body: dict) -> Any:
     bank = body.get("bank")
     boletos = [dict(b, bank=b.get("bank") or bank) for b in body.get("boletos") or []]
+    # O teto valia só para /api/boleto/multi. Como o carnê renderiza pelo mesmo
+    # `pdf_multi`, e de forma síncrona, dava para passar do limite trocando de
+    # endpoint — sem nenhum teto, um lote grande vai direto ao OOM em vez de
+    # receber o 413 barato.
+    if len(boletos) > LOTE_MAX:
+        return JSONResponse(status_code=413, content={
+            "error": f"Lote acima do limite de {LOTE_MAX} itens",
+            "recebidos": len(boletos),
+            "hint": "divida o lote (processamento assíncrono: ver docs/development/plano-jobs-lote.md)"})
     try:
         pdf, _ = pycob.pdf_multi(boletos, template="carne")
     except pycob.DadosInvalidos as e:
