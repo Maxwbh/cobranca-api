@@ -14,7 +14,7 @@ DECLARE
   l_boleto  cobranca_api.t_boleto;
   l_cob     cobranca_api.t_cobranca;
 BEGIN
-  cobranca_api.g_base_url := 'https://boleto-cnab-api.onrender.com';
+  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
 
   ------------------------------------------------------------------------
   -- 1) Credenciais do C6 -> token bapi_

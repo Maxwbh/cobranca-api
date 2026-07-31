@@ -17,7 +17,7 @@ DECLARE
   l_cob     cobranca_api.t_cobranca;
   l_creds   CLOB;
 BEGIN
-  cobranca_api.g_base_url := 'https://boleto-cnab-api.onrender.com';
+  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
 
   ------------------------------------------------------------------------
   -- 1) Credenciais — escolha a via

@@ -6,7 +6,7 @@
 -- 1) ACL de rede (Oracle 12c+)
 BEGIN
   DBMS_NETWORK_ACL_ADMIN.append_host_ace(
-    host => 'boleto-cnab-api.onrender.com',   -- troque pelo seu host
+    host => 'SEU-SERVICO.onrender.com',   -- troque pelo seu host
     ace  => xs$ace_type(
               privilege_list => xs$name_list('http', 'connect', 'resolve'),
               principal_name => 'MEU_SCHEMA', -- schema dono do pacote
@@ -39,7 +39,7 @@ DECLARE
 BEGIN
   UTL_HTTP.set_wallet('file:/u01/app/oracle/wallet');
   l_resp := APEX_WEB_SERVICE.make_rest_request(
-              p_url         => 'https://boleto-cnab-api.onrender.com/health',
+              p_url         => 'https://SEU-SERVICO.onrender.com/health',
               p_http_method => 'GET');
   DBMS_OUTPUT.put_line(l_resp);
 END;

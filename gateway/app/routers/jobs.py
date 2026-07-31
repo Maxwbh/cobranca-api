@@ -149,8 +149,8 @@ def _metricas(job: dict[str, Any], inicio: float) -> dict[str, Any]:
 
 
 def _item_id(item: dict[str, Any], indice: int) -> str:
-    return str(item.get("external_id") or item.get("seu_numero")
-               or item.get("numero_documento") or indice)
+    """Delega para a derivação central — antes era uma terceira cópia."""
+    return pycob.item_id(item, indice)
 
 
 def _itens_e_duplicados(

@@ -593,3 +593,30 @@ def test_render_boleto_aceita_template(client):
         return len(_b64.b64decode(r.json()["pdf_base64"]))
     assert _tam("classico") != _tam("moderno")
     assert _tam(None) == _tam("moderno")
+
+
+def test_multi_recusa_boleto_duplicado(client):
+    # Mesmo defeito do carne: o `pdf_multi` calculava o item_id e o handler
+    # descartava, entao o lote saia com a duplicata impressa.
+    import io as _io
+    import json as _json
+    lote = [{**DADOS_BB, "bank": "banco_brasil", "nosso_numero": str(500 + i),
+             "numero_documento": f"L-{i:02d}"} for i in range(4)]
+    lote[3] = dict(lote[1])
+    r = client.post("/api/boleto/multi",
+                    files={"data": ("lote.json", _io.BytesIO(_json.dumps(lote).encode()),
+                                    "application/json")})
+    assert r.status_code == 422, r.text
+    assert r.json()["duplicados"] == [{"item_id": "L-01", "indices": [1, 3]}]
+
+
+def test_multi_sem_duplicata_continua_aceito(client):
+    import io as _io
+    import json as _json
+    lote = [{**DADOS_BB, "bank": "banco_brasil", "nosso_numero": str(600 + i),
+             "numero_documento": f"M-{i:02d}"} for i in range(4)]
+    r = client.post("/api/boleto/multi",
+                    files={"data": ("lote.json", _io.BytesIO(_json.dumps(lote).encode()),
+                                    "application/json")})
+    assert r.status_code == 200, r.text
+    assert r.content[:4] == b"%PDF"

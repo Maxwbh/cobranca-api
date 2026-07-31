@@ -3,31 +3,37 @@
 > Documento autoritativo referenciado por `docs/ARCHITECTURE.md` e
 > `gateway/README.md`.
 
-Este repositório abriga **dois artefatos com versionamentos independentes**, e
-consome um terceiro que vive fora dele. Saber qual é qual desfaz a colisão de
-nomes que existia até a v1.5.0.
+São **três produtos separados, cada um com sua versão**, e este repositório
+abriga **um** deles. Saber qual é qual desfaz a colisão de nomes que existia até
+a v1.5.0.
 
 ## Os produtos
 
 | # | Produto | Onde vive | Papel | Versão |
 |---|---|---|---|---|
-| 1 | **Cobranca-API** (Python/FastAPI) | `gateway/` | O **serviço**: gateway online (C6, Sicoob), cofre de credenciais multi-tenant, jobs em lote, webhooks — e a superfície offline `/api/*`, servida **in-process** | `app.version` (2.1.0) |
-| 2 | **Cliente pip** (Python) | `python-client/` | SDK para consumir a **API** por HTTP a partir de qualquer app Python | `cobranca_api.__version__` |
-| 3 | **PyCobrança** (engine) | [repositório próprio](https://github.com/Maxwbh/pyCobranca) | **Renderização e formato**: boleto PDF, carnê 3 vias, remessa/retorno CNAB 240/400, PIX-QR — 18 bancos, offline | dependência em `gateway/requirements.txt` |
+| 1 | **PyCobrança** (engine) | [repositório próprio](https://github.com/Maxwbh/pyCobranca) | **Renderização e formato**: boleto PDF, carnê 3 vias, remessa/retorno CNAB 240/400, PIX-QR — 18 bancos, offline | própria; a versão em uso aparece em `GET /api/metadata` |
+| 2 | **Cobranca-API** (Python/FastAPI) | **este repositório**, em `gateway/` | O **serviço**: gateway online (C6, Sicoob), cofre de credenciais multi-tenant, jobs em lote, webhooks — e a superfície offline `/api/*`, servida **in-process** | `app.version` (2.1.0) |
+| 3 | **Consumidor da API** | fora deste repositório | Quem chama o serviço por HTTP: SDK, app, job, PL/SQL — qualquer linguagem | própria |
 
-> A engine **não vive neste repositório**: é uma dependência Python comum,
-> importada pelo serviço. Quem quiser gerar boleto direto em Python usa a
-> PyCobrança sem passar por esta API.
+> Nem a engine nem o consumidor vivem aqui. A engine é uma dependência Python
+> comum, declarada em `gateway/requirements.txt`; o consumidor está do outro
+> lado da seta, atrás do contrato HTTP. Este repositório versiona **só o
+> serviço** — a tag `vX.Y.Z` daqui não fala pelos outros dois.
+
+O que fica aqui do lado do consumidor é **documentação de contrato**, não
+produto: a spec OpenAPI (`docs/openapi.yaml`), a coleção Postman e os scripts de
+`examples/` — todos exercitam a API por HTTP, sem SDK próprio.
 
 ## Regras da separação
 
 1. **"Cobranca-API" designa a plataforma; o serviço FastAPI é a porta única.**
    Não há segundo processo, segundo runtime nem sidecar.
 2. **Versionamento independente**: o serviço versiona em `app.version`; a engine
-   versiona no repositório dela. Nenhum release acopla os dois — a versão da
-   engine em uso aparece em `GET /api/metadata`.
+   versiona no repositório dela; o consumidor versiona no dele. Nenhum release
+   acopla os três — a versão da engine em uso aparece em `GET /api/metadata`.
 3. **Fluxo de dependência** (uma direção só):
-   `consumidores → Cobranca-API → engine`. A engine não conhece o serviço.
+   `consumidores → Cobranca-API → engine`. A engine não conhece o serviço, e o
+   serviço não conhece o consumidor — por isso nenhum dos dois mora aqui.
 4. **Caminho registrado** (API do banco): resolvido inteiro no serviço
    (OAuth + mTLS + JSON) — o banco devolve linha digitável/PDF/QR, **sem tocar
    na engine**.

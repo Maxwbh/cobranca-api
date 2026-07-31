@@ -13,7 +13,7 @@ T1–T10 do [roadmap de migração](../docs/development/roadmap-migracao-servico
 | Arquivo | O quê |
 |---|---|
 | `cobranca-api.postman_collection.json` | Coleção (14 pastas: SMK + 00–11 + NEG) — todos os endpoints da versão atual |
-| `hml.postman_environment.json` | Environment HML (`base_url` = https://boleto-cnab-api.onrender.com — ambiente de teste; troque com `COB_BASE_URL`) |
+| `hml.postman_environment.json` | Environment HML. O `base_url` vem preenchido com a instância de demonstração, mas a URL do Render **não é fixa** — troque no environment ou sobreponha com `--env-var base_url=...` |
 | `local.postman_environment.json` | Environment local (`http://localhost:8000`) |
 | `check_coverage.py` | Guarda de cobertura (§8): endpoint do OpenAPI sem request ⇒ `exit 1` |
 

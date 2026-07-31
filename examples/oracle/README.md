@@ -32,7 +32,7 @@ que já existe no Oracle (`UTL_HTTP` + `APEX_JSON`, ou `APEX_WEB_SERVICE`).
 
 -- 3) aponta para a sua instância (ou deixe a demo pública)
 BEGIN
-  cobranca_api.g_base_url := 'https://boleto-cnab-api.onrender.com';
+  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
   cobranca_api.g_wallet   := 'file:/u01/app/oracle/wallet';  -- HTTPS
 END;
 /

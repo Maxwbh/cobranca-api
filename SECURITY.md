@@ -193,9 +193,6 @@ pip-audit -r gateway/requirements-dev.txt
 - `cryptography` — AES-256-GCM e HKDF do cofre de credenciais
 - `pypdf` — concatenação de PDFs em lote
 
-**Cliente Python** (`python-client/`):
-- `requests` — cliente HTTP
-
 ## 🔍 Auditoria de Segurança
 
 Este projeto:

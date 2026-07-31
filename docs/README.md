@@ -82,10 +82,6 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 - [fields/nosso-numero.md](./fields/nosso-numero.md) — Nosso numero: entrada, saida, conciliacao
 - [fields/all-banks.md](./fields/all-banks.md) — Compatibilidade e exemplos por banco
 
-## Cliente Python
-
-- [python-client/README.md](../python-client/README.md) — Cliente Python oficial
-
 ## Exemplos por linguagem
 
 - [examples/oracle/](../examples/oracle/) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB e lote

@@ -1,12 +1,15 @@
 # Changelog
 
-Mudanças **do produto** — o que muda para quem consome a API, roda a imagem ou
-instala o cliente.
+Mudanças **do produto** — o que muda para quem consome a API ou roda a imagem.
 
 Mudança de **processo** não entra aqui: CI, workflows, templates de issue e PR,
 scripts de release, configuração de deploy e convenção de branches vivem no
 histórico do git e nos próprios arquivos. O critério é uma pergunta só: *isso
 muda alguma coisa para quem usa o serviço?* Se a resposta for não, fica fora.
+
+Entradas **curtas**: o que mudou e qual é o comportamento novo, em uma a três
+linhas. Diagnóstico, causa e medição pertencem ao commit e ao PR — quem lê o
+changelog quer saber se precisa mexer na integração, não como o defeito surgiu.
 
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
@@ -17,74 +20,36 @@ _Nada ainda._
 
 ## [2.1.0] - 2026-07-31
 
-### Corrigido
-- **`POST /jobs/boletos` respondia `500` quando dois itens do lote tinham o
-  mesmo identificador.** O `item_id` deriva de `external_id`, `seu_numero` ou
-  `numero_documento` e é chave primária junto com o `job_id` — dois itens com o
-  mesmo valor violavam a restrição e o `IntegrityError` do banco vazava como
-  erro interno, sem dizer ao cliente o que corrigir. Agora responde **`422`
-  listando os identificadores repetidos e os índices em que aparecem**. Item
-  sem nenhum dos três campos continua caindo no índice, que nunca colide.
-  Mesma proteção aplicada a `POST /jobs/cnab/remessas`.
-- **`template` continuava ignorado em `POST /jobs/boletos` e
-  `POST /api/render/boleto`.** A correção anterior cobriu só dois dos quatro
-  caminhos. No job era o pior caso: o valor era aceito, **gravado em
-  `meta.template`** e descartado pelo worker — quem consultasse o job lia
-  `"classico"` num artefato que era `moderno`. Agora o modelo é aplicado de
-  verdade nos quatro, e valor inválido responde **`422`** no job (era aceito
-  com `202`) e **`400`** no síncrono.
-  - O enum do job perdeu **`carne`**: o job gera **um PDF por item** e carnê é
-    3 boletos por página — era opção impossível por construção, oferecida no
-    contrato. Pedir `carne` ali agora responde `422` apontando
-    `POST /api/render/carne`.
-  - `POST /api/render/boleto` **passa a aceitar `template`**; antes nem
-    declarava o campo, então quem migrava do `GET /api/boleto` para ele perdia
-    a escolha do modelo em silêncio.
-- **`instrucoes` enviado como texto virava um caractere por linha no boleto.**
-  A engine desenha o campo linha a linha e espera uma **lista**; recebendo a
-  string que o JSON naturalmente carrega, iterava os caracteres — o boleto saía
-  com `A`, `p`, `o`, `s`… um por linha, até estourar a caixa, sem erro e com o
-  texto perdido. O gateway passa a separar por `\n` antes de entregar; cada
-  linha chega ao PDF **exatamente como enviada**, sem reformatação.
-  - Os tamanhos passam a ser **validados**: no máximo **7 linhas de 100
-    caracteres**, medidos na área impressa (idêntica com e sem PIX). Exceder
-    responde **`400`** dizendo qual linha e com quantos caracteres. Antes, linha
-    comprida atravessava a coluna de Desconto/Mora/Valor cobrado e linha além
-    da sétima simplesmente não era desenhada — nos dois casos, em silêncio.
-- **`template` era aceito e ignorado em `GET /api/boleto` e
-  `POST /api/boleto/multi`.** O parâmetro nunca chegava à engine, então
-  `template=classico` devolvia um PDF idêntico ao `moderno` — o modelo clássico
-  era inalcançável pela API. Agora o modelo é repassado, e valor fora de
-  `moderno`/`classico` responde **`400`** em vez de cair no default em silêncio.
-- **`LOG_LEVEL` não tinha efeito nenhum.** A variável era declarada no
-  `render.yaml` desde sempre, mas nada a lia: o código não configura logging e
-  o `CMD` do Dockerfile não passava `--log-level` (o uvicorn lê
-  `UVICORN_LOG_LEVEL`, não `LOG_LEVEL`). Quem subia o serviço com
-  `LOG_LEVEL=debug` continuava com log em `info`, sem aviso. O `CMD` agora
-  mapeia a variável para o `--log-level` do uvicorn, com dois cuidados: a
-  caixa é normalizada (o uvicorn aborta em `INFO` e derrubaria o container no
-  boot) e valor inválido cai para `info` com aviso, em vez de virar
-  crash-loop. `LOG_LEVEL=info` entra como default no `ENV` da imagem.
-- **Link quebrado servido pela própria API**: `_DOC_REPO` (`app/main.py`), que
-  aparece na descrição da tag `bancos` do Swagger, apontava para
-  `/tree/master/docs/development` — 404, já que o branch default é `main`.
-- **5 links `/blob/master/` e `/tree/master/` no `docs/openapi.yaml`** —
-  CHANGELOG, guias por banco, validação de campos e encargos. Todos 404, e
-  todos servidos no Swagger público.
-
 ### Adicionado
-- **`POST /api/render/fatura`** — renderiza a fatura pela engine
-  (`render_fatura_pdf`): corpo livre no topo + boleto de pagamento abaixo, num
-  só PDF. Passthrough puro (o gateway não soma nem calcula; o `valor` vem no
-  payload). Expõe os níveis 1 (`itens`) e 2 (`fatura.blocos`); o nível 3
-  (`fatura.desenhar`, callback Python) **não** trafega por JSON e é recusado
-  com `400`.
+- **`POST /api/render/fatura`** — corpo livre (itens ou blocos) no topo e boleto
+  abaixo, num só PDF. Passthrough: o `valor` cobrado vem no payload.
+
+### Corrigido
+- **Item duplicado no lote era impresso em silêncio** em `POST /api/render/carne`
+  e `POST /api/boleto/multi` — o título sobrescrito sumia do PDF. Agora `422`
+  com os identificadores repetidos.
+- **`POST /jobs/boletos` respondia `500`** com identificador de item repetido.
+  Agora `422`. Mesma proteção em `POST /jobs/cnab/remessas`.
+- **`template` era aceito e ignorado** em `GET /api/boleto`,
+  `POST /api/boleto/multi`, `POST /api/render/boleto` e `POST /jobs/boletos`:
+  `classico` saía idêntico a `moderno`. Valor inválido agora responde `400`
+  (`422` no job), e `carne` deixa de ser oferecido no job.
+- **`instrucoes` em texto virava um caractere por linha no boleto.** Agora `\n`
+  separa as linhas, no máximo 7 de 100 caracteres — acima disso, `400`.
+- **`LOG_LEVEL` não tinha efeito.** Passa a definir o nível de log do uvicorn;
+  valor inválido cai para `info` com aviso, sem derrubar o container.
+- **Links 404 servidos no Swagger público** — `_DOC_REPO` e 5 em
+  `docs/openapi.yaml` apontavam para `master`, branch que não existe.
 
 ### Alterado
-- **Python mínimo 3.14 → 3.12** e **engine `pycobranca` ≥ 1.0.2**: a 1.0.2
-  baixou o piso para `>=3.12`, que tem wheels prontos e **elimina a compilação
-  a partir do código-fonte** (e o problema do pydantic no `3.14.0rc2`).
-  Dockerfile passa a `python:3.12-slim`.
+- **Python mínimo 3.14 → 3.12** e engine **`pycobranca >= 1.0.2`**: wheels
+  prontos, sem compilação a partir do código-fonte. Imagem em `python:3.12-slim`.
+
+### Removido
+- **Cliente pip (`python-client/`) saiu deste repositório.** Ele é um produto à
+  parte, com versão própria, e o serviço nunca o importou. Quem usava
+  `pip install "git+...#subdirectory=python-client"` passa a chamar a API por
+  HTTP direto — a spec OpenAPI e a coleção Postman continuam aqui.
 
 ## [2.0.0] - 2026-07-28
 
@@ -482,16 +447,6 @@ Este release atualiza brcobranca de 12.6.0 → 12.6.1, trazendo:
 - ✅ Fixtures com dados válidos
 - ✅ Cobertura de casos de erro
 - ✅ Testes de mapeamento de campos
-
----
-
-## [Unreleased]
-
-### Em Desenvolvimento
-- 🔄 Publicação do cliente Python no PyPI
-- 🔄 GitHub Actions para CI/CD
-- 🔄 Badges de status e qualidade
-- 🔄 Suporte a PIX (QR Code)
 
 ---
 

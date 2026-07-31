@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import time
@@ -32,7 +33,9 @@ import urllib.error
 import urllib.request
 from datetime import date, timedelta
 
-BASE_PADRAO = "https://boleto-cnab-api.onrender.com"
+# A URL do Render nao e fixa (vem do nome do servico): o alvo remoto sai de
+# COB_BASE_URL. Sem ela, o benchmark roda contra o servico local.
+BASE_PADRAO = os.environ.get("COB_BASE_URL", "http://localhost:8000")
 BANCO = "sicoob"
 
 # Conta de teste — dados de forma, nao credencial. O caminho offline nao

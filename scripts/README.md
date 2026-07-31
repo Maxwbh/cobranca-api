@@ -131,7 +131,7 @@ Para automatizar versionamento em pipelines:
   run: |
     git config user.name "Maxwell da Silva Oliveira"
     git config user.email "maxwbh@gmail.com"
-    git add VERSION CHANGELOG.md python-client/
+    git add VERSION CHANGELOG.md
     git commit -m "[AUTO] Bump version"
     git push
 ```

@@ -228,6 +228,38 @@ def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = N
     return render_fatura_pdf(contexto)
 
 
+def item_id(item: dict[str, Any], indice: int) -> str:
+    """Identidade do item dentro do lote.
+
+    Derivação única — antes existia em três cópias (aqui, no router de jobs e
+    implícita no carnê), que é exatamente como elas passam a divergir.
+
+    Só cai no índice quando o item não traz nenhum dos três campos. Como o
+    índice nunca colide, lote sem identificador **nunca** acusa duplicidade —
+    é o que faz o problema passar despercebido em teste com payload mínimo.
+    """
+    return str(item.get("external_id") or item.get("seu_numero")
+               or item.get("numero_documento") or indice)
+
+
+def duplicados(itens: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Identificadores repetidos no lote, com os índices onde aparecem.
+
+    Dois itens com o mesmo `item_id` são o mesmo título emitido duas vezes: no
+    carnê, a parcela sai impressa em duplicata e a que foi sobrescrita nunca é
+    cobrada — some silenciosamente do bloco.
+    """
+    primeiro: dict[str, int] = {}
+    repetidos: dict[str, list[int]] = {}
+    for indice, item in enumerate(itens):
+        iid = item_id(item, indice)
+        if iid in primeiro:
+            repetidos.setdefault(iid, [primeiro[iid]]).append(indice)
+        else:
+            primeiro[iid] = indice
+    return [{"item_id": k, "indices": v} for k, v in sorted(repetidos.items())]
+
+
 def pdf_multi(
     boletos: list[dict[str, Any]],
     template: str = "moderno",
@@ -247,8 +279,7 @@ def pdf_multi(
     for indice, item in enumerate(boletos):
         bank = item.get("bank") or item.get("banco") or ""
         data = {k: v for k, v in item.items() if k not in ("bank", "banco")}
-        item_id = str(item.get("external_id") or item.get("seu_numero")
-                      or item.get("numero_documento") or indice)
+        iid = item_id(item, indice)
         try:
             boleto = construir_boleto(bank, data)
             boleto.validar()
@@ -256,12 +287,12 @@ def pdf_multi(
         except (DadosInvalidos, BoletoInvalido) as e:
             erros = _erros(e)
             if not tolerante:
-                raise DadosInvalidos([f"{item_id}: {'; '.join(erros)}"]) from e
-            itens.append({"item_id": item_id, "indice": indice, "bank": bank,
+                raise DadosInvalidos([f"{iid}: {'; '.join(erros)}"]) from e
+            itens.append({"item_id": iid, "indice": indice, "bank": bank,
                           "status": "failed", "errors": erros})
             continue
         contextos.append(boleto.contexto_render())
-        itens.append({"item_id": item_id, "indice": indice, "bank": bank,
+        itens.append({"item_id": iid, "indice": indice, "bank": bank,
                       "status": "completed", **info})
 
     if not contextos:

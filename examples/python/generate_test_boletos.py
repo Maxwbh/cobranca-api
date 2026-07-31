@@ -59,7 +59,7 @@ BASE_SICOOB = {
 EMV_C6 = "00020101021226840014br.gov.bcb.pix2562payload-de-teste-c6-pix-12345678905204000053039865802BR5921Recebedor Teste C66009Sao Paulo62070503***6304ABCD"
 EMV_SICOOB = "00020101021226840014br.gov.bcb.pix2562payload-de-teste-sicoob-pix-12345678905204000053039865802BR5925Recebedor Teste Sicoob6009Sao Paulo62070503***63041234"
 
-def generate_boleto(bank, type_name, index, payload, template='prawn'):
+def generate_boleto(bank, type_name, index, payload, template='moderno'):
     var_payload = payload.copy()
     var_payload['nosso_numero'] = str(int(payload['nosso_numero']) + index)
     var_payload['numero_documento'] = f"{payload['numero_documento']}-{index}"
@@ -92,8 +92,8 @@ print(f"Iniciando geracao de boletos de teste em {OUTPUT_DIR}...")
 
 # 3 padrao
 for i in range(1, 4):
-    generate_boleto('banco_c6', 'padrao', i, BASE_C6, 'prawn')
-    generate_boleto('sicoob', 'padrao', i, BASE_SICOOB, 'prawn')
+    generate_boleto('banco_c6', 'padrao', i, BASE_C6, 'moderno')
+    generate_boleto('sicoob', 'padrao', i, BASE_SICOOB, 'moderno')
 
 # 3 pix
 for i in range(1, 4):
@@ -101,12 +101,10 @@ for i in range(1, 4):
     c6_pix.update({'emv': EMV_C6, 'pix_label': 'Pague com Pix C6'})
     sicoob_pix = BASE_SICOOB.copy()
     sicoob_pix.update({'emv': EMV_SICOOB, 'pix_label': 'Pague com Pix Sicoob'})
-    generate_boleto('banco_c6', 'pix', i, c6_pix, 'prawn')
-    generate_boleto('sicoob', 'pix', i, sicoob_pix, 'prawn')
+    generate_boleto('banco_c6', 'pix', i, c6_pix, 'moderno')
+    generate_boleto('sicoob', 'pix', i, sicoob_pix, 'moderno')
 
-# 3 carne
-for i in range(1, 4):
-    generate_boleto('banco_c6', 'carne', i, BASE_C6, 'carne')
-    generate_boleto('sicoob', 'carne', i, BASE_SICOOB, 'carne')
+# Carne NAO e template de boleto: e o endpoint POST /api/render/carne, que
+# recebe a lista de parcelas e devolve 3 vias por folha A4.
 
 print(f"Pronto! Todos os boletos de teste foram salvos em {OUTPUT_DIR}.")

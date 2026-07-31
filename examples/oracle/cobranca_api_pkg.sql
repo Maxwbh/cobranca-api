@@ -9,12 +9,13 @@
 --   1) ACL de rede para o host da API (ver acl_setup.sql)
 --   2) Wallet com o certificado do host, se a API for HTTPS (ver acl_setup.sql)
 --
--- Testado contra: https://boleto-cnab-api.onrender.com
+-- A URL do Render vem do NOME do servico e muda se ele for renomeado,
+-- recriado ou apontado para dominio proprio. Defina g_base_url no seu schema.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE PACKAGE cobranca_api AS
 
   -- URL base da API (troque para a sua instância)
-  g_base_url  VARCHAR2(500) := 'https://boleto-cnab-api.onrender.com';
+  g_base_url  VARCHAR2(500) := 'https://SEU-SERVICO.onrender.com';
   -- Wallet (obrigatório para HTTPS no UTL_HTTP; vazio se usar APEX_WEB_SERVICE)
   g_wallet    VARCHAR2(500) := 'file:/u01/app/oracle/wallet';
   g_wallet_pw VARCHAR2(100) := NULL;

@@ -153,13 +153,10 @@ cd cobranca-api
 # 2. Dependências do serviço (gateway + engine)
 pip install -r gateway/requirements.txt -r gateway/requirements-dev.txt
 
-# 3. Cliente Python (opcional, para testar o SDK)
-pip install -e "./python-client[dev]"
-
-# 4. Rodar testes
+# 3. Rodar testes
 pytest gateway/tests
 
-# 5. Subir a API localmente (as DUAS superfícies na mesma porta)
+# 4. Subir a API localmente (as DUAS superfícies na mesma porta)
 uvicorn app.main:app --app-dir gateway --reload --port 8000
 #   gateway  -> http://localhost:8000/docs
 #   offline  -> http://localhost:8000/api/docs
@@ -475,7 +472,6 @@ Idealmente, novos códigos devem ter:
 | API endpoints        | `docs/api/`                    |
 | Campos por banco     | `docs/fields/`                 |
 | Exemplos de uso      | `examples/python/`             |
-| Cliente Python       | `python-client/README.md`      |
 | Guia de deploy       | `DEPLOY.md`                    |
 | Scripts              | `scripts/README.md`            |
 | README principal     | `README.md`                    |

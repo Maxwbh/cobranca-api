@@ -208,6 +208,17 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
                 "error": f"Lote acima do limite de {LOTE_MAX} itens",
                 "recebidos": len(boletos),
                 "hint": "divida o lote (processamento assíncrono: ver docs/development/plano-jobs-lote.md)"})
+        # Dois itens com o mesmo identificador são o MESMO título emitido duas
+        # vezes: o PDF sai com a duplicata impressa e o título sobrescrito nunca
+        # é cobrado — some do lote em silêncio. O `pdf_multi` já calculava isso
+        # e o resultado era descartado aqui.
+        repetidos = pycob.duplicados(boletos)
+        if repetidos:
+            return JSONResponse(status_code=422, content={
+                "error": "Itens com identificador duplicado no lote",
+                "hint": "o item_id vem de external_id, seu_numero ou numero_documento —"
+                        " cada item precisa de um valor distinto",
+                "duplicados": repetidos})
         pdf, itens = pycob.pdf_multi(boletos, template=template)
     except (json.JSONDecodeError, pycob.DadosInvalidos) as e:
         erros = e.erros if isinstance(e, pycob.DadosInvalidos) else [str(e)]
@@ -331,6 +342,19 @@ async def render_carne(body: dict) -> Any:
             "error": f"Lote acima do limite de {LOTE_MAX} itens",
             "recebidos": len(boletos),
             "hint": "divida o lote (processamento assíncrono: ver docs/development/plano-jobs-lote.md)"})
+
+    # Dois itens com o mesmo identificador são o MESMO título emitido duas
+    # vezes: no carnê a parcela sai impressa em duplicata e a que foi
+    # sobrescrita nunca é cobrada — some do bloco em silêncio. O `pdf_multi` já
+    # calculava isso e o resultado era descartado aqui.
+    repetidos = pycob.duplicados(boletos)
+    if repetidos:
+        return JSONResponse(status_code=422, content={
+            "error": "Itens com identificador duplicado no lote",
+            "hint": "o item_id vem de external_id, seu_numero ou numero_documento —"
+                    " cada item precisa de um valor distinto",
+            "duplicados": repetidos})
+
     try:
         pdf, _ = pycob.pdf_multi(boletos, template="carne")
     except pycob.DadosInvalidos as e:

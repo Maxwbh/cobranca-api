@@ -93,11 +93,11 @@ retry = Retry(
 session.mount('https://', HTTPAdapter(max_retries=retry))
 
 # Primeira chamada acorda o servidor
-response = session.get('https://boleto-cnab-api.onrender.com/api/health', timeout=60)
+response = session.get('https://SEU-SERVICO.onrender.com/api/health', timeout=60)
 ```
 
 **Exemplo de ping service (cron-job.org):**
-- URL: `https://seu-service.onrender.com/api/health`
+- URL: `https://SEU-SERVICO.onrender.com/api/health`
 - Intervalo: a cada 10 minutos
 - Método: GET
 - Timeout: 30s

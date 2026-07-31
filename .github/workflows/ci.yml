@@ -43,7 +43,6 @@ jobs:
           cache-dependency-path: |
             gateway/requirements.txt
             gateway/requirements-dev.txt
-            python-client/pyproject.toml
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       # Validação do Dockerfile, não produção de artefato: nenhum passo daqui
@@ -65,7 +64,6 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Install test pre-requisites
         run: |
-          pip install -e "./python-client[dev]"
           pip install -r gateway/requirements.txt -r gateway/requirements-dev.txt
           pip install openapi-spec-validator pyyaml
       - name: Validate OpenAPI specs (Core 3.0 + Gateway 3.1)
@@ -96,5 +94,3 @@ jobs:
         run: python postman/check_coverage.py
       - name: Test (gateway Python/FastAPI)
         run: cd gateway && PYTHONPATH=. pytest -v
-      - name: Test (python-client)
-        run: cd python-client && pytest -v

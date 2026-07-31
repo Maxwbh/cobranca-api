@@ -31,9 +31,8 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: "URL do ambiente alvo"
+        description: "URL do ambiente alvo (vazio = variavel de repo HML_BASE_URL)"
         required: false
-        default: "https://boleto-cnab-api.onrender.com"
       smoke:
         description: "Só o smoke (< 5 min)"
         type: boolean
@@ -65,9 +64,24 @@ jobs:
             echo "Dentro da janela do sandbox C6."
           fi
 
+      # Sem host default: a URL do Render vem do nome do servico e muda. O alvo
+      # sai de HML_BASE_URL (Settings > Secrets and variables > Actions) ou do
+      # input do dispatch — nunca de um valor cravado aqui, que um fork herdaria
+      # e passaria a bater no ambiente de outra pessoa.
+      - name: Resolver URL do ambiente alvo
+        id: alvo
+        run: |
+          URL="${{ inputs.base_url || vars.HML_BASE_URL }}"
+          if [ -z "$URL" ]; then
+            echo "::error::Defina a variavel de repo HML_BASE_URL ou informe base_url no dispatch."
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Alvo: $URL"
+
       - name: Regressão (segredos por --env-var, nunca em arquivo)
         env:
-          COB_BASE_URL: ${{ inputs.base_url || 'https://boleto-cnab-api.onrender.com' }}
+          COB_BASE_URL: ${{ steps.alvo.outputs.url }}
           COB_C6_CLIENT_ID: ${{ secrets.COB_C6_CLIENT_ID }}
           COB_C6_CLIENT_SECRET: ${{ secrets.COB_C6_CLIENT_SECRET }}
           COB_C6_PFX_BASE64: ${{ secrets.COB_C6_PFX_BASE64 }}

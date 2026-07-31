@@ -15,7 +15,8 @@ PHP, C#, Go, Delphi, Oracle APEX ou PL/SQL.
 
 > A instância pública roda no plano gratuito do Render e hiberna após 15 minutos
 > de inatividade — a **primeira** chamada pode levar até um minuto. É ambiente de
-> demonstração, não de produção.
+> demonstração, não de produção, e a URL **não é fixa**: o Render a deriva do nome
+> do serviço. Na sua instalação, troque pelo hostname do seu.
 
 ---
 
