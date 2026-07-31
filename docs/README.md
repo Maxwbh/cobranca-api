@@ -73,6 +73,7 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Estrutura modular, services, middleware, fluxos
 - [development/brcobranca-fork.md](./development/brcobranca-fork.md) — BrCobrança (Ruby): engine offline **descontinuada** na 2.0.0
 - [development/roadmap-providers.md](./development/roadmap-providers.md) — **Roadmap** de providers (bancos e PSP)
+- [development/estudo-link-pagamento-cartao.md](./development/estudo-link-pagamento-cartao.md) — **Estudo**: link de pagamento com cartão no C6 e no Sicoob (não implementado)
 - [development/plano-jobs-lote.md](./development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
 - Integrações REST: [c6-rest.md](./development/c6-rest.md) · [sicoob-rest.md](./development/sicoob-rest.md) · planejados: [inter](./development/inter-rest.md) · [banco-do-brasil](./development/banco-do-brasil-rest.md) · [mercado-pago](./development/mercado-pago-rest.md)
 
