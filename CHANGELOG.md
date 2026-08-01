@@ -16,16 +16,22 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [3.0.0] - 2026-08-01
+
+### Alterado
+- **BREAKING: erro do banco não vira mais `502` por padrão.** Só `401`/`403`
+  escapavam. Agora `400`/`422`/`405` do banco respondem `422` (payload do
+  chamador), `404` responde `404`, `409` responde `409` e `429` responde `429`
+  repassando `Retry-After`. `5xx` e status não mapeado seguem `502`; o corpo
+  original do banco continua em `upstream`. **Quem tratava `502` como erro
+  transitório e re-tentava precisa ajustar: as respostas `4xx` não devem ser
+  re-tentadas sem corrigir a requisição.**
+
 ### Corrigido
 - **`POST /bolepix` sem endereço do pagador respondia `502`.** O C6 `/v2` exige
   `city`, `state` e `zip_code`; a API mandava o endereço vazio e traduzia o `400`
   do banco em erro de servidor. Agora recusa com `422` dizendo qual campo falta,
   antes de chamar o banco.
-- **Erro do banco virava `502` quase sempre.** Só `401`/`403` escapavam. Agora
-  `400`/`422`/`405` do banco respondem `422` (payload do chamador), `404`
-  responde `404`, `409` responde `409` e `429` responde `429` repassando
-  `Retry-After`. `5xx` e status não mapeado seguem `502`; o corpo original do
-  banco continua em `upstream`.
 
 ## [2.1.0] - 2026-07-31
 
