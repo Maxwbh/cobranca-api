@@ -73,6 +73,23 @@ livre e o `GET /bancos` documenta o esquema vigente:
 | 424 | tenant sem credenciais (nem request, nem token, nem cofre) |
 | 409 | registro em processamento no banco (CIP) — re-tente em instantes |
 
+### Erro que veio do banco
+
+O status do banco é **traduzido** para o que o chamador precisa fazer. Em todos
+os casos o corpo traz `upstream` com o status, a URL e a resposta original do
+banco — traduzir a faixa não custa o diagnóstico.
+
+| Banco responde | A API responde | O que fazer |
+|---|---|---|
+| `400`, `422` | **`422`** | corrigir o payload — re-tentar igual não resolve |
+| `401`, `403` | **`424`** | corrigir as credenciais do banco |
+| `404` | **`404`** | o recurso não existe no banco |
+| `405` | **`422`** | operação não suportada para esse recurso |
+| `409` | **`409`** | conflito: já existe, ou o estado não permite |
+| `429` | **`429`** | respeitar o `Retry-After` (repassado quando o banco envia) |
+| `5xx` e demais | **`502`** | falha do banco — re-tentar com backoff |
+| rede/timeout | **`504`** | banco indisponível |
+
 ---
 
 ## 🔑 Credenciais (tokenização)
@@ -239,6 +256,10 @@ curl -X POST http://localhost:8000/bolepix \
   }'
 # 201 → linha digitável + código de barras + pix_copia_cola (QR EVP)
 ```
+
+O `endereco` do pagador é **obrigatório** no Bolepix: o `/v2` do C6 exige
+`city`, `state` e `zip_code` (aliases `cidade`, `uf`, `cep`). Faltando qualquer
+um, a API responde **`422`** dizendo qual campo falta, sem chamar o banco.
 
 ### `GET /bolepix/{ext_ref}` · `GET /bolepix/{ext_ref}/pdf` · `DELETE /bolepix/{ext_ref}`
 Consulta, PDF (base64) e cancelamento (**409** enquanto a CIP processa).

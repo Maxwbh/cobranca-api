@@ -185,7 +185,10 @@ class BolepixCobranca(BaseModel):
     valor: Decimal = Field(description="Valor da cobrança", examples=["99.90"])
     vencimento: date
     descricao: str = Field(description="Descrição da cobrança (obrigatória no Bolepix)")
-    pagador: Pagador = Field(description="endereco: {address|logradouro+numero, neighborhood|bairro, city, state, zip_code}")
+    pagador: Pagador = Field(
+        description="endereco OBRIGATORIO: {address|logradouro+numero, neighborhood|bairro, "
+                    "city|cidade, state|uf, zip_code|cep} — os 3 ultimos sao exigidos pelo C6 /v2"
+    )
     external_reference_id: str | None = Field(
         default=None, description="^[A-Z0-9]{26}$ — gerado automaticamente se omitido"
     )

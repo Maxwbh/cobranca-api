@@ -25,6 +25,7 @@ Documentação técnica da **Cobranca-API** — plataforma REST de cobrança ban
 |---------|-----------|
 | [openapi.yaml](./openapi.yaml) | Especificação OpenAPI 3.0 da superfície offline (`/api/*`) |
 | [api/gateway-python.md](./api/gateway-python.md) | **Referência do gateway Python** — credenciais/token, cobrança, Pix, conciliação, webhooks |
+| [api/online-vs-offline.md](./api/online-vs-offline.md) | **Boleto online × offline** — C6 e Sicoob lado a lado, com documentos reais dos sandboxes |
 | [api/troubleshooting.md](./api/troubleshooting.md) | Solução de problemas comuns |
 | [api/ofx-parsing.md](./api/ofx-parsing.md) | Guia detalhado do endpoint OFX |
 | [api/pix.md](./api/pix.md) | Guia de PIX híbrido em boletos |
@@ -73,6 +74,7 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Estrutura modular, services, middleware, fluxos
 - [development/brcobranca-fork.md](./development/brcobranca-fork.md) — BrCobrança (Ruby): engine offline **descontinuada** na 2.0.0
 - [development/roadmap-providers.md](./development/roadmap-providers.md) — **Roadmap** de providers (bancos e PSP)
+- [development/estudo-link-pagamento-cartao.md](./development/estudo-link-pagamento-cartao.md) — **Estudo**: link de pagamento com cartão no C6 e no Sicoob (não implementado)
 - [development/plano-jobs-lote.md](./development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
 - Integrações REST: [c6-rest.md](./development/c6-rest.md) · [sicoob-rest.md](./development/sicoob-rest.md) · planejados: [inter](./development/inter-rest.md) · [banco-do-brasil](./development/banco-do-brasil-rest.md) · [mercado-pago](./development/mercado-pago-rest.md)
 

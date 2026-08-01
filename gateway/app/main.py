@@ -148,25 +148,50 @@ async def _processamento_pendente(request: Request, exc: ProcessamentoPendente) 
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
+# Tradução do erro do BANCO para o erro do CHAMADOR.
+#
+# Antes só existiam dois destinos: 401/403 -> 424 e TODO O RESTO -> 502. Isso
+# jogava erro do chamador na faixa 5xx: quem mandava payload que o banco recusa
+# (400/422) ou pedia recurso inexistente (404) recebia "bad gateway", que diz
+# "o upstream falhou" e manda re-tentar -- quando re-tentar igual nunca ia dar
+# certo. A regra passa a ser: erro que o chamador conserta responde 4xx; erro do
+# banco ou da rede continua 5xx.
+#
+# O corpo e o status do banco vao em `upstream` em TODOS os casos: traduzir a
+# faixa nao pode custar o diagnostico.
+ERRO_UPSTREAM: dict[int, tuple[int, str]] = {
+    400: (422, "o banco recusou os dados enviados"),
+    422: (422, "o banco recusou os dados enviados"),
+    401: (424, "credenciais do banco rejeitadas (401/403 no upstream)"),
+    403: (424, "credenciais do banco rejeitadas (401/403 no upstream)"),
+    404: (404, "recurso não encontrado no banco"),
+    405: (422, "operação não suportada pelo banco para este recurso"),
+    409: (409, "conflito no banco (registro já existe ou estado não permite)"),
+    429: (429, "limite de requisições do banco atingido"),
+}
+
+
 @app.exception_handler(httpx.HTTPStatusError)
 async def _erro_do_banco(request: Request, exc: httpx.HTTPStatusError) -> JSONResponse:
     """Erro HTTP vindo do BANCO (upstream) — nunca 500 genérico.
 
-    401/403 do banco = credencial inválida/sem permissão para o produto → 424
-    (dependência falhou, o chamador precisa corrigir as credenciais);
-    demais status → 502 (bad gateway), preservando status e corpo do banco.
+    Ver ERRO_UPSTREAM: o que o chamador conserta vira 4xx; 5xx do banco e
+    status não mapeado seguem 502 (bad gateway).
     """
     upstream = exc.response.status_code
     try:
         detalhe = exc.response.json()
     except ValueError:
         detalhe = (exc.response.text or "")[:500]
-    status = 424 if upstream in (401, 403) else 502
-    return JSONResponse(status_code=status, content={
-        "detail": ("credenciais do banco rejeitadas (401/403 no upstream)"
-                    if status == 424 else "erro na API do banco"),
+    status, mensagem = ERRO_UPSTREAM.get(upstream, (502, "erro na API do banco"))
+    resposta = JSONResponse(status_code=status, content={
+        "detail": mensagem,
         "upstream": {"status": upstream, "url": str(exc.request.url), "body": detalhe},
     })
+    # 429 sem Retry-After obriga o chamador a chutar o intervalo do backoff.
+    if status == 429 and exc.response.headers.get("retry-after"):
+        resposta.headers["Retry-After"] = exc.response.headers["retry-after"]
+    return resposta
 
 
 @app.exception_handler(httpx.RequestError)

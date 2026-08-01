@@ -126,3 +126,11 @@ postman/reports/
 
 # Fixtures usadas pela coleção Postman
 !postman/fixtures/*.ret
+
+# Cofre de credenciais criado ao rodar o servico localmente (CREDENTIAL_DB_PATH,
+# default credentials.db na raiz). Guarda credencial cifrada de banco -- nunca
+# vai para o git.
+credentials.db
+credentials.db-journal
+*.db-wal
+*.db-shm

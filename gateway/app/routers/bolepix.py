@@ -31,6 +31,16 @@ def _provider(tenant_id, provider, account_config, vault, credentials):
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+# O /v2 exige city, state e zip_code no endereço do pagador. Sem eles o banco
+# responde 400 e o gateway traduzia em 502 — erro de servidor para um payload
+# que já dava para recusar aqui, com a mensagem dizendo qual campo falta.
+ENDERECO_OBRIGATORIO = {
+    "city": ("city", "cidade"),
+    "state": ("state", "uf"),
+    "zip_code": ("zip_code", "cep"),
+}
+
+
 def _payer_v2(pagador: Pagador) -> dict:
     end = pagador.endereco or {}
     linha = end.get("address")
@@ -45,6 +55,16 @@ def _payer_v2(pagador: Pagador) -> dict:
         "state": end.get("state") or end.get("uf"),
         "zip_code": end.get("zip_code") or end.get("cep"),
     }
+    faltando = [
+        f"pagador.endereco.{campo} (ou {alias})"
+        for campo, (_, alias) in ENDERECO_OBRIGATORIO.items()
+        if not address.get(campo)
+    ]
+    if faltando:
+        raise HTTPException(
+            status_code=422,
+            detail="Bolepix exige endereço do pagador; faltando: " + ", ".join(faltando),
+        )
     payer = {"name": pagador.nome, "tax_id": pagador.documento,
              "address": {k: v for k, v in address.items() if v is not None}}
     if end.get("email"):
@@ -64,6 +84,11 @@ def criar(body: BolepixIn, authorization: str | None = _AUTH_HEADER,
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
                                         tenant_id=body.tenant_id, provider=body.provider)
     p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    # Capacidade ANTES do payload: "este banco não faz Bolepix" precede
+    # "faltou o CEP" — senão um provider sem suporte responderia sobre o campo.
+    emitir = exige_capacidade(p, "criar_bolepix", body.provider,
+                              recurso="Bolepix",
+                              alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")
     bp = body.bolepix
     chave = bp.chave_pix or body.account_config.get("chave_pix")
     dados = {
@@ -89,8 +114,7 @@ def criar(body: BolepixIn, authorization: str | None = _AUTH_HEADER,
         dados["days_after_due_date"] = bp.dias_apos_vencimento
     if chave:  # sem chave, o banco emite boleto sem o segmento Pix
         dados["payment_method"]["pix"] = {"key": chave, "type": "EVP"}
-    return exige_capacidade(p, "criar_bolepix", body.provider,
-                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")(dados)
+    return emitir(dados)
 
 
 @router.get("/{external_reference_id}", response_model=CobrancaOut)
