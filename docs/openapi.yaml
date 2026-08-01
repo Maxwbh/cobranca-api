@@ -61,7 +61,7 @@ info:
     | Unicred | 136 | ✅ | ✅ | ✅ | — |
     | Ailos | 085 | ✅ | ✅ | ❌ | — |
 
-  version: 2.1.0
+  version: 2.1.1
   contact:
     name: Maxwell da Silva Oliveira
     email: maxwbh@gmail.com
@@ -1143,7 +1143,7 @@ components:
             version:
               type: string
               description: Versão da Cobranca-API
-              example: '2.1.0'
+              example: '2.1.1'
             engine:
               type: string
               example: python

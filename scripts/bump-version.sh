@@ -72,6 +72,13 @@ substituir docs/openapi.yaml \
     "s/^  version: ${CURRENT_VERSION}$/  version: ${NEW_VERSION}/" \
     "^  version: ${NEW_VERSION}$"
 
+# example do campo `version` em /api/metadata — é o que aparece no Swagger.
+# Ficava para trás a cada release: exatamente a versão sobrando num arquivo
+# que o comentário de `substituir` acima descreve.
+substituir docs/openapi.yaml \
+    "s/^              example: '${CURRENT_VERSION}'$/              example: '${NEW_VERSION}'/" \
+    "^              example: '${NEW_VERSION}'$"
+
 # CHANGELOG: abre a seção da versão logo abaixo de [Não lançado], que segue
 # existindo, vazia, para o próximo ciclo.
 if [ -f CHANGELOG.md ]; then

@@ -16,6 +16,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [2.1.1] - 2026-08-01
+
 ### Corrigido
 - **`POST /bolepix` sem endereço do pagador respondia `502`.** O C6 `/v2` exige
   `city`, `state` e `zip_code`; a API mandava o endereço vazio e traduzia o `400`
