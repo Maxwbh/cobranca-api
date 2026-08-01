@@ -450,6 +450,7 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 | PIX híbrido + Remessa PIX | [docs/api/pix.md](./docs/api/pix.md) |
 | Parsing OFX | [docs/api/ofx-parsing.md](./docs/api/ofx-parsing.md) |
 | Troubleshooting | [docs/api/troubleshooting.md](./docs/api/troubleshooting.md) |
+| Boleto online × offline (comparativo) | [docs/api/online-vs-offline.md](./docs/api/online-vs-offline.md) |
 | Arquitetura | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Roadmap | [roadmap de providers](./docs/development/roadmap-providers.md) |
 | Deploy | [DEPLOY.md](./DEPLOY.md) |

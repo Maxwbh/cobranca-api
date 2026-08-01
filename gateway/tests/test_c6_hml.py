@@ -156,6 +156,41 @@ def test_bolepix_criar_mapeia_schema_v2(client, c6_env, monkeypatch):
     assert sent["description"] == "Pedido 42"
 
 
+def test_bolepix_sem_endereco_recusa_antes_de_chamar_o_banco(client, c6_env, monkeypatch):
+    """O /v2 exige city, state e zip_code. Sem eles o banco respondia 400 e o
+    gateway devolvia 502 -- erro de servidor para payload invalido. Agora e 422,
+    e nenhuma requisicao sai."""
+    calls = _capture(monkeypatch, {"external_reference_id": "C" * 26})
+    body = {"tenant_id": "empresa1", "provider": "c6",
+            "account_config": {"chave_pix": "evp-key"},
+            "bolepix": {"valor": "99.90", "vencimento": "2026-08-31",
+                        "descricao": "Pedido 42",
+                        "pagador": {"nome": "Jose", "documento": "12345678909"}}}
+    r = client.post("/bolepix", json=body)
+    assert r.status_code == 422, r.text
+    detalhe = r.json()["detail"]
+    for campo in ("city", "state", "zip_code"):
+        assert campo in detalhe, detalhe
+    assert calls == []  # nada foi enviado ao banco
+
+
+def test_bolepix_endereco_parcial_aponta_so_o_que_falta(client, c6_env, monkeypatch):
+    calls = _capture(monkeypatch, {"external_reference_id": "D" * 26})
+    body = {"tenant_id": "empresa1", "provider": "c6",
+            "account_config": {"chave_pix": "evp-key"},
+            "bolepix": {"valor": "99.90", "vencimento": "2026-08-31",
+                        "descricao": "Pedido 42",
+                        "pagador": {"nome": "Jose", "documento": "12345678909",
+                                    "endereco": {"logradouro": "Av. X", "numero": 100,
+                                                 "cidade": "Sete Lagoas", "uf": "MG"}}}}
+    r = client.post("/bolepix", json=body)
+    assert r.status_code == 422, r.text
+    detalhe = r.json()["detail"]
+    assert "zip_code" in detalhe
+    assert "city" not in detalhe and "state" not in detalhe  # aliases pt-BR aceitos
+    assert calls == []
+
+
 def test_bolepix_consultar_pdf_cancelar(client, c6_env, monkeypatch):
     calls = _capture(monkeypatch, {"external_reference_id": "B" * 26, "status": "CREATED",
                                    "base64_pdf_file": "JVBERi0="})

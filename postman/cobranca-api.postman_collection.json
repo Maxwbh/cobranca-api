@@ -2416,7 +2416,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\",\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"bolepix\": {\n    \"external_reference_id\": \"{{external_reference_id}}\",\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"descricao\": \"Bolepix HML\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\",\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"bolepix\": {\n    \"external_reference_id\": \"{{external_reference_id}}\",\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"descricao\": \"Bolepix HML\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
