@@ -49,7 +49,7 @@ def test_sicoob_registrar_mapeia_identificadores_e_normaliza(client, cobranca_pa
         "cobranca": cobranca_payload,
     }
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     data = r.json()
     assert data["id"] == "77"
     assert data["status"] == "registrado"
@@ -76,7 +76,7 @@ def test_sicoob_pix_herdado_do_mixin_bacen(client, sicoob_env, monkeypatch):
     body = {"tenant_id": "empresa1", "provider": "sicoob",
             "account_config": {"chave_pix": "k"}, "pix": {"valor": "10.00"}}
     r = client.post("/pix", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["pix_copia_cola"].startswith("000201")
     assert captured["path"] == "/pix/api/v2/cob"  # prefixo Sicoob, dialeto BACEN
 
@@ -91,5 +91,37 @@ def test_sicoob_boleto_hibrido_devolve_pix(client, cobranca_payload, sicoob_env,
     body = {"tenant_id": "empresa1", "provider": "sicoob",
             "account_config": {"numeroCliente": 99}, "cobranca": cobranca_payload}
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200
+    assert r.status_code == 201
     assert r.json()["pix_copia_cola"].startswith("00020126")  # híbrido
+
+
+def test_consulta_sicoob_leva_a_conta_para_o_banco(client, monkeypatch):
+    """As rotas de leitura montavam o provider com account_config={} e no Sicoob
+    isso significa numeroCliente VAZIO: consultar, imprimir ou baixar respondia
+    400 do banco, sempre. O C6 nunca expos a falha porque identifica o boleto so
+    pelo id -- foi o roteiro do Sicoob que achou."""
+    monkeypatch.setenv("VAULT__t1__sicoob__client_id", "cid")
+    monkeypatch.setenv("VAULT__t1__sicoob__access_token", "tok")
+    monkeypatch.setenv("SICOOB_REGISTERED_READY", "true")
+    vistos = []
+
+    def fake(self, method, path, json=None, params=None):
+        vistos.append(params or {})
+        return {"resultado": {"situacaoBoleto": "EM ABERTO", "linhaDigitavel": "756..."}}
+
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request", fake)
+    r = client.get("/cobranca/17654321", params={
+        "tenant_id": "t1", "provider": "sicoob",
+        "numero_cliente": 25546454, "codigo_modalidade": 1})
+    assert r.status_code == 200, r.text
+    assert vistos[0]["numeroCliente"] == 25546454
+    assert vistos[0]["codigoModalidade"] == 1
+    assert vistos[0]["nossoNumero"] == "17654321"
+
+
+def test_conta_ausente_nao_vira_campo_vazio(client, monkeypatch):
+    """Sem a conta, o campo nao deve ir vazio para o banco -- e' o que produzia
+    `numeroCliente=` na URL. Melhor omitir e deixar o banco recusar por falta."""
+    from app.routers.cobranca import _conta
+    assert _conta(None, None) == {}
+    assert _conta(25546454, None) == {"numeroCliente": 25546454}

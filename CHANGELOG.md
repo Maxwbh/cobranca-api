@@ -14,7 +14,31 @@ changelog quer saber se precisa mexer na integração, não como o defeito surgi
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [2.2.0] — previsto para setembro de 2026
+
+### Adicionado
+- **Banco Inter (077)** como provider REST (`provider=inter`): boleto
+  registrado, Pix BACEN, extrato e webhook. Sem fallback offline.
+- **`POST/GET/DELETE /checkout`** — link de pagamento com cartão no C6, em modo
+  link: nenhum dado de cartão passa pela API.
+- OpenAPI passa a declarar os erros de banco (`404`, `409`, `424`, `429`,
+  `502`, `504`) nas rotas que falam com ele.
+
+### Alterado
+- **`POST /cobranca`, `/carne` e `/pix` respondem `201`** (antes `200`), com
+  `Location`. **`PUT /pix/lote/{id}` responde `202`** — o lote é enfileirado.
+  Quem compara com `200` exato precisa ajustar.
+- Erro no endpoint de token do banco responde `424`, não `422`.
+- `POST /credenciais` aceita certificado em PEM, além de PKCS12.
+
+### Corrigido
+- Consultar, imprimir e baixar boleto do Sicoob não funcionava: as rotas de
+  leitura iam sem conta. Agora aceitam `numero_cliente` e `codigo_modalidade`.
+- Evento de criação de checkout do C6 chegava como `cobranca.atualizada`.
+- Número de endereço com sufixo (`126A`) fazia o C6 recusar o registro.
+- Boleto offline levava só o logradouro do pagador para o CNAB.
+- Prazo absurdo devolvido pelo banco derrubava a rota Pix com `500`.
+- Cancelar boleto no C6 podia transformar sucesso em erro.
 
 ## [2.1.1] - 2026-08-01
 

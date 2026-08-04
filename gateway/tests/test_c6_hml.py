@@ -41,7 +41,7 @@ def test_pix_cob_com_txid_usa_put(client, c6_env, monkeypatch):
     body = {"tenant_id": "empresa1", "provider": "c6",
             "account_config": {"chave_pix": "k"},
             "pix": {"valor": "10.00", "txid": "T" * 28}}
-    assert client.post("/pix", json=body).status_code == 200
+    assert client.post("/pix", json=body).status_code == 201
     assert calls[0]["method"] == "PUT" and calls[0]["path"] == f"/v2/pix/cob/{'T'*28}"
 
 
@@ -88,7 +88,10 @@ def test_lote_cobv(client, c6_env, monkeypatch):
                                        "endereco": {"logradouro": "Rua X", "cidade": "R",
                                                     "uf": "PE", "cep": "50000000"}}}]}
     r = client.put("/pix/lote/123", json=body)
-    assert r.status_code == 200, r.text
+    # 202, nao 201: o banco responde "lote solicitado para criacao", sem corpo --
+    # o lote e' enfileirado, nao criado.
+    assert r.status_code == 202, r.text
+    assert r.headers["Location"] == "/pix/lote/123?tenant_id=empresa1&provider=c6"
     assert calls[0]["method"] == "PUT" and calls[0]["path"] == "/v2/pix/lotecobv/123"
     item = calls[0]["json"]["cobsv"][0]
     assert item["txid"] == "A" * 30 and item["chave"] == "k"

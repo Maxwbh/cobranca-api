@@ -30,6 +30,7 @@ from app.clients.oauth_mtls import OAuthMtlsClient
 from app.providers.bacen_pix import BacenPixAutomaticoMixin, BacenPixMixin, BacenPixRecebidosMixin, _devedor, _devedor_simples, _map_pix_status, _pix_out
 from app.providers.base import BankProvider
 from app.schemas import (
+    CheckoutOut,
     Cobranca,
     CobrancaOut,
     ConciliacaoOut,
@@ -67,6 +68,19 @@ def _cip_pendente(e: httpx.HTTPStatusError) -> bool:
     return e.response.status_code in (400, 422) and (
         "existe uma requisi" in e.response.text or "processamento" in e.response.text
     )
+
+
+def _ja_cancelado(e: httpx.HTTPStatusError) -> bool:
+    """O banco recusa cancelar o que já está cancelado, e isso não é erro aqui.
+
+    O cancelamento NÃO é idempotente no C6, e `_cip_retry` re-tenta enquanto a
+    CIP processa: a primeira chamada é aceita, a CIP conclui, e a re-tentativa
+    encontra o registro em CANCELLED e levanta. Quem chamou pediu que a cobrança
+    ficasse cancelada — e ela está. Reportar erro faria o consumidor tentar de
+    novo para sempre, e faria a homologação registrar falha onde a operação
+    tinha funcionado.
+    """
+    return e.response.status_code in (400, 422) and "with status CANCELLED" in e.response.text
 
 
 class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin, BankProvider):
@@ -128,8 +142,19 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
 
     def baixar(self, cobranca_id: str) -> CobrancaOut:
         # Cancelamento é PUT e responde 204 (sem corpo)
-        data = self._cip_retry("PUT", f"/v1/bank_slips/{cobranca_id}/cancel")
+        data = self._cancelar(f"/v1/bank_slips/{cobranca_id}/cancel")
         return CobrancaOut(id=cobranca_id, status=Status.baixado, raw=data or None)
+
+    def _cancelar(self, path: str) -> dict[str, Any]:
+        """Cancela tolerando o já-cancelado — ver `_ja_cancelado`."""
+        try:
+            return self._cip_retry("PUT", path)
+        except httpx.HTTPStatusError as e:
+            if not _ja_cancelado(e):
+                raise
+            return {"observacao": "registro já estava cancelado no banco; "
+                                  "o estado pedido é o estado atual",
+                    "upstream": e.response.json() if e.response.content else None}
 
     def _cip_retry(self, method: str, path: str, json: Any = None) -> dict[str, Any]:
         # Registro assíncrono na CIP: re-tenta 400/422 transitório por janela curta.
@@ -165,8 +190,29 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
         return out
 
     def cancelar_bolepix(self, external_reference_id: str) -> CobrancaOut:
-        data = self._cip_retry("PUT", f"/v2/bank_slips/{external_reference_id}/cancel")
+        data = self._cancelar(f"/v2/bank_slips/{external_reference_id}/cancel")
         return CobrancaOut(id=external_reference_id, status=Status.baixado, raw=data or None)
+
+    # --- Checkout (/v1/checkouts — link de pagamento com cartão) -----------------
+    # Só o modo LINK: criar, consultar e cancelar. O spec também expõe
+    # /authorize, /{id}/capture, /generate/public-key e /sdk-doc — todos ficam
+    # de fora por decisão de produto (checkout transparente e captura em duas
+    # fases), não por esforço.
+
+    def criar_checkout(self, dados: dict[str, Any]) -> CheckoutOut:
+        data = self._client().request("POST", "/v1/checkouts/", json=dados)
+        return _checkout_out(data, default_status=Status.pendente)
+
+    def consultar_checkout(self, checkout_id: str) -> CheckoutOut:
+        data = self._client().request("GET", f"/v1/checkouts/{checkout_id}")
+        return _checkout_out(data, default_status=Status.pendente)
+
+    def cancelar_checkout(self, checkout_id: str) -> CheckoutOut:
+        # Sem CIP aqui: o checkout não passa por registro assíncrono.
+        data = self._client().request("PUT", f"/v1/checkouts/{checkout_id}/cancel")
+        if isinstance(data, dict) and data:
+            return _checkout_out(data, default_status=Status.baixado)
+        return CheckoutOut(id=checkout_id, status=Status.baixado, raw=data or None)
 
     # --- extrato (/v1/statement) --------------------------------------------------
 
@@ -219,6 +265,20 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
                 status=_map_pix_status(body.get("status")),
                 raw=body,
             )
+        if _eh_checkout(body):
+            # Sem o mapa próprio, DECLINED/ERROR/IN PROGRESS chegariam ao
+            # consumidor com status NULO: o mapa do boleto não os conhece, e os
+            # três que ele acerta (PAID/CANCELLED/EXPIRED) acerta por coincidência
+            # de vocabulário. Cartão recusado tem de chegar como `erro`.
+            pagamentos_ck = body.get("payments") or []
+            return WebhookEvent(
+                event="checkout.atualizado",
+                id=body.get("id") or body.get("external_reference_id"),
+                status=_map_checkout_status(body.get("status")),
+                paid_at=(pagamentos_ck[0] if pagamentos_ck else {}).get("date"),
+                valor=body.get("amount"),
+                raw=body,
+            )
         status = _map_status(body.get("status")) or _map_pix_status(body.get("status"))
         return WebhookEvent(
             event="pix.atualizada" if txid else "cobranca.atualizada",
@@ -233,6 +293,36 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
 # --- mapeamentos ------------------------------------------------------------------
 
 
+def _numero_do_endereco(v: Any) -> tuple[Any, str]:
+    """Separa o número inteiro do resto: o C6 exige `number` numérico.
+
+    "412" → (412, ""), "126A" → (126, "A"), "126 -A" → (126, "A"),
+    "126.A" → (126, "A"). O sufixo volta para quem chama porque ele não some:
+    vai para o `complement`, que é onde o banco o aceita. Perder o "A" mudaria
+    o endereço de entrega do boleto — endereço truncado é endereço errado.
+
+    Sem dígito nenhum ("S/N", "SN") → 0, que é a convenção brasileira para
+    imóvel sem número — e faz o boleto sair, em vez de o banco recusar o
+    registro por um campo que o cadastro nunca vai ter. Texto que não seja
+    marca de sem-número ("Fundos") vira 0 e sobrevive no `complement`.
+    """
+    if not isinstance(v, str):
+        return v, ""
+    texto = v.strip()
+    if texto.isdigit():
+        return int(texto), ""
+    digitos = ""
+    for ch in texto:
+        if not ch.isdigit():
+            break
+        digitos += ch
+    resto = texto[len(digitos):].strip(" .,-/").strip()
+    if not digitos:
+        marca = "".join(ch for ch in resto.upper() if ch.isalpha() and ch not in "º°")
+        return 0, "" if marca in ("SN", "SEMNUMERO", "SEMNÚMERO", "") else texto
+    return int(digitos), resto
+
+
 def _payer(pagador: Pagador) -> dict[str, Any]:
     payer: dict[str, Any] = {
         "name": pagador.nome,
@@ -241,10 +331,19 @@ def _payer(pagador: Pagador) -> dict[str, Any]:
     end = pagador.endereco or {}
     if end.get("email"):
         payer["email"] = end["email"]
+    # O /v1/bank_slips exige `number` numérico e recusa a string com 400. Número
+    # de endereço chega como texto em praticamente todo cadastro brasileiro, e
+    # traduzir dialeto do banco é o trabalho desta camada — repassar "126A" e
+    # devolver a recusa empurra o problema para quem chama. O sufixo vai para o
+    # `complement`, que é onde o banco o aceita: perder o "A" mudaria o endereço.
+    numero, sufixo = _numero_do_endereco(end.get("number") or end.get("numero"))
+    complemento = end.get("complement") or end.get("complemento")
+    if sufixo:
+        complemento = f"{sufixo} {complemento}".strip() if complemento else sufixo
     address = {
         "street": end.get("street") or end.get("logradouro"),
-        "number": end.get("number") or end.get("numero"),
-        "complement": end.get("complement") or end.get("complemento"),
+        "number": numero,
+        "complement": complemento,
         "city": end.get("city") or end.get("cidade"),
         "state": end.get("state") or end.get("uf"),
         "zip_code": end.get("zip_code") or end.get("cep"),
@@ -287,6 +386,79 @@ def _conciliacao_out(data: dict[str, Any], key: str) -> ConciliacaoOut:
         total_items=data.get("items") if isinstance(data.get("items"), int) else None,
         items=data.get(key) or [],
     )
+
+
+def _checkout_out(data: dict[str, Any], *, default_status: Status) -> CheckoutOut:
+    return CheckoutOut(
+        id=data.get("id"),
+        url=data.get("url"),
+        status=_map_checkout_status(data.get("status")) or default_status,
+        expira_em=data.get("expiration_date_time"),
+        raw=data,
+    )
+
+
+# Status que só o checkout tem — o boleto nunca os emite.
+_STATUS_SO_CHECKOUT = {
+    "IN PROGRESS", "AUTHORIZED, CONFIRMATION PENDING", "CONFIRMATION REQUESTED",
+    "CANCELLATION REQUESTED", "DECLINED", "ERROR",
+}
+
+
+def _eh_checkout(body: dict[str, Any]) -> bool:
+    """Distingue notificação de checkout da de boleto.
+
+    O spec do Checkout não documenta webhook (a notificação vem pela API de
+    webhooks genérica, com `service: CHECKOUT`), então não há campo de tipo para
+    ler — a discriminação sai do formato observado no sandbox:
+
+        checkout → amount, emission_date_time, expiration_date_time, id, status
+        boleto   → amount, due_date, digitable_line, bar_code, our_number, ...
+
+    O status decide primeiro porque é o mais específico; o formato cobre o resto.
+
+    A `url` de pagamento entra como sinal próprio porque a criação do checkout
+    devolve um corpo mínimo — só `id` e `url`, sem status e sem data. Exigir
+    data ali classificava o evento de criação como boleto, e ele chegava ao
+    consumidor como `cobranca.atualizada` com status nulo. Boleto não tem link
+    de pagamento: o campo só existe de um lado.
+    """
+    if (body.get("status") or "").upper() in _STATUS_SO_CHECKOUT:
+        return True
+    if body.get("url") and not body.get("digitable_line"):
+        return True
+    tem_datas_de_checkout = bool(body.get("expiration_date_time") or body.get("emission_date_time"))
+    tem_cara_de_boleto = bool(
+        body.get("digitable_line") or body.get("bar_code")
+        or body.get("due_date") or body.get("our_number")
+    )
+    return tem_datas_de_checkout and not tem_cara_de_boleto
+
+
+def _map_checkout_status(s: str | None) -> Status | None:
+    """Checkout C6 → `Status` normalizado. Cabe inteiro no enum, sem status novo.
+
+    `DECLINED` e `ERROR` viram `erro`, NÃO `baixado`: `baixado` afirma que a
+    cobrança foi encerrada — ato deliberado, que é o caso do `CANCELLED`. Cartão
+    recusado não encerrou nada; o link se esgotou, a dívida não. Quem decide que
+    "segue em aberto" é o Consumidor da API, porque contrato e parcela não são
+    conceitos deste lado.
+
+    `CANCELLATION REQUESTED` é `pendente` pela mesma régua: cancelamento pedido
+    ainda não é cancelamento concluído.
+    """
+    return {
+        "CREATED": Status.pendente,
+        "IN PROGRESS": Status.pendente,
+        "AUTHORIZED, CONFIRMATION PENDING": Status.pendente,
+        "CONFIRMATION REQUESTED": Status.pendente,
+        "CANCELLATION REQUESTED": Status.pendente,
+        "PAID": Status.liquidado,
+        "CANCELLED": Status.baixado,
+        "EXPIRED": Status.expirado,
+        "DECLINED": Status.erro,
+        "ERROR": Status.erro,
+    }.get((s or "").upper())
 
 
 def _map_status(s: str | None) -> Status | None:

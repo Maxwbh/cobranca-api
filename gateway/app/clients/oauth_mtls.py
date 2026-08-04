@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import ssl
 import tempfile
 import time
@@ -36,8 +37,10 @@ class OAuthMtlsClient:
         auth_url: str,
         client_id: str,
         client_secret: str,
-        pfx_base64: str,
+        pfx_base64: str = "",
         pfx_password: str = "",
+        cert_pem: str = "",
+        key_pem: str = "",
         scopes: list[str] | None = None,
         default_headers: dict[str, str] | None = None,
         timeout: float = 30.0,
@@ -52,7 +55,7 @@ class OAuthMtlsClient:
         # sem o fluxo OAuth: se informado, token() o devolve direto.
         self.static_token = static_token
         self.default_headers = default_headers or {}
-        self._ssl = self._build_ssl_context(pfx_base64, pfx_password)
+        self._ssl = self._build_ssl_context(pfx_base64, pfx_password, cert_pem, key_pem)
         self._timeout = timeout
 
     # --- auth ---------------------------------------------------------------
@@ -112,14 +115,47 @@ class OAuthMtlsClient:
 
     # --- mTLS helper --------------------------------------------------------
     @staticmethod
-    def _build_ssl_context(pfx_base64: str, pfx_password: str) -> ssl.SSLContext:
+    def _pem(valor: str) -> bytes | None:
+        """Aceita PEM cru ou em base64 — o mesmo campo serve aos dois.
+
+        Quem cola o conteúdo do `.crt` num JSON manda PEM cru; quem automatiza
+        costuma mandar base64. Exigir um formato específico faria a metade
+        errar, e o erro (handshake que falha) não diz qual metade.
+        """
+        if not valor:
+            return None
+        texto = valor.strip()
+        if "-----BEGIN" in texto:
+            return texto.encode()
+        try:
+            bruto = base64.b64decode(texto, validate=True)
+        except (binascii.Error, ValueError):
+            return None
+        return bruto if b"-----BEGIN" in bruto else None
+
+    @staticmethod
+    def _build_ssl_context(pfx_base64: str, pfx_password: str,
+                           cert_pem: str = "", key_pem: str = "") -> ssl.SSLContext:
         ctx = ssl.create_default_context()
+        # PEM separado (`.crt` + `.key`) é o que o Banco Inter entrega — e vários
+        # outros. Sem este caminho, integrar exigiria rodar `openssl pkcs12
+        # -export` à mão antes da primeira chamada: atrito que a API absorve.
+        cert, chave = OAuthMtlsClient._pem(cert_pem), OAuthMtlsClient._pem(key_pem)
+        if cert and chave:
+            with tempfile.NamedTemporaryFile(suffix=".pem") as cf, \
+                 tempfile.NamedTemporaryFile(suffix=".pem") as kf:
+                cf.write(cert); cf.flush()
+                kf.write(chave); kf.flush()
+                ctx.load_cert_chain(certfile=cf.name, keyfile=kf.name,
+                                    password=pfx_password or None)
+            return ctx
         if not pfx_base64:
             return ctx
-        key, cert, _chain = pkcs12.load_key_and_certificates(
+        key, cert_obj, _chain = pkcs12.load_key_and_certificates(
             base64.b64decode(pfx_base64),
             pfx_password.encode() if pfx_password else None,
         )
+        cert = cert_obj
         # Arquivos efêmeros só para o load_cert_chain; removidos em seguida.
         with tempfile.NamedTemporaryFile(suffix=".pem") as cf, \
              tempfile.NamedTemporaryFile(suffix=".pem") as kf:

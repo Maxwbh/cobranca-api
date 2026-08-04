@@ -1,7 +1,9 @@
 # Pix dinâmico (cob/cobv BACEN) — só providers REST; o caminho offline não emite Pix.
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
@@ -9,6 +11,15 @@ from app.routers._credentials import resolve_request_credentials
 from app.schemas import LoteCobvIn, PixCobrancaIn, PixCobrancaOut, Provider
 
 router = APIRouter(prefix="/pix", tags=["pix"])
+
+# O `Location` só serve a quem sabe que ele existe: o FastAPI não documenta
+# header setado em tempo de execução, então o Swagger dizia 201 sem dizer para
+# onde ir. Declarado aqui para aparecer no contrato.
+_LOCATION = {
+    "description": "URL de consulta do recurso criado, já com tenant_id e provider",
+    "schema": {"type": "string"},
+}
+
 
 _CREDS_HEADER = Header(
     default=None,
@@ -29,9 +40,11 @@ def _provider(tenant_id: str, provider: Provider, account_config: dict, vault: V
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-@router.post("", response_model=PixCobrancaOut)
+@router.post("", response_model=PixCobrancaOut, status_code=201,
+             responses={201: {"headers": {"Location": _LOCATION}}})
 def criar(
     body: PixCobrancaIn,
+    response: Response,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> PixCobrancaOut:
@@ -42,9 +55,23 @@ def criar(
     )
     p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
     try:
-        return p.criar_pix(body.pix)
+        out = p.criar_pix(body.pix)
     except ValueError as e:  # chave/txid/devedor ausentes → erro do chamador
         raise HTTPException(status_code=422, detail=str(e)) from e
+    # cob e cobv moram na mesma rota e se distinguem por `vencimento`; sem esse
+    # parâmetro o Location de uma cobv apontaria para a cob, que não existe.
+    if out.txid:
+        extra = {"vencimento": "true"} if body.pix.data_vencimento else {}
+        response.headers["Location"] = _location(
+            f"/pix/{out.txid}", body.tenant_id, body.provider, **extra)
+    return out
+
+
+def _location(caminho: str, tenant_id: str, provider, **extra: str) -> str:
+    """Location que o cliente consegue seguir: as rotas de consulta exigem
+    tenant_id e provider, então omiti-los devolveria 422 a quem confia no header."""
+    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider), **extra}
+    return f"{caminho}?{urlencode(params)}"
 
 
 def _creds(credentials, authorization, tenant_id, provider):
@@ -139,9 +166,16 @@ def listar_lotes(
     return p.listar_lotes_cobv(inicio=inicio, fim=fim)
 
 
-@router.put("/lote/{lote_id}", response_model=dict)
+# 202, e não 201 como as demais rotas de criação: o banco responde "lote
+# solicitado para criação", sem corpo — o lote é enfileirado, não criado. É a
+# mesma régua que mantém o /cobranca em 201: lá existe id e linha digitável na
+# resposta, aqui não existe nada ainda. O `Location` fica, que é justamente o
+# uso do 202: dizer onde acompanhar.
+@router.put("/lote/{lote_id}", response_model=dict, status_code=202,
+            responses={202: {"headers": {"Location": _LOCATION}}})
 def criar_lote(
     lote_id: str, body: LoteCobvIn,
+    response: Response,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
@@ -165,7 +199,10 @@ def criar_lote(
             "valor": {"original": f"{pix.valor:.2f}"},
             "chave": pix.chave or chave_conta,
         })
-    return p.criar_lote_cobv(lote_id, body.descricao, cobsv)
+    out = p.criar_lote_cobv(lote_id, body.descricao, cobsv)
+    response.headers["Location"] = _location(
+        f"/pix/lote/{lote_id}", body.tenant_id, body.provider)
+    return out
 
 
 @router.get("/lote/{lote_id}", response_model=dict)

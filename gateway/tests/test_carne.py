@@ -34,7 +34,7 @@ def test_carne_registra_parcelas_e_monta_pdf(client, cobranca_payload, monkeypat
         "parcelas": [cobranca_payload, {**cobranca_payload, "nosso_numero": "2"}],
     }
     r = client.post("/carne", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     data = r.json()
 
     assert data["carne_pdf_base64"] == "JVBERi0xCg=="
@@ -57,7 +57,7 @@ def test_carne_offline_gera_pdf_real(client, cobranca_payload):
             "parcelas": [{**cobranca_payload, "pagador": pagador},
                           {**cobranca_payload, "nosso_numero": "2", "pagador": pagador}]}
     r = client.post("/carne", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["carne_pdf_base64"].startswith("JVBER")
 
 

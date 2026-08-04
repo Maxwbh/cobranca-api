@@ -1,8 +1,13 @@
-# Roadmap de Providers — Bancos e PSPs
+# Roadmap de Providers ONLINE — Bancos e PSPs
 
-> Próximos passos de integração do **gateway** (`gateway`). Estado
-> atual: **C6** e **Sicoob** REST validados em sandbox; **18 bancos** via CNAB
-> offline (engine pyCobrança). Cada linha aqui é **planejada**, não implementada.
+> Próximos passos de integração do **gateway** (`gateway`) — o caminho **online**,
+> que fala com a API do banco. Estado atual: **C6**, **Sicoob** e **Inter**
+> validados em sandbox; **18 bancos** via CNAB offline (engine pyCobrança).
+> Salvo o que está marcado ✅, cada linha aqui é **planejada**, não implementada.
+>
+> Só o caminho online. O catálogo **offline** é da engine
+> [pyCobrança](https://github.com/Maxwbh/pyCobranca) e a fila dele vive lá — esta
+> API apenas expõe o que a engine suporta, em `GET /api/bancos`.
 
 ## Princípio de esforço (o que torna barato)
 
@@ -15,21 +20,42 @@
   1 provider novo + testes. `GET /bancos` lista o novo provider automaticamente
   (capacidades por introspecção).
 
+## Princípio de escopo (o que não entra, em provider nenhum)
+
+A API é **intermediária**: traduz a requisição, fala com a instituição e
+normaliza o status de volta. **Não calcula, não confere e não guarda regra de
+negócio de cliente.** Isto é régua de seleção, não só de implementação — o que
+cai aqui sai antes da discussão de esforço:
+
+- **Split e comissão** (ex.: Marketplace/OAuth do Mercado Pago, MP-S08) —
+  ficar com fatia de pagamento alheio faz o serviço participar do fluxo do
+  dinheiro, e ele deixa de ser tradutor.
+- **Saída de dinheiro** (pagamentos, DDA, TED) — o produto é cobrança, entrada.
+- **Configuração comercial do cliente** (juro de parcelamento, baixa de parcela)
+  — chega no payload, resolvida por quem chama.
+- **Captura presencial** (maquininha) — não há superfície para esta API
+  consumir; não vira nem linha de catálogo.
+
 ## Fases
 
 ### ✅ Fase 0 — Concluída
 | Provider | Tipo | Estado |
 |---|---|---|
 | C6 Bank (336) | Banco REST | boleto, Pix, Bolepix, extrato, conciliação, Pix Automático — validado sandbox |
-| Sicoob (756) | Banco REST | boleto v3, Pix, extrato, Pix Automático — validado sandbox |
+| Sicoob (756) | Banco REST | boleto v3, Pix, extrato, Pix Automático — sandbox é **mock de schema**: valida contrato, não comportamento |
+| Banco Inter (077) | Banco REST | boleto híbrido (QR Pix no mesmo documento), Pix, extrato, webhook — **validado sandbox**, 13 casos em 2xx, zero falhas |
 | 18 bancos CNAB | Offline | via engine pyCobrança |
 
 ### 🎯 Fase 1 — Bancos self-service (próximos)
 | Prioridade | Provider | Cód | Por quê | Esforço | Doc |
 |---|---|---|---|---|---|
-| 1ª ⭐ | **Banco Inter** | 077 | Melhor self-service; mTLS+OAuth (= família C6); Bolepix nativo | **Baixo** | [inter-rest.md](./inter-rest.md) |
-| 2ª | **Banco do Brasil** | 001 | Maior alcance; API Cobrança + Arrecadação Pix; híbrido | Médio | [banco-do-brasil-rest.md](./banco-do-brasil-rest.md) |
-| 3ª | **Sicredi** | 748 | Cooperativo; reaproveita quase tudo do Sicoob | **Muito baixo** | (planejado) |
+| 1ª | **Banco do Brasil** | 001 | Maior alcance; API Cobrança + Arrecadação Pix; híbrido | Médio | [banco-do-brasil-rest.md](./banco-do-brasil-rest.md) |
+| 2ª | **Sicredi** | 748 | Cooperativo; reaproveita quase tudo do Sicoob | **Muito baixo** | (planejado) |
+| 3ª | **BTG Pactual** | 208 | Único outro banco com **link de cartão hospedado por API**; self-service, **sem mTLS** | Médio¹ | [btg-rest.md](./btg-rest.md) |
+
+> ¹ Duas incógnitas decidem a conta, ambas respondíveis no sandbox: o link de
+> pagamento aceita `client_credentials` (ou só Authorization Code, que o cofre
+> não comporta hoje)? E o Pix é dialeto BACEN (mixins de graça) ou próprio?
 
 ### 🔌 Fase 2 — PSP / Agregador
 | Prioridade | Provider | Tipo | Por quê | Esforço | Doc |
@@ -57,6 +83,35 @@
 
 **Estratégia sugerida:** bancos como trilha principal (Inter → BB → Sicredi) +
 Mercado Pago como o provider "PSP" de referência (menor atrito, cartão + carteira).
+
+## Cartão — link de pagamento (capacidade, não provider)
+
+Cartão atravessa as fases acima em vez de ocupar uma linha nelas: não é um
+provider novo, é uma capacidade que cada instituição tem ou não tem.
+
+**Critério de entrada:** a instituição **oferece link hospedado**. Quem oferece,
+tem; quem não oferece responde `422` do `exige_capacidade` dizendo para onde ir,
+como já acontece com o Bolepix. Não é lista fechada de bancos — é teste aplicado
+a cada um, e a assimetria entre providers é o resultado esperado, não exceção a
+justificar.
+
+**Restrição dura: modo link, e só ele.** O PAN é digitado no domínio da
+instituição, e o escopo PCI-DSS fica com ela. Checkout transparente e
+`save_card` estão fora em definitivo — integração que exija cartão no nosso
+domínio troca o assunto de integração para certificação.
+
+| Instituição | Oferece link hospedado? | Estado | Onde |
+|---|---|---|---|
+| **C6 Bank** | Sim — API Checkout, mesmo host e auth do boleto | ✅ **implementado** (`/checkout`) | [c6-rest.md](./c6-rest.md) · C6-S09 |
+| **BTG Pactual** | Sim — link → `linkUrl`, área não logada; **7 webhooks** | 🔜 possibilidade | [btg-rest.md](./btg-rest.md) · BTG-S05 |
+| **Mercado Pago** | Sim — Checkout Pro (`POST /checkout/preferences` → `init_point`) | 🔜 possibilidade | [mercado-pago-rest.md](./mercado-pago-rest.md) · MP-S07 |
+| **Sicoob** | Não — cartão é da Sipag, sem API pública | ⛔ `422` por capacidade | [sicoob-rest.md](./sicoob-rest.md) |
+| **Banco Inter** | Não levantado — o portal PJ não expõe checkout de cartão nas APIs que integramos | ⛔ `422` por capacidade | [inter-rest.md](./inter-rest.md) |
+
+O C6 é o mais barato por larga margem: mesmo host, mesma OAuth+mTLS, mesmo
+cofre — rota nova sobre o `OAuthMtlsClient` que já existe, não integração nova.
+Efí, Asaas, PagBank e Cielo também oferecem link hospedado e passam no mesmo
+critério; entram quando existir cliente que nenhum banco integrado atenda.
 
 ## Como cada provider entra (checklist)
 

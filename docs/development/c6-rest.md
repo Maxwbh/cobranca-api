@@ -55,7 +55,7 @@ está documentado em [`../c6-rest.md`](./c6-rest.md). Sequência de integração
 | C6-S06 | Notificações / Webhooks (`/v1/webhooks`) | Avisos de pagamento/baixa de boleto | ✅ | `/config/webhook-banco` (config) + `POST /webhooks/c6[/{tenant}]` (entrada) |
 | C6-S07 | Extrato (`/v1/statement`) | Movimentações da conta PJ | ✅ | `GET /extrato` |
 | C6-S08 | Transações e Recebíveis — C6 Pay | Extrato da adquirência (cartão) | ✅ | `GET /conciliacao/recebiveis\|transacoes` |
-| C6-S09 | Checkout (cartão/Pix) | Página de pagamento hospedada | ⛔ | Sem previsão (decisão de produto) |
+| C6-S09 | Checkout (cartão/Pix) | Página de pagamento hospedada | ✅ | `POST/GET/DELETE /checkout` — **modo link apenas**; transparente e `save_card` recusados no schema |
 | C6-S10 | Agendamento de Pagamentos / DDA | Pagar contas/boletos (saída de dinheiro) | ⛔ | Fora de escopo — o produto é **cobrança** (entrada), não pagamento |
 
 ## Roteamento de provider
@@ -114,6 +114,9 @@ vigente com o time do C6 (varia por ambiente e pode mudar sem aviso).
 | Webhook no banco | `POST/GET/DELETE /v1/webhooks/` | `/config/webhook-banco` |
 | Recebíveis | `GET /v1/c6pay/statement/receivables` | `GET /conciliacao/recebiveis` |
 | Transações | `GET /v1/c6pay/statement/transactions` | `GET /conciliacao/transacoes` |
+| Criar link de pagamento | `POST /v1/checkouts/` | `POST /checkout` |
+| Consultar link | `GET /v1/checkouts/{id}` | `GET /checkout/{id}` |
+| Cancelar link | `PUT /v1/checkouts/{id}/cancel` | `DELETE /checkout/{id}` |
 | Notificações (status) | webhook do banco | `POST /webhooks/c6[/{tenant}]` |
 
 ## Pix Automático, recebidos e webhook por chave (BACEN, compartilhado)
@@ -216,13 +219,38 @@ com HMAC (`X-Signature`), como nos demais bancos.
 
 ## Testes
 
-- `pytest` (mock): `tests/test_cobranca_c6.py`, `test_pix_c6.py`,
-  `test_conciliacao_c6.py`, `test_webhooks.py`.
-- E2E sandbox (`tests/test_sandbox_c6.py`): roda só com `C6_SANDBOX_CLIENT_ID`
-  / `C6_SANDBOX_CLIENT_SECRET` (+ `C6_SANDBOX_PFX_*`, `C6_SANDBOX_CHAVE_PIX`)
-  no ambiente, dentro da janela do sandbox.
+Mock — interceptam `OAuthMtlsClient.request` e rodam no `pytest` de sempre, sem
+credencial:
 
-## Validado no sandbox real (roteiro v3.0)
+| Arquivo | O que cobre |
+|---|---|
+| `tests/test_c6_hml.py` (14) | As operações do **roteiro de homologação v3.0**: alterar boleto, Pix (txid via PUT, PATCH de revisão, cobv, listas, lote), extrato, webhook, Bolepix (criar/consultar/PDF/cancelar + as duas recusas por endereço) e o `409` de CIP com re-tentativa |
+| `tests/test_c6_checkout.py` (30) | **Checkout**: payload, os 10 status do spec, capacidade por provider, e a recusa de `save_card`/transparente/captura |
+| `tests/test_pix_c6.py` (8) | Dialeto BACEN pelo provider C6 |
+| `tests/test_webhooks.py` (9) · `test_webhook_banco.py` | Recepção, autenticidade e cadastro do webhook no banco |
+| `tests/test_errors.py` (10) | Tradução do erro do banco em `4xx`/`5xx` |
+| `tests/test_cobranca_c6.py` (3) · `test_conciliacao_c6.py` (3) | Boleto e recebíveis/transações |
+
+### E2E contra o sandbox real
+
+`tests/test_sandbox_c6.py` — roda só com `C6_SANDBOX_CLIENT_ID` /
+`C6_SANDBOX_CLIENT_SECRET` (+ `C6_SANDBOX_PFX_*`, `C6_SANDBOX_CHAVE_PIX`) no
+ambiente e dentro da janela do sandbox. São **dois fluxos**, não mais:
+
+```
+test_sandbox_emitir_consultar_cancelar_boleto
+test_sandbox_pix_cob_imediata
+```
+
+## Homologação — o que foi validado, e como
+
+São duas coisas diferentes, e convém não lê-las como uma.
+
+### Roteiro v3.0 — manual, snapshot registrado na 2.1.0 (2026-07-31)
+
+Executado **uma vez** contra o sandbox real. **Nada re-verifica esta lista
+automaticamente**: o e2e acima cobre dois destes fluxos; o restante vale como
+registro do que passou naquela data, não como garantia de hoje.
 
 - Boleto: emitir (simples/juros+multa/desconto), alterar, consultar, PDF e
   cancelar — o **registro é assíncrono (CIP)**: cancelamentos no intervalo
@@ -234,9 +262,28 @@ com HMAC (`X-Signature`), como nos demais bancos.
 - Extrato, recebíveis/transações e cadastro de webhook no banco.
 - Indisponível no sandbox à época: `lotecobv` (502 do lado do banco).
 
+### Mudou depois do snapshot (2.1.1)
+
+O roteiro acima é anterior a estes dois, e ambos são visíveis para quem integra:
+
+- **Bolepix sem endereço do pagador recusa com `422` antes de chamar o banco.**
+  Antes, o endereço vazio virava `400` do C6 traduzido em `502`. Cobertura em
+  `test_c6_hml.py`.
+- **Erro do banco deixou de virar `502` quase sempre:** `400`/`422`/`405` → `422`,
+  `404` → `404`, `409` → `409`, `429` → `429` repassando `Retry-After`. Cobertura
+  em `test_errors.py`.
+
+Quando o roteiro for reexecutado, os dois entram na lista acima.
+
 ## Pendências
 
-1. Mecanismo de autenticidade do webhook (hoje: token na URL).
+1. **Autenticidade do webhook de entrada.** Hoje é token de rota — `?token=` ou
+   header `x-webhook-token`, comparado em tempo constante com
+   `hmac.compare_digest`. Funciona, mas é segredo compartilhado; o desejável
+   seria assinatura do próprio banco, que o C6 não oferece.
 2. Shape fino de `receivables/transactions` (tipagem passthrough).
 3. Enviar o roteiro preenchido a homologacaoapi@c6bank.com e, aprovado,
    ligar `C6_REGISTERED_READY=true` + carteira 15 + `C6_BASE_URL` de produção.
+   O formulário **preenchido com o retorno real do sandbox**, a evidência crua
+   e o passo a passo para reexecutar estão em
+   [docs/homologacao/](../homologacao/README.md).

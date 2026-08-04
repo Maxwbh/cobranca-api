@@ -119,3 +119,44 @@ def test_timeout_do_banco_vira_504(client, monkeypatch):
                                    "account_config": {"chave_pix": "x"},
                                    "pix": {"valor": "10.00"}})
     assert r.status_code == 504
+
+
+def test_erro_no_endpoint_de_token_vira_424_e_nao_422(client, monkeypatch):
+    """O Inter devolve 400 para client_credentials invalido, e o mapa geral
+    traduzia isso como "o banco recusou os dados enviados" — mandando quem
+    integra cacar defeito no payload quando o problema e' a credencial."""
+    import httpx
+
+    monkeypatch.setenv("VAULT__t1__inter__client_id", "cid")
+    monkeypatch.setenv("VAULT__t1__inter__client_secret", "errado")
+    monkeypatch.setenv("INTER_REGISTERED_READY", "true")
+
+    def fake(self):
+        req = httpx.Request("POST", "https://cdpj-sandbox.partners.uatinter.co/oauth/v2/token")
+        resp = httpx.Response(400, text="", request=req)
+        raise httpx.HTTPStatusError("400", request=req, response=resp)
+
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.token", fake)
+    r = client.get("/cobranca/abc", params={"tenant_id": "t1", "provider": "inter"})
+    assert r.status_code == 424, r.text
+    assert "credenciais" in r.json()["detail"]
+
+
+def test_erro_400_fora_do_token_continua_sendo_payload(client, monkeypatch):
+    """A regra e' estreita: so o endpoint de autenticacao. 400 numa rota de
+    negocio continua significando dado recusado."""
+    import httpx
+
+    monkeypatch.setenv("VAULT__t1__inter__client_id", "cid")
+    monkeypatch.setenv("VAULT__t1__inter__client_secret", "sec")
+    monkeypatch.setenv("INTER_REGISTERED_READY", "true")
+
+    def fake(self, method, path, json=None, params=None):
+        req = httpx.Request(method, f"https://cdpj-sandbox.partners.uatinter.co{path}")
+        resp = httpx.Response(400, json={"detail": "campo invalido"}, request=req)
+        raise httpx.HTTPStatusError("400", request=req, response=resp)
+
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request", fake)
+    r = client.get("/cobranca/abc", params={"tenant_id": "t1", "provider": "inter"})
+    assert r.status_code == 422, r.text
+    assert "recusou os dados" in r.json()["detail"]

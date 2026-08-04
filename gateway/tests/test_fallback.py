@@ -33,7 +33,7 @@ def test_c6_nao_pronto_cai_no_offline(client, cobranca_payload, monkeypatch):
         "cobranca": {**cobranca_payload, "pagador": PAGADOR},
     }
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     data = r.json()
     assert data["status"] in ("registrado", "erro")  # depende dos dados da conta
     if data["status"] == "registrado":
@@ -49,7 +49,7 @@ def test_sicoob_nao_pronto_cai_no_offline(client, cobranca_payload, monkeypatch)
                                 "documento_cedente": "11222333000181"},
             "cobranca": {**cobranca_payload, "pagador": PAGADOR}}
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["status"] in ("registrado", "erro")
 
 
@@ -58,10 +58,10 @@ def test_provider_omitido_ou_vazio_vai_para_offline(client, cobranca_payload):
     body = {"tenant_id": "x", "account_config": {"bank": "banco_brasil", **CONTA_OFFLINE},
             "cobranca": {**cobranca_payload, "pagador": PAGADOR}}
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["status"] == "registrado"
 
     body_vazio = {**body, "provider": ""}
     r2 = client.post("/cobranca", json=body_vazio)
-    assert r2.status_code == 200
+    assert r2.status_code == 201
     assert r2.json()["status"] == "registrado"
