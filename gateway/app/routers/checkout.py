@@ -12,6 +12,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
+from app.core.idempotency import (
+    ConflitoDeIdempotencia,
+    get_idempotency_store,
+    impressao,
+)
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._capacidades import exige_capacidade
@@ -31,6 +36,10 @@ router = APIRouter(prefix="/checkout", tags=["checkout"])
 _CREDS_HEADER = Header(default=None, alias="X-Bank-Credentials",
                        description="Credenciais do banco (JSON base64) — só memória.")
 _AUTH_HEADER = Header(default=None, description="Bearer bapi_... (token do /credenciais)")
+_IDEMPOTENCIA_HEADER = Header(
+    default=None, alias="Idempotency-Key",
+    description="Reenvio com a mesma chave devolve O MESMO link, sem criar outro no "
+                "banco. Mesma chave com corpo diferente é 422.")
 
 # Cartão existe onde a instituição OFERECE link hospedado. Hoje, o C6.
 _ALTERNATIVA = ("link de pagamento existe no banco que oferece a funcionalidade — "
@@ -101,11 +110,25 @@ def _payer_checkout(pagador: Pagador) -> dict:
 
 @router.post("", response_model=CheckoutOut, status_code=201)
 def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
+          idempotency_key: str | None = _IDEMPOTENCIA_HEADER,
           vault: Vault = Depends(get_vault)) -> CheckoutOut:
     """Cria o link de pagamento e devolve a `url` para onde mandar o pagador.
 
     Aceita cartão e, com `pix: true`, Pix no mesmo link. Expira em 7 dias quando
-    `expira_em` é omitido (default do banco)."""
+    `expira_em` é omitido (default do banco).
+
+    Mande `Idempotency-Key` se houver botão humano na frente disto: sem a chave,
+    duplo clique cria **dois links para a mesma venda**, e nada impede o pagador
+    de pagar os dois."""
+    # A impressão é do checkout, não do corpo inteiro: `credentials` pode vir no
+    # request e não faz parte da identidade do pedido — o mesmo pedido com a
+    # credencial reenviada de outro jeito continua sendo o mesmo pedido.
+    marca = impressao(body.checkout.model_dump(mode="json")) if idempotency_key else ""
+    if idempotency_key:
+        guardada = _replay(body.tenant_id, idempotency_key, marca)
+        if guardada is not None:
+            return guardada
+
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
                                         tenant_id=body.tenant_id, provider=body.provider)
     p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
@@ -138,7 +161,39 @@ def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
         payload["external_reference_id"] = ck.external_reference_id
     if ck.pagador:
         payload["payer"] = _payer_checkout(ck.pagador)
-    return criar_link(payload)
+
+    resultado = criar_link(payload)
+    if idempotency_key:
+        _guardar(body.tenant_id, idempotency_key, marca, resultado)
+    return resultado
+
+
+def _replay(tenant_id: str, chave: str, marca: str) -> CheckoutOut | None:
+    """Resposta já guardada para esta chave, ou None se é a primeira vez.
+
+    Store indisponível devolve None (segue e cria): perder a idempotência é ruim,
+    mas recusar a venda porque o nosso SQLite tropeçou é pior."""
+    try:
+        guardada = get_idempotency_store().buscar(tenant_id, "checkout", chave, marca)
+    except ConflitoDeIdempotencia:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Idempotency-Key '{chave}' já foi usada neste tenant com outro "
+                   "checkout; use uma chave nova para um pedido novo",
+        ) from None
+    except Exception:  # noqa: BLE001
+        return None
+    return CheckoutOut(**guardada) if guardada else None
+
+
+def _guardar(tenant_id: str, chave: str, marca: str, resultado: CheckoutOut) -> None:
+    """Nunca levanta: o link JÁ existe no banco a esta altura, e falhar aqui
+    esconderia do cliente uma cobrança que foi criada."""
+    try:
+        get_idempotency_store().guardar(tenant_id, "checkout", chave, marca,
+                                        resultado.model_dump(mode="json"))
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @router.get("/{checkout_id}", response_model=CheckoutOut)

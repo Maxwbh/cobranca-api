@@ -190,7 +190,7 @@ def test_pix_usa_a_base_do_inter_sem_codigo_novo(client, inter_env, monkeypatch)
 
 # --- webhook ----------------------------------------------------------------------
 
-def test_webhook_do_inter_normaliza_a_situacao(client, monkeypatch):
+def test_webhook_do_inter_normaliza_a_situacao(client, monkeypatch, webhook_aberto):
     r = client.post("/webhooks/inter", json={
         "cobranca": {"codigoSolicitacao": "abc-123", "situacao": "RECEBIDO",
                      "valorNominal": 150.0, "dataHoraSituacao": "2026-08-04T10:00:00Z"}})

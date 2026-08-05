@@ -259,7 +259,10 @@ AUSENTES: dict[str, tuple[str, str]] = {
               "banco expõe as rotas. Prometer antes de confirmar seria vender o que não se sabe"),
     "SA_01": ("Banking v2 — saldo",
               "LACUNA DE SUPERFÍCIE, não de escopo: o endpoint existe e o gateway não expõe "
-              "rota de saldo para nenhum banco (mesma situação do SIC-S06)"),
+              "rota de saldo para nenhum banco (mesma situação do SIC-S06). ADIADO por "
+              "decisão de produto: saldo é posição de conta, não cobrança, e o /extrato "
+              "cobre o caso de uso. Se um dia entrar, entra para todos os bancos de uma "
+              "vez — não como exceção do Inter"),
 }
 
 

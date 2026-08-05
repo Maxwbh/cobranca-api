@@ -138,6 +138,20 @@ request (verificado pelo §8). Coluna **Roadmap** liga aos critérios T1–T10 (
 > retentativa, PATCH de revisão) entram na matriz na geração da coleção,
 > seguindo a numeração — a regra do §8 impede que fiquem de fora.
 
+| ID | Funcionalidade | Endpoint | Cobre |
+|---|---|---|---|
+| BC-088 | Revisar cobranças dentro do lote de cobv | `PATCH /pix/lote/{id}` | `P_03_02` do roteiro C6 — encadeia no `lote_id`/`txid_lote1` do BC-052 |
+
+> **BC-088 fechou uma ausência de homologação, não só uma linha de matriz.**
+> `revisar_lote_cobv` existia no mixin BACEN e o router não expunha, então
+> `P_03_02` saía do roteiro do C6 como caso ausente. A cobrança individual já
+> tinha o seu `PATCH /pix/{txid}`; a assimetria era o defeito.
+>
+> O teste aceita `502` entre os status esperados: o sandbox do C6 devolve `502`
+> em `/lotecobv` no `PUT` e no `GET`, e isso está registrado em
+> [docs/homologacao/](../homologacao/README.md) como defeito do banco. Marcar o
+> request como falho por causa disso apontaria para o lugar errado.
+
 ### 4.2 Cenários negativos (NEG) — enxutos, só comportamento já implementado
 
 | ID | Cenário | Esperado |

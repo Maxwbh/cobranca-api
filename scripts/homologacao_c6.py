@@ -29,7 +29,6 @@ pilha de rotas — só não cruza um socket.
 Casos AUSENTES (declarados em `AUSENTES`, nunca executados):
   AP_01..AP_06  saída de dinheiro — fora do escopo do produto
   P_04_01..04   o gateway consome a `location` da cob; não gerencia o recurso
-  P_03_02       lacuna de superfície: o provider revisa lote, o router não expõe
 
 Ausente também sai de `SemMassa`, levantada em tempo de execução quando o caso
 depende de dado que o ambiente não tem (P_05_01/03/04: a conta sandbox nunca
@@ -479,6 +478,19 @@ def p_03_01():
 
 
 
+def p_03_02():
+    # Revisão do lote: só as cobranças enviadas mudam. O txid é o MESMO de
+    # p_03_01 — revisar um txid que não está no lote não seria revisão, seria
+    # inclusão, e o banco recusaria por outro motivo que não o do caso.
+    return API("PATCH", f"/pix/lote/{_lote_id()}", json={
+        "tenant_id": TENANT, "provider": "c6",
+        "account_config": {"chave_pix": CHAVE_PIX},
+        "cobrancas": [{
+            "valor": "2.00", "txid": _txid(), "data_vencimento": VENC,
+            "devedor": {"nome": "Teste Homologacao", "documento": "12345678909"},
+        }]})
+
+
 def p_03_03():
     return API("GET", f"/pix/lote/{_lote_id()}", params=_q())
 
@@ -639,7 +651,6 @@ AUSENTES: dict[str, tuple[str, str]] = {
     "P_04_02": ("Consultar locations cadastradas", "fora do escopo: idem P_04_01"),
     "P_04_03": ("Recuperar location específica", "fora do escopo: idem P_04_01"),
     "P_04_04": ("Desvincular cobrança de uma location", "fora do escopo: idem P_04_01"),
-    "P_03_02": ("Revisar cobranças dentro do lote", "LACUNA DE SUPERFÍCIE, não de escopo: provider.revisar_lote_cobv existe, o router não expõe"),
 }
 
 
@@ -663,6 +674,7 @@ CASOS = [
     ("P_02_03", "Consultar cobrança com vencimento", p_02_03),
     ("P_02_04", "Consultar lista de cobranças com vencimento", p_02_04),
     ("P_03_01", "Criar lote de cobranças com vencimento", p_03_01),
+    ("P_03_02", "Revisar cobranças dentro do lote", p_03_02),
     ("P_03_03", "Consultar lote específico", p_03_03),
     ("P_03_04", "Consultar lista de lotes", p_03_04),
     ("P_05_02", "Consultar lista de Pix recebidos", p_05_02),

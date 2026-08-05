@@ -8,7 +8,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._credentials import resolve_request_credentials
-from app.schemas import LoteCobvIn, PixCobrancaIn, PixCobrancaOut, Provider
+from app.schemas import (
+    LoteCobvIn,
+    LoteCobvRevisaoIn,
+    PixCobrancaIn,
+    PixCobrancaOut,
+    Provider,
+)
 
 router = APIRouter(prefix="/pix", tags=["pix"])
 
@@ -185,13 +191,25 @@ def criar_lote(
         tenant_id=body.tenant_id, provider=body.provider,
     )
     p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    out = p.criar_lote_cobv(lote_id, body.descricao, _cobsv(body))
+    response.headers["Location"] = _location(
+        f"/pix/lote/{lote_id}", body.tenant_id, body.provider)
+    return out
+
+
+def _cobsv(body: LoteCobvIn | LoteCobvRevisaoIn) -> list[dict]:
+    """Itens do lote no dialeto BACEN. Compartilhado por criar e revisar: o
+    `cobsv` do PATCH tem a mesma forma do PUT, e duas cópias divergiriam no dia
+    em que um campo mudasse."""
     from app.providers.c6 import _devedor  # mapeamento canonico -> BACEN
+
     chave_conta = body.account_config.get("chave_pix")
-    cobsv = []
+    itens = []
     for pix in body.cobrancas:
         if not (pix.txid and pix.data_vencimento and pix.devedor):
-            raise HTTPException(status_code=422, detail="cada item do lote exige txid, data_vencimento e devedor")
-        cobsv.append({
+            raise HTTPException(status_code=422,
+                                detail="cada item do lote exige txid, data_vencimento e devedor")
+        itens.append({
             "txid": pix.txid,
             "calendario": {"dataDeVencimento": pix.data_vencimento.isoformat(),
                            "validadeAposVencimento": pix.validade_apos_vencimento},
@@ -199,10 +217,30 @@ def criar_lote(
             "valor": {"original": f"{pix.valor:.2f}"},
             "chave": pix.chave or chave_conta,
         })
-    out = p.criar_lote_cobv(lote_id, body.descricao, cobsv)
-    response.headers["Location"] = _location(
-        f"/pix/lote/{lote_id}", body.tenant_id, body.provider)
-    return out
+    return itens
+
+
+# PATCH e não PUT: o PUT do BACEN recria o lote inteiro (e exige `descricao`),
+# o PATCH revisa as cobranças que vão no corpo. Faltava — `revisar_lote_cobv`
+# existia no mixin desde sempre, sem rota, e a homologação do C6 registrou o
+# caso P_03_02 como ausente por causa disso. A cobrança individual já tinha o
+# seu PATCH (`/pix/{txid}`); a assimetria era o defeito.
+@router.patch("/lote/{lote_id}", response_model=dict)
+def revisar_lote(
+    lote_id: str, body: LoteCobvRevisaoIn,
+    authorization: str | None = _AUTH_HEADER,
+    vault: Vault = Depends(get_vault),
+) -> dict:
+    """Revisa cobranças dentro de um lote de cobv (PATCH BACEN `/lotecobv/{id}`).
+
+    Só as cobranças enviadas são revisadas; as demais do lote ficam como estão.
+    Vale para qualquer provider de dialeto BACEN — C6, Sicoob e Inter."""
+    creds = resolve_request_credentials(
+        authorization=authorization, explicit=body.credentials,
+        tenant_id=body.tenant_id, provider=body.provider,
+    )
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    return p.revisar_lote_cobv(lote_id, _cobsv(body))
 
 
 @router.get("/lote/{lote_id}", response_model=dict)

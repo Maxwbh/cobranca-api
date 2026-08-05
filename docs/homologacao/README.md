@@ -111,9 +111,15 @@ que muda é quem fez a chamada, e está dito no documento.
 |---|---|
 | Retorno `2xx` do banco | **50** |
 | Recusa do banco, com o corpo do erro | **4** |
-| Marcadas `N/A` com o motivo | **14** |
+| Marcadas `N/A` com o motivo | **14**, hoje **13** |
 | Em branco | **0** |
 | Total do formulário | **68** |
+
+> **`P_03_02` saiu dos `N/A` depois desta execução.** Ele era ausente porque
+> `revisar_lote_cobv` existia no mixin BACEN e o router não expunha; a rota
+> `PATCH /pix/lote/{id}` fechou a lacuna, e o caso passa a ser executável. Os
+> números da tabela são os da rodada de 04/08 e **não** foram remedidos — a
+> próxima execução é que dirá se o banco aceita.
 
 > O formulário tem **68** tabelas de retorno, não 51. Ele usa duas formas —
 > Pix Automático e `BP_01` trazem um subtítulo entre o título e o cabeçalho — e
@@ -150,14 +156,13 @@ Pix** — o híbrido é `BOLETO_PIX`, hoje o default.
 ## Escopo — o que foi marcado e o que não foi
 
 O banco manda **não marcar** o checkbox de API que a aplicação não usa. Das nove,
-sete estão marcadas. As 14 tabelas `N/A` se dividem em três motivos, e a
+sete estão marcadas. As 13 tabelas `N/A` se dividem em três motivos, e a
 diferença importa — só o primeiro é decisão de produto:
 
 | Caso | Motivo |
 |---|---|
 | `AP_01`…`AP_06` — Agendamento de pagamentos / DDA | **Fora de escopo.** Saída de dinheiro; o produto é cobrança (entrada), e a [régua de escopo](../development/roadmap-providers.md) exclui pagamento em qualquer provider |
 | `P_04_01`…`P_04_04` — Gerenciamento de location | **Fora de escopo.** O gateway *consome* a `location` que a cob devolve; não gerencia o recurso |
-| `P_03_02` — Revisar cobranças dentro do lote | **Lacuna de superfície, não de escopo.** `provider.revisar_lote_cobv` existe; o router não expõe |
 | `P_05_01`, `P_05_03`, `P_05_04` — Pix recebido e devolução | **Limite do ambiente**, mesma família do `C_05_02`. A conta sandbox nunca recebeu Pix: `GET /pix` responde `200` com lista vazia até em janela de 180 dias, e o único lançamento do extrato é uma tarifa. **Não há como gerar a massa por API** — a de Agendamento de Pagamentos do C6 não executa pagamento, apenas enfileira para aprovação manual no internet banking. As rotas existem e estão cobertas por `test_pix_recebidos_e_devolucao` |
 
 ## O que o sandbox não deixou concluir
@@ -195,6 +200,33 @@ O preenchedor corrige as duas primeiras **por índice**, que é o que identifica
 tabela de fato, e continua avisando se aparecer outra repetição. Casar só pelo
 identificador faria a segunda tabela disputar a evidência da primeira — e ficar
 vazia sem explicação.
+
+## Sonda dos casos não finalizados
+
+O C6 avisou que está ajustando o sandbox. Como sete dos oito casos abertos
+dependem do banco ou do ambiente — não há o que corrigir do nosso lado, só
+descobrir **quando** destravam —, a verificação virou agendada:
+[`.github/workflows/sonda-sandbox-c6.yml`](../../.github/workflows/sonda-sandbox-c6.yml).
+
+| | |
+|---|---|
+| Cadência | 1× a cada 2 dias, 10:37 BRT (dentro da janela seg-sex 7h-23h) |
+| Escopo | só os N/F **e as suas pré-condições** — rodar o roteiro inteiro sujaria o sandbox com dezenas de boletos por nada |
+| Duração | **autodesliga em 13/08/2026**; para estender, mova `SONDA_ATE` |
+| Resultado | tabela *antes × agora* no Summary do run, JSON como artefato (30 dias) |
+| Falha o build? | **Não.** Hoje o erro é o resultado esperado; vermelho a cada execução treinaria todo mundo a ignorar o alerta |
+
+O que ela grita é **mudança de estado**: um `502` que virou `2xx` sai como
+`✅ DESTRAVOU` no Summary e como anotação no run. Nada mudou → uma linha e
+silêncio.
+
+Quando algo destravar: rode o roteiro completo (não só a sonda), regenere o
+`.docx` e atualize os números da seção acima — eles são da rodada de 04/08 e não
+são remedidos pela sonda.
+
+Reutiliza os secrets da regressão (`COB_C6_*`, `COB_CHAVE_PIX`); não há nada
+novo a cadastrar. Fora da janela ou fora do prazo, o job sai neutro sem chamar
+o banco.
 
 ## O que reportar ao C6
 

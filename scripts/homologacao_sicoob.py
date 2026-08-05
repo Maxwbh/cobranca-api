@@ -279,7 +279,9 @@ AUSENTES: dict[str, tuple[str, str]] = {
     "B_05": ("Alteração de boleto emitido",
              "LACUNA DE SUPERFÍCIE, não de escopo: o C6 expõe PUT /cobranca/{id} e o "
              "Sicoob não implementa `alterar` no provider — a rota responde 422 pelo "
-             "exige_capacidade, dizendo para onde ir"),
+             "exige_capacidade, dizendo para onde ir. ADIADO por decisão de produto: o "
+             "sandbox do Sicoob é mock de schema, então implementar agora provaria "
+             "contrato e nunca comportamento — o caso continuaria sem evidência real"),
 }
 
 

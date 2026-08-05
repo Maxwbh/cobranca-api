@@ -74,6 +74,40 @@ CREATE OR REPLACE PACKAGE cobranca_api AS
                               p_account_config_json IN VARCHAR2 DEFAULT '{}')
     RETURN t_cobranca;
 
+  -- Resultado do link de pagamento com cartao (checkout)
+  TYPE t_checkout IS RECORD (
+    id         VARCHAR2(100),
+    url        VARCHAR2(1000),
+    status     VARCHAR2(30),
+    expira_em  VARCHAR2(40)
+  );
+
+  -- Link de pagamento com CARTAO — POST /checkout.
+  -- Nenhum dado de cartao passa por aqui: o PAN e digitado no dominio do banco.
+  -- `p_com_pix` oferece Pix no MESMO link (QR gerado pelo banco).
+  --
+  -- p_idempotency_key: mande sempre que houver botao humano na frente. Sem ela,
+  -- duplo clique cria DOIS links para a mesma venda. Derive da venda
+  -- ('venda-'||id), nunca de SYSTIMESTAMP — chave nova a cada clique nao
+  -- protege de nada.
+  FUNCTION criar_checkout(p_tenant IN VARCHAR2, p_valor IN NUMBER,
+                          p_descricao IN VARCHAR2 DEFAULT NULL,
+                          p_parcelas IN NUMBER DEFAULT 1,
+                          p_com_pix IN BOOLEAN DEFAULT FALSE,
+                          p_referencia IN VARCHAR2 DEFAULT NULL,
+                          p_redirect_url IN VARCHAR2 DEFAULT NULL,
+                          p_idempotency_key IN VARCHAR2 DEFAULT NULL,
+                          p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+
+  -- Status do link — GET /checkout/{id}. `liquidado` e o unico que da baixa;
+  -- `erro` e cartao recusado (o LINK acabou, a divida nao).
+  FUNCTION consultar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
+                              p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+
+  -- Cancela o link — DELETE /checkout/{id}
+  FUNCTION cancelar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
+                             p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+
   -- Remessa CNAB (texto) — POST /api/remessa
   FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
                          p_payload IN CLOB) RETURN CLOB;
@@ -132,6 +166,33 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
     UTL_HTTP.end_response(l_resp);
     RETURN l_out;
   END f_get_clob;
+
+  -- DELETE existe para o cancelamento do checkout; identico ao GET fora do verbo.
+  FUNCTION f_delete_clob(p_path IN VARCHAR2) RETURN CLOB IS
+    l_req   UTL_HTTP.req;
+    l_resp  UTL_HTTP.resp;
+    l_buf   VARCHAR2(32767);
+    l_out   CLOB;
+  BEGIN
+    p_config_wallet;
+    DBMS_LOB.createtemporary(l_out, TRUE);
+    l_req := UTL_HTTP.begin_request(g_base_url || p_path, 'DELETE');
+    UTL_HTTP.set_header(l_req, 'Accept', 'application/json');
+    IF g_token IS NOT NULL THEN
+      UTL_HTTP.set_header(l_req, 'Authorization', 'Bearer ' || g_token);
+    END IF;
+    l_resp := UTL_HTTP.get_response(l_req);
+    BEGIN
+      LOOP
+        UTL_HTTP.read_text(l_resp, l_buf, 32767);
+        DBMS_LOB.writeappend(l_out, LENGTH(l_buf), l_buf);
+      END LOOP;
+    EXCEPTION
+      WHEN UTL_HTTP.end_of_body THEN NULL;
+    END;
+    UTL_HTTP.end_response(l_resp);
+    RETURN l_out;
+  END f_delete_clob;
 
   FUNCTION f_get_blob(p_path IN VARCHAR2) RETURN BLOB IS
     l_req   UTL_HTTP.req;
@@ -313,6 +374,87 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
     l_out.pix_copia_cola  := APEX_JSON.get_varchar2('pix_copia_cola');
     RETURN l_out;
   END registrar_cobranca;
+
+  --------------------------------------------------------------------------
+  -- Checkout — link de pagamento com cartao (e Pix no mesmo link)
+  --
+  -- Nao ha campo de cartao em lugar nenhum daqui, de proposito: o PAN e
+  -- digitado no dominio do banco e o escopo PCI-DSS fica la.
+  --------------------------------------------------------------------------
+  FUNCTION f_checkout_out(p_resp IN CLOB) RETURN t_checkout IS
+    l_out t_checkout;
+  BEGIN
+    APEX_JSON.parse(p_resp);
+    l_out.id        := APEX_JSON.get_varchar2('id');
+    l_out.url       := APEX_JSON.get_varchar2('url');
+    l_out.status    := APEX_JSON.get_varchar2('status');
+    l_out.expira_em := APEX_JSON.get_varchar2('expira_em');
+    RETURN l_out;
+  END f_checkout_out;
+
+  FUNCTION criar_checkout(p_tenant IN VARCHAR2, p_valor IN NUMBER,
+                          p_descricao IN VARCHAR2 DEFAULT NULL,
+                          p_parcelas IN NUMBER DEFAULT 1,
+                          p_com_pix IN BOOLEAN DEFAULT FALSE,
+                          p_referencia IN VARCHAR2 DEFAULT NULL,
+                          p_redirect_url IN VARCHAR2 DEFAULT NULL,
+                          p_idempotency_key IN VARCHAR2 DEFAULT NULL,
+                          p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+    l_body CLOB;
+    l_ck   VARCHAR2(4000);
+  BEGIN
+    l_ck := '"valor":' || TO_CHAR(p_valor, 'FM9999999990.00',
+                                  'NLS_NUMERIC_CHARACTERS=''.,''')
+         || ',"tipo":"credito"'
+         || ',"parcelas":' || NVL(p_parcelas, 1);
+    -- A API exige juros_por quando parcelas > 1. O default dela ja e `loja`,
+    -- mas explicitar evita descobrir a regra por 422 em producao.
+    IF NVL(p_parcelas, 1) > 1 THEN
+      l_ck := l_ck || ',"juros_por":"loja"';
+    END IF;
+    IF p_com_pix THEN
+      l_ck := l_ck || ',"pix":true';
+    END IF;
+    IF p_descricao IS NOT NULL THEN
+      l_ck := l_ck || ',"descricao":"' || f_esc(p_descricao) || '"';
+    END IF;
+    IF p_referencia IS NOT NULL THEN
+      l_ck := l_ck || ',"external_reference_id":"' || f_esc(p_referencia) || '"';
+    END IF;
+    IF p_redirect_url IS NOT NULL THEN
+      l_ck := l_ck || ',"redirect_url":"' || f_esc(p_redirect_url) || '"';
+    END IF;
+
+    l_body := TO_CLOB('{"tenant_id":"' || f_esc(p_tenant) || '",'
+                      || '"provider":"' || f_esc(p_provider) || '",'
+                      || '"checkout":{' || l_ck || '}}');
+
+    -- Reenvio com a mesma chave devolve o MESMO link, sem criar outro no banco.
+    -- Mesma chave com corpo diferente e 422 — a chave identifica UMA requisicao.
+    IF p_idempotency_key IS NOT NULL THEN
+      RETURN f_checkout_out(f_post_json('/checkout', l_body,
+                                        'Idempotency-Key', p_idempotency_key));
+    END IF;
+    RETURN f_checkout_out(f_post_json('/checkout', l_body));
+  END criar_checkout;
+
+  FUNCTION consultar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
+                              p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+  BEGIN
+    RETURN f_checkout_out(
+      f_get_clob('/checkout/' || UTL_URL.escape(p_checkout_id)
+                 || '?tenant_id=' || UTL_URL.escape(p_tenant)
+                 || '&provider='  || UTL_URL.escape(p_provider)));
+  END consultar_checkout;
+
+  FUNCTION cancelar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
+                             p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+  BEGIN
+    RETURN f_checkout_out(
+      f_delete_clob('/checkout/' || UTL_URL.escape(p_checkout_id)
+                    || '?tenant_id=' || UTL_URL.escape(p_tenant)
+                    || '&provider='  || UTL_URL.escape(p_provider)));
+  END cancelar_checkout;
 
   FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
                          p_payload IN CLOB) RETURN CLOB IS

@@ -246,13 +246,28 @@ class Autenticacao(str, Enum):
 class CheckoutCobranca(BaseModel):
     """Corpo do link de pagamento. Tudo aqui é do CONSUMIDOR da API: varia de
     cliente para cliente e viaja na requisição — esta API não guarda regra
-    comercial de ninguém."""
+    comercial de ninguém.
+
+    Isso vale em particular para **política de parcelamento**: teto de parcelas e
+    valor mínimo de parcela são da loja, e a aplicação que consome resolve os
+    dois ANTES de chamar. Replicá-los aqui criaria uma segunda fonte de verdade
+    que envelhece — e recusaria como inválido um parcelamento que o banco
+    aceita."""
 
     model_config = {"extra": "forbid"}
 
     valor: Decimal = Field(description="Valor total do checkout", examples=["150.00"])
     tipo: TipoCartao = Field(default=TipoCartao.credito, description="credito | debito")
-    parcelas: int = Field(default=1, ge=1, description="Máximo de parcelas oferecido ao pagador")
+    parcelas: int = Field(
+        default=1, ge=1,
+        description="Máximo de parcelas oferecido ao pagador (ele escolhe abaixo disso, "
+                    "salvo `parcelas_fixas`). Repassado ao banco COMO VEIO: não há teto "
+                    "aqui, e **valor mínimo de parcela não existe nesta API** — é regra "
+                    "comercial de quem chama, que calcula o número antes de enviar "
+                    "(ex.: `min(3, valor // 100)`). Se o banco recusar o número enviado, "
+                    "a resposta é `422` com o motivo dele em `upstream`, e o ajuste é "
+                    "reenviar com outra configuração.",
+    )
     juros_por: JurosPor | None = Field(
         default=JurosPor.loja,
         description="Quem paga o juro do parcelamento: loja (BY_SELLER) ou emissor (BY_ISSUER)",
@@ -313,6 +328,26 @@ class LoteCobvIn(BaseModel):
     account_config: dict[str, Any] = Field(default_factory=dict)
     descricao: str
     cobrancas: list[PixCobranca] = Field(description="Cada item exige txid e data_vencimento")
+    credentials: dict[str, Any] | None = None
+
+
+class LoteCobvRevisaoIn(BaseModel):
+    """Revisão de lote de cobv (PATCH BACEN `/lotecobv/{id}`).
+
+    Sem `descricao`, ao contrário do `LoteCobvIn`: o PATCH do BACEN carrega
+    apenas `cobsv`. Reaproveitar o schema da criação obrigaria a mandar um campo
+    que o banco ignora — e um campo que o chamador acha que está alterando, mas
+    não está, é pior que campo ausente. Daí o `extra="forbid"`: mandar
+    `descricao` aqui é `422`, não silêncio."""
+
+    model_config = {"extra": "forbid"}
+
+    tenant_id: str
+    provider: Provider = Provider.c6
+    account_config: dict[str, Any] = Field(default_factory=dict)
+    cobrancas: list[PixCobranca] = Field(
+        description="As cobranças a revisar — mesma forma da criação. Cada item exige "
+                    "txid, data_vencimento e devedor")
     credentials: dict[str, Any] | None = None
 
 
@@ -425,6 +460,18 @@ class WebhookEvent(BaseModel):
     status: Status | None = None
     paid_at: datetime | None = Field(default=None, description="Data/hora do pagamento, se liquidado")
     valor: Decimal | None = Field(default=None, description="Valor pago, se aplicável")
+    confirmado: bool | None = Field(
+        default=None,
+        description="O status foi reconsultado no banco? `true` confere; `false` o banco "
+                    "discordou e o `status` aqui é o DELE; `null` não foi possível "
+                    "perguntar (evento sem tenant, sem credencial no cofre, ou consulta "
+                    "desligada). Só status que move dinheiro é reconsultado.",
+    )
+    pendente_de_entrega: bool | None = Field(
+        default=None,
+        description="`true` quando o push ao consumidor não saiu de primeira e o evento "
+                    "ficou no outbox para re-tentativa com backoff.",
+    )
     raw: dict[str, Any] | None = None
 
 

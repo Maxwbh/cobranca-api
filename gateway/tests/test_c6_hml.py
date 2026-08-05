@@ -102,6 +102,70 @@ def test_lote_cobv(client, c6_env, monkeypatch):
     assert r.status_code == 200
 
 
+# --- P_03_02 revisar cobrancas dentro do lote -----------------------------------
+
+def _lote_item(txid="B" * 30, valor="20.00"):
+    return {"valor": valor, "txid": txid, "data_vencimento": "2026-09-30",
+            "devedor": {"nome": "F", "documento": "12345678909",
+                        "endereco": {"logradouro": "Rua X", "cidade": "R",
+                                     "uf": "PE", "cep": "50000000"}}}
+
+
+def test_revisar_lote_cobv_usa_patch(client, c6_env, monkeypatch):
+    """P_03_02 da homologacao do C6 ficava ausente: `revisar_lote_cobv` existia
+    no mixin BACEN desde sempre e o router nao expunha. A cobranca individual ja
+    tinha o seu PATCH (/pix/{txid}) -- a assimetria era o defeito."""
+    calls = _capture(monkeypatch, {"descricao": "Lote", "cobsv": []})
+    r = client.patch("/pix/lote/123", json={
+        "tenant_id": "empresa1", "provider": "c6",
+        "account_config": {"chave_pix": "k"},
+        "cobrancas": [_lote_item()]})
+
+    assert r.status_code == 200, r.text
+    assert calls[0]["method"] == "PATCH"
+    assert calls[0]["path"] == "/v2/pix/lotecobv/123"
+    # o PATCH do BACEN carrega SO `cobsv` -- `descricao` e' do PUT
+    assert set(calls[0]["json"]) == {"cobsv"}
+    item = calls[0]["json"]["cobsv"][0]
+    assert item["txid"] == "B" * 30 and item["chave"] == "k"
+    assert item["valor"] == {"original": "20.00"}
+
+
+def test_revisar_lote_monta_o_item_igual_a_criacao(client, c6_env, monkeypatch):
+    """Criar e revisar compartilham a montagem: duas copias divergiriam no dia
+    em que um campo mudasse."""
+    calls = _capture(monkeypatch, {"cobsv": []})
+    corpo = {"tenant_id": "empresa1", "provider": "c6",
+             "account_config": {"chave_pix": "k"}, "cobrancas": [_lote_item()]}
+    client.put("/pix/lote/9", json={**corpo, "descricao": "Lote"})
+    client.patch("/pix/lote/9", json=corpo)
+
+    assert calls[0]["json"]["cobsv"] == calls[1]["json"]["cobsv"]
+
+
+def test_revisar_lote_item_incompleto_e_422_nosso(client, c6_env, monkeypatch):
+    """Mesma validacao da criacao: item sem devedor e' recusado aqui, nao vira
+    400 do banco."""
+    calls = _capture(monkeypatch, {})
+    r = client.patch("/pix/lote/123", json={
+        "tenant_id": "empresa1", "provider": "c6",
+        "cobrancas": [{"valor": "20.00", "txid": "C" * 30, "data_vencimento": "2026-09-30"}]})
+
+    assert r.status_code == 422
+    assert "devedor" in r.json()["detail"]
+    assert calls == []   # nada chegou ao banco
+
+
+def test_revisar_lote_nao_aceita_descricao(client, c6_env, monkeypatch):
+    """`extra` do schema recusa `descricao`: um campo que o chamador acha que
+    esta alterando, mas o banco ignora, e' pior que campo ausente."""
+    _capture(monkeypatch, {})
+    r = client.patch("/pix/lote/123", json={
+        "tenant_id": "empresa1", "provider": "c6",
+        "descricao": "nova", "cobrancas": [_lote_item()]})
+    assert r.status_code == 422, r.text
+
+
 # --- E_01 extrato ---------------------------------------------------------------
 
 def test_extrato(client, c6_env, monkeypatch):

@@ -319,11 +319,17 @@ Lista cobranças do período (RFC3339: `2026-07-15T00:00:00Z`).
 
 ### Lote de cobv
 `PUT /pix/lote/{id}` (corpo: `{descricao, cobrancas:[{txid, valor,
-data_vencimento, devedor…}]}`) · `GET /pix/lote/{id}` · `GET /pix/lotes?inicio=&fim=`.
+data_vencimento, devedor…}]}`) · **`PATCH /pix/lote/{id}`** · `GET /pix/lote/{id}`
+· `GET /pix/lotes?inicio=&fim=`.
 
 O `PUT` responde **`202`**, não `201`: o banco devolve *"lote solicitado para
 criação"* — ele enfileira, e o resultado se lê no `GET`. Prometer `201` seria
 dizer que o recurso já existe.
+
+O `PATCH` **revisa** as cobranças do lote: só as que vão no corpo mudam, as
+demais ficam como estão. Mesma forma de item do `PUT`, **sem `descricao`** — o
+PATCH do BACEN carrega apenas `cobsv`, e mandar `descricao` aqui é `422` em vez
+de silêncio. Vale para qualquer provider de dialeto BACEN (C6, Sicoob, Inter).
 
 ---
 
@@ -390,7 +396,7 @@ mantém o escopo PCI-DSS lá.
 | Campo | Default | Observação |
 |---|---|---|
 | `tipo` | `credito` | `credito` \| `debito` |
-| `parcelas` | `1` | máximo oferecido ao pagador |
+| `parcelas` | `1` | **teto** oferecido ao pagador — ele escolhe abaixo, salvo `parcelas_fixas`. Repassado ao banco como veio; ver "política de parcelamento" abaixo |
 | `juros_por` | `loja` | quem paga o juro: `loja` (BY_SELLER) ou `emissor`. Com `parcelas > 1` o campo é obrigatório — anulá-lo responde `422` daqui, não `400` do banco |
 | `pix` | `false` | oferece Pix no mesmo link; o QR é gerado pelo banco |
 | `expira_em` | 7 dias (banco) | ISO 8601 |
@@ -398,6 +404,55 @@ mantém o escopo PCI-DSS lá.
 
 Responde **201** com `{id, url, status, expira_em}`. A `url` é o que se manda
 ao cliente.
+
+**Mande `Idempotency-Key` se houver botão humano na frente disto.** Sem a chave,
+duplo clique cria **dois links para a mesma venda** — e nada impede o pagador de
+pagar os dois. Com a chave, o reenvio devolve o mesmo link sem tocar no banco:
+
+```bash
+curl -X POST .../checkout -H 'Idempotency-Key: venda-42' -d @pedido.json
+```
+
+A chave vale por tenant. Reusá-la com um `checkout` diferente responde `422` —
+uma chave identifica **uma** requisição, e devolver o link errado seria pior que
+recusar. Sem o header, o comportamento é o de sempre.
+
+#### Política de parcelamento — de quem é cada parte
+
+| Regra | Quem resolve |
+|---|---|
+| **Valor mínimo de parcela** (ex.: R$ 100) | **A aplicação que consome.** Não existe campo para isso, e não vai existir |
+| **Teto de parcelas da loja** (ex.: até 3x) | **A aplicação que consome**, mandando o número já calculado em `parcelas` |
+| Teto de parcelas do banco | O **banco**, que recusa o que não aceita |
+| Quem paga o juro | Você, em `juros_por` — repassado como `interest_type` |
+
+A API **não valida** `parcelas` além de `>= 1`: o valor vai ao banco como veio.
+Isso é decisão, não omissão — replicar aqui o teto do banco criaria uma segunda
+fonte de verdade que envelhece, e no dia em que o banco ampliar o limite a nossa
+cópia recusaria um parcelamento válido.
+
+Com valor mínimo de parcela, o cálculo é de quem chama, antes do POST:
+
+```sql
+-- 3x, com parcela mínima de R$ 100 — a política é da loja, não da API
+p_parcelas => GREATEST(1, LEAST(3, FLOOR(l_valor / 100)))
+```
+
+| Venda | `parcelas` enviado | O pagador vê |
+|---|---|---|
+| R$ 300,00 | 3 | 3 × R$ 100,00 |
+| R$ 250,00 | 2 | 2 × R$ 125,00 |
+| R$ 90,00 | 1 | à vista |
+
+Mandar `parcelas: 3` fixo numa venda de R$ 90 ofereceria 3 × R$ 30 ao pagador —
+**violando a política da própria loja, e o banco não vai barrar isso por você.**
+
+Se o número enviado passar do que o banco aceita, a resposta é **`422`** com o
+motivo original dele em `upstream` — o caminho é reenviar com outra
+configuração, não há estado a desfazer (o link não chegou a ser criado).
+
+Nada disto vale para `juros_por`: esse é obrigatório quando `parcelas > 1`, e
+anulá-lo é `422` **daqui**, sem chamar o banco.
 
 ### `GET /checkout/{id}` · `DELETE /checkout/{id}`
 
@@ -417,11 +472,19 @@ Consulta e cancelamento. Status normalizado igual ao resto da API:
 
 **Notificação:** o checkout não tem callback próprio. Cadastre a URL com
 `service: CHECKOUT` em `POST /config/webhook-banco` — o evento chega em
-`/webhooks/c6` e é repassado assinado, como o do boleto, com
+`/webhooks/c6/<tenant>` e é repassado assinado, como o do boleto, com
 `event: "checkout.atualizado"` e o mesmo status normalizado da tabela acima.
+Use a rota **com tenant**: é a única em que o `liquidado` é reconsultado no
+banco antes de seguir para você.
 
 **Provider que não oferece link hospedado responde `422`** dizendo para onde ir.
 Hoje só o C6 oferece.
+
+**Oracle:** página pronta em
+[`examples/apex/apex_checkout.sql`](../../examples/apex/apex_checkout.sql)
+(criar link, acompanhar status, handler ORDS do webhook) e
+`cobranca_api.criar_checkout` no
+[pacote PL/SQL](../../examples/oracle/cobranca_api_pkg.sql).
 
 ---
 
@@ -454,13 +517,27 @@ curl "http://localhost:8000/conciliacao/recebiveis?tenant_id=empresa_123&start_d
 ## 🔔 Webhooks (entrada) e push de eventos (saída)
 
 ### `POST /webhooks/{banco}` · `POST /webhooks/{banco}/{tenant_id}`
-URL que você cadastra **no banco**. Com `WEBHOOK_TOKEN__<BANCO>` configurado,
-exige `?token=...` (ou header `x-webhook-token`) — divergiu, **401**.
+URL que você cadastra **no banco**. Exige `WEBHOOK_TOKEN__<BANCO>` configurado e
+`?token=...` (ou header `x-webhook-token`) — sem token configurado, ou token
+divergente, **401**. Os bancos não assinam o payload; o token de rota é a prova
+de origem, e sem ela qualquer um forjaria um `liquidado`.
 
 O evento é normalizado (`WebhookEvent`) e **empurrado por POST assinado**
 (`X-Signature: sha256=<hmac_sha256(secret, body)>`) ao consumidor dono do
 tenant (`SUB__<tenant>__URL/SECRET`) ou ao destino global
-(`EVENT_WEBHOOK_URL/SECRET`).
+(`EVENT_WEBHOOK_URL/SECRET`). Se o push não sair de primeira, o evento fica em
+fila e é re-tentado com backoff — a resposta traz `pendente_de_entrega: true`.
+
+Três campos do `WebhookEvent` que valem ler antes de integrar:
+
+| Campo | O que diz |
+|---|---|
+| `event` | `"duplicado"` quando o banco reentregou algo que já passou — ignore |
+| `confirmado` | `true` o banco confirmou o `liquidado`; `false` ele discordou e o `status` aqui é o **dele**; `null` não foi possível perguntar |
+| `pendente_de_entrega` | `true` quando o push falhou e vai ser re-tentado |
+
+A confirmação só acontece na rota **com tenant** — o cofre de credenciais é por
+tenant, e sem credencial não há como perguntar ao banco.
 
 ### `GET /health`
 `{"status": "ok"}`.

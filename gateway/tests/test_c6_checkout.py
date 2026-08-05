@@ -270,7 +270,7 @@ _STATUS_CHECKOUT = [
 
 
 @pytest.mark.parametrize("c6,esperado", _STATUS_CHECKOUT)
-def test_webhook_de_checkout_normaliza_os_dez_status(client, c6, esperado):
+def test_webhook_de_checkout_normaliza_os_dez_status(client, webhook_aberto, c6, esperado):
     """O evento do checkout usava o mapa do BOLETO.
 
     Os tres que acertavam -- PAID, CANCELLED, EXPIRED -- acertavam por
@@ -285,7 +285,7 @@ def test_webhook_de_checkout_normaliza_os_dez_status(client, c6, esperado):
     assert r.json()["status"] == esperado
 
 
-def test_webhook_de_checkout_tem_evento_proprio(client):
+def test_webhook_de_checkout_tem_evento_proprio(client, webhook_aberto):
     """`checkout.atualizado` distingue de boleto: o consumidor nao deveria
     precisar inspecionar o corpo para saber o que chegou."""
     r = client.post("/webhooks/c6", json={
@@ -294,7 +294,7 @@ def test_webhook_de_checkout_tem_evento_proprio(client):
     assert r.json()["event"] == "checkout.atualizado"
 
 
-def test_webhook_de_criacao_de_checkout_e_reconhecido_sem_status_nem_data(client):
+def test_webhook_de_criacao_de_checkout_e_reconhecido_sem_status_nem_data(client, webhook_aberto):
     """Corpo real que o C6 devolve ao criar o link: so `id` e `url`.
 
     A homologacao reentregou esse corpo na rota de webhook e ele saiu como
@@ -309,7 +309,7 @@ def test_webhook_de_criacao_de_checkout_e_reconhecido_sem_status_nem_data(client
     assert r.json()["event"] == "checkout.atualizado"
 
 
-def test_webhook_de_boleto_nao_e_confundido_com_checkout(client):
+def test_webhook_de_boleto_nao_e_confundido_com_checkout(client, webhook_aberto):
     """A discriminacao e por formato, entao o caminho do boleto tem de seguir
     intacto -- inclusive quando o status coincide (PAID vale nos dois)."""
     r = client.post("/webhooks/c6", json={
@@ -319,3 +319,88 @@ def test_webhook_de_boleto_nao_e_confundido_com_checkout(client):
     })
     assert r.json()["event"] == "cobranca.atualizada"
     assert r.json()["status"] == "liquidado"
+
+
+# --- idempotencia -----------------------------------------------------------------
+
+def test_reenvio_com_a_mesma_chave_devolve_o_mesmo_link(client, c6_env, monkeypatch):
+    """Duplo clique no botao criava DOIS links para a mesma venda, e nada impede
+    o pagador de pagar os dois. Com a chave, o segundo POST nem chega no banco."""
+    calls = _capture(monkeypatch, _CRIADO)
+    corpo = _body(descricao="Pedido 42")
+    cab = {"Idempotency-Key": "venda-42"}
+
+    primeira = client.post("/checkout", json=corpo, headers=cab)
+    segunda = client.post("/checkout", json=corpo, headers=cab)
+
+    assert primeira.status_code == 201
+    assert segunda.status_code == 201
+    assert segunda.json() == primeira.json()
+    assert len(calls) == 1  # o banco viu UMA criacao
+
+
+def test_mesma_chave_com_outro_corpo_e_recusada(client, c6_env, monkeypatch):
+    """A chave identifica UMA requisicao. Reaproveita-la com outro payload e bug
+    de quem chama -- devolver o link errado seria pior que recusar."""
+    _capture(monkeypatch, _CRIADO)
+    cab = {"Idempotency-Key": "venda-42"}
+
+    client.post("/checkout", json=_body(valor="150.00"), headers=cab)
+    r = client.post("/checkout", json=_body(valor="999.00"), headers=cab)
+
+    assert r.status_code == 422
+    assert "venda-42" in r.json()["detail"]
+
+
+def test_chaves_diferentes_criam_links_diferentes(client, c6_env, monkeypatch):
+    calls = _capture(monkeypatch, _CRIADO)
+    corpo = _body(descricao="Pedido 42")
+
+    client.post("/checkout", json=corpo, headers={"Idempotency-Key": "venda-42"})
+    client.post("/checkout", json=corpo, headers={"Idempotency-Key": "venda-43"})
+
+    assert len(calls) == 2
+
+
+def test_sem_chave_continua_criando(client, c6_env, monkeypatch):
+    """O header e opt-in: quem nao manda mantem o comportamento de sempre."""
+    calls = _capture(monkeypatch, _CRIADO)
+    corpo = _body(descricao="Pedido 42")
+
+    client.post("/checkout", json=corpo)
+    client.post("/checkout", json=corpo)
+
+    assert len(calls) == 2
+
+
+def test_idempotencia_e_por_tenant(client, monkeypatch):
+    """Chave igual em tenants diferentes sao pedidos diferentes."""
+    monkeypatch.setenv("VAULT__empresa1__c6__client_id", "cid")
+    monkeypatch.setenv("VAULT__empresa1__c6__client_secret", "sec")
+    monkeypatch.setenv("VAULT__empresa2__c6__client_id", "cid")
+    monkeypatch.setenv("VAULT__empresa2__c6__client_secret", "sec")
+    monkeypatch.setenv("C6_REGISTERED_READY", "true")
+    calls = _capture(monkeypatch, _CRIADO)
+    cab = {"Idempotency-Key": "venda-42"}
+
+    client.post("/checkout", json=_body(), headers=cab)
+    corpo2 = _body()
+    corpo2["tenant_id"] = "empresa2"
+    client.post("/checkout", json=corpo2, headers=cab)
+
+    assert len(calls) == 2
+
+
+def test_credencial_no_request_nao_muda_a_identidade_do_pedido(client, c6_env, monkeypatch):
+    """A impressao e do `checkout`, nao do corpo inteiro: a mesma venda reenviada
+    com a credencial vindo por outro caminho continua sendo a mesma venda."""
+    calls = _capture(monkeypatch, _CRIADO)
+    cab = {"Idempotency-Key": "venda-42"}
+
+    client.post("/checkout", json=_body(descricao="X"), headers=cab)
+    com_cred = _body(descricao="X")
+    com_cred["credentials"] = {"client_id": "cid", "client_secret": "sec"}
+    r = client.post("/checkout", json=com_cred, headers=cab)
+
+    assert r.status_code == 201
+    assert len(calls) == 1

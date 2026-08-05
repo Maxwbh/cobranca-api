@@ -1,0 +1,180 @@
+# Sonda dos casos NÃO FINALIZADOS do roteiro C6 — 1x a cada 2 dias, por 1 semana.
+#
+# Por que existe: o C6 avisou que está ajustando o sandbox. Oito casos do roteiro
+# não fecharam em 2xx, e sete deles dependem do banco ou do ambiente — não há o
+# que corrigir do nosso lado, só descobrir QUANDO destravam. Ficar re-rodando o
+# roteiro inteiro à mão custa caro e é fácil de esquecer; isto roda sozinho.
+#
+# Roda só os N/F e as suas PRÉ-CONDIÇÕES (C_01 cria o checkout que C_05_02 sonda,
+# P_03_01 cria o lote que os outros três consultam, P_05_02 popula o e2eid).
+# Rodar o roteiro completo a cada dois dias sujaria o sandbox com dezenas de
+# boletos por nada.
+#
+# **Nunca falha o build.** O resultado esperado hoje é justamente o erro; marcar
+# vermelho a cada execução treinaria todo mundo a ignorar o alerta. O que ele faz
+# é gritar no Summary quando um caso MUDA de estado — que é o evento que
+# interessa.
+#
+# Autodesliga em 13/08/2026 (uma semana). Prazo no código e não no calendário de
+# ninguém: sonda esquecida ligada é ruído permanente. Para estender, mova a data.
+#
+# Secrets (os mesmos da regressão — nada novo a cadastrar):
+#   COB_C6_CLIENT_ID, COB_C6_CLIENT_SECRET, COB_C6_PFX_BASE64,
+#   COB_C6_PFX_PASSWORD, COB_CHAVE_PIX
+name: Sonda sandbox C6 (casos não finalizados)
+
+on:
+  schedule:
+    # A cada 2 dias, 13:37 UTC = 10:37 BRT — dentro da janela (seg-sex 7h-23h).
+    # Minuto quebrado de propósito: o cron do GitHub atrasa sob carga nas horas
+    # cheias, e 10:37 dá folga larga até as 23h de qualquer jeito.
+    - cron: "37 13 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Fim da janela de observação. Depois disto o job sai neutro sem chamar o banco.
+  SONDA_ATE: "2026-08-13"
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.repository == 'Maxwbh/cobranca-api' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: A semana de observação já acabou?
+        id: prazo
+        run: |
+          HOJE=$(date -u +%F)
+          if [[ "$HOJE" > "$SONDA_ATE" ]]; then
+            echo "::notice::Sonda expirada em $SONDA_ATE. Apague este workflow ou mova a data."
+            echo "seguir=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "seguir=sim" >> "$GITHUB_OUTPUT"
+          fi
+
+      # O sandbox do C6 só autentica seg-sex, 7h-23h BRT. Fora disso o /v1/auth
+      # devolve 403 e TODO caso falha por horário — evidência que não diz nada
+      # sobre o que estamos observando.
+      - name: A janela do sandbox está aberta?
+        id: janela
+        if: steps.prazo.outputs.seguir == 'sim'
+        run: |
+          HORA=$(TZ=America/Sao_Paulo date +%H)
+          DIA=$(TZ=America/Sao_Paulo date +%u)
+          echo "Agora: $(TZ=America/Sao_Paulo date '+%a %d/%m %H:%M') BRT"
+          if [ "$DIA" -gt 5 ] || [ "$((10#$HORA))" -lt 7 ] || [ "$((10#$HORA))" -ge 23 ]; then
+            echo "::notice::Fora da janela do sandbox (seg-sex 7h-23h BRT) — sonda adiada."
+            echo "aberta=nao" >> "$GITHUB_OUTPUT"
+          else
+            echo "aberta=sim" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.janela.outputs.aberta == 'sim'
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        if: steps.janela.outputs.aberta == 'sim'
+        run: pip install -q -r gateway/requirements.txt
+
+      - name: Sondar os casos não finalizados
+        if: steps.janela.outputs.aberta == 'sim'
+        continue-on-error: true
+        env:
+          C6_SANDBOX_CLIENT_ID: ${{ secrets.COB_C6_CLIENT_ID }}
+          C6_SANDBOX_CLIENT_SECRET: ${{ secrets.COB_C6_CLIENT_SECRET }}
+          C6_SANDBOX_PFX_BASE64: ${{ secrets.COB_C6_PFX_BASE64 }}
+          C6_SANDBOX_PFX_PASSWORD: ${{ secrets.COB_C6_PFX_PASSWORD }}
+          C6_SANDBOX_CHAVE_PIX: ${{ secrets.COB_CHAVE_PIX }}
+          HML_TENANT: sonda
+        run: |
+          mkdir -p sonda
+          # A ordem é a de CASOS no script; os ids abaixo incluem as
+          # pré-condições, senão os N/F falhariam por falta de dado nosso e não
+          # por causa do banco — que é o oposto do que a sonda quer medir.
+          PYTHONPATH=gateway python scripts/homologacao_c6.py --json \
+            C_01 P_03_01 P_03_02 P_03_03 P_03_04 \
+            P_05_02 P_05_01 P_05_03 P_05_04 C_05_02 \
+            > "sonda/$(date -u +%F).json"
+
+      - name: Comparar com o estado conhecido
+        if: steps.janela.outputs.aberta == 'sim'
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, json, os
+
+          arquivos = sorted(glob.glob("sonda/*.json"))
+          if not arquivos:
+              print("## Sonda C6\n\nO script não gerou saída — veja o log do passo anterior.")
+              raise SystemExit
+
+          # Estado conhecido em 04/08/2026 (docs/homologacao/README.md). `None`
+          # = caso nunca fechou porque não havia massa; "novo" = nunca executado.
+          CONHECIDO = {
+              "P_03_01": 502, "P_03_03": 502, "P_03_04": 502,
+              "C_05_02": 403,
+              "P_05_01": None, "P_05_03": None, "P_05_04": None,
+              "P_03_02": "novo",
+          }
+          PRE = {"C_01", "P_05_02"}   # pré-condições: contexto, não o que se mede
+
+          d = json.load(open(arquivos[-1], encoding="utf-8"))
+          print(f"## Sonda C6 — {os.path.basename(arquivos[-1])[:-5]}\n")
+          print("| Caso | Antes | Agora | |")
+          print("|---|---|---|---|")
+
+          mudou = []
+          for r in d["resultados"]:
+              cid = r["caso"]
+              if cid in PRE:
+                  continue
+              antes = CONHECIDO.get(cid, "?")
+              agora = r.get("status_code")
+              fechou = isinstance(agora, int) and 200 <= agora < 300
+              if fechou:
+                  marca = "✅ **DESTRAVOU**"
+                  mudou.append(cid)
+              elif agora != antes and not (agora is None and antes is None):
+                  marca = "⚠️ mudou"
+                  mudou.append(cid)
+              else:
+                  marca = "igual"
+              rotulo_antes = "ausente" if antes is None else antes
+              rotulo_agora = "ausente" if agora is None else agora
+              print(f"| `{cid}` | {rotulo_antes} | {rotulo_agora} | {marca} |")
+
+          print()
+          if mudou:
+              print(f"**{len(mudou)} caso(s) mudaram de estado: {', '.join(mudou)}.** "
+                    "Rode o roteiro completo e atualize `docs/homologacao/`.")
+          else:
+              print("Nada mudou desde 04/08. O sandbox segue como estava.")
+
+          # O stdout deste bloco vai para o Summary, e o GitHub lê anotação do
+          # STDOUT do passo — um `::notice::` aqui viraria texto no relatório em
+          # vez de alerta. Sai por arquivo, e o passo seguinte anuncia.
+          open("sonda/mudou.txt", "w").write(",".join(mudou))
+          PY
+
+      - name: Anunciar mudança de estado
+        if: steps.janela.outputs.aberta == 'sim'
+        run: |
+          MUDOU=$(cat sonda/mudou.txt 2>/dev/null || true)
+          if [ -n "$MUDOU" ]; then
+            echo "::notice::Sonda C6 — mudaram de estado: $MUDOU. Rode o roteiro completo."
+          else
+            echo "Sonda C6: nada mudou."
+          fi
+
+      - name: Guardar a evidência
+        if: always() && steps.janela.outputs.aberta == 'sim'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonda-c6-${{ github.run_number }}
+          path: sonda/
+          retention-days: 30

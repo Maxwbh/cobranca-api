@@ -2349,6 +2349,72 @@
           ]
         },
         {
+          "name": "BC-088 · Revisar cobranças dentro do lote de cobv",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pix/lote/{{lote_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pix",
+                "lote",
+                "{{lote_id}}"
+              ]
+            },
+            "description": "P_03_02 do roteiro C6. Revisa AS COBRANÇAS enviadas; as demais do lote ficam como estão. Sem `descricao`: o PATCH do BACEN carrega só `cobsv`, e mandá-la aqui é 422 em vez de silêncio.\n\nDepende do BC-052 — reusa `lote_id` e `txid_lote1` daquele request, porque revisar um txid que não está no lote seria inclusão, não revisão.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"{{provider}}\",\n  \"account_config\": {\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"cobrancas\": [\n    {\n      \"valor\": \"{{valor}}\",\n      \"txid\": \"{{txid_lote1}}\",\n      \"data_vencimento\": \"{{vencimento}}\",\n      \"devedor\": {\n        \"nome\": \"{{pagador_nome}}\",\n        \"documento\": \"{{pagador_documento}}\"\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio (o BC-052 falhou, ex.: janela do sandbox) colapsa a",
+                  "// URL e o servidor responde 405 — falha ENGANOSA. Pula em vez disso.",
+                  "const _ids = [\"lote_id\", \"txid_lote1\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName);",
+                  "  pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "// 502 entra na lista: o sandbox do C6 devolve 502 em /lotecobv (PUT e GET),",
+                  "// documentado em docs/homologacao — é defeito do banco, não da integração.",
+                  "statusEsperado([200, 404, 405, 502], [\"BANCO\", \"chave_pix\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "BC-053 · Consultar lote",
           "request": {
             "method": "GET",

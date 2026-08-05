@@ -127,8 +127,8 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 
 ## Exemplos por linguagem
 
-- [examples/oracle/](../examples/oracle/) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB e lote
-- [examples/apex/](../examples/apex/) — **Oracle APEX**: emissão, download de PDF, lote com progresso
+- [examples/oracle/](../examples/oracle/) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB, lote e checkout de cartão
+- [examples/apex/](../examples/apex/) — **Oracle APEX**: emissão, download de PDF, lote com progresso, checkout com cartão
 - [examples/python/](../examples/python/) — Python (scripts executáveis)
 
 ## Recursos Externos

@@ -1,4 +1,4 @@
-# Oracle APEX — emissão de boletos e lotes
+# Oracle APEX — boletos, lotes e cartão
 
 Páginas APEX que consomem a **Cobranca-API** via `APEX_WEB_SERVICE` — sem
 dependência externa, sem PL/SQL de baixo nível e sem travar a sessão.
@@ -9,6 +9,7 @@ dependência externa, sem PL/SQL de baixo nível e sem travar a sessão.
 |---|---|
 | [`apex_boleto.sql`](./apex_boleto.sql) | Página de emissão: process On Submit, **download do PDF** e **preview em iframe** |
 | [`apex_lote_job.sql`](./apex_lote_job.sql) | Fechamento em **lote**: cria o job, AJAX Callback de progresso, report de itens e botão "baixar zip" |
+| [`apex_checkout.sql`](./apex_checkout.sql) | **Link de pagamento com cartão** (+ Pix no mesmo link): cria o link, acompanha o status e recebe o webhook em ORDS |
 | [`../oracle/`](../oracle/) | Pacote PL/SQL `COBRANCA_API` (para uso fora do APEX) e setup de ACL |
 
 ## Setup (5 minutos)
@@ -53,6 +54,48 @@ Detalhes que evitam retrabalho:
 - **Sem base64**: os PDFs saem por download (`/artifacts`), com `sha256` no
   manifesto — o JSON não carrega binário.
 
+## Página 3 — cartão (`apex_checkout.sql`)
+
+O caso de balcão: cobrar na hora, na tela, sem maquininha. `POST /checkout` com
+`pix: true` devolve **um link que aceita cartão e Pix**, e o QR sai do banco.
+
+**Não existe campo de cartão nesta página, de propósito.** O PAN é digitado no
+domínio do banco e o escopo PCI-DSS fica lá — pôr o número no APEX trocaria o
+assunto de integração para certificação.
+
+| Componente | Tipo | O que faz |
+|---|---|---|
+| Process `CRIAR_LINK` | On Submit → PL/SQL | `POST /checkout` com `Idempotency-Key`; grava `checkout_id` e `url` na venda |
+| Application Process `ATUALIZAR_CHECKOUT` | On Demand | `GET /checkout/{id}` — o Dynamic Action (timer 5s) lê `{status}` |
+| Region "Pagar" | PL/SQL Dynamic Content | Botão para a `url` + `div` para o QR |
+| Process `CANCELAR` | On Submit → PL/SQL | `DELETE /checkout/{id}` |
+
+O que separa isto de um POST comum:
+
+- **`Idempotency-Key` derivada da venda** (`'venda-' || :P30_VENDA_ID`), não de
+  `SYSTIMESTAMP`. Duplo clique em botão de APEX não é hipótese; sem a chave ele
+  cria **dois links para a mesma venda**, e nada impede o pagador de pagar os
+  dois. Reenvio com a mesma chave devolve o mesmo link, sem tocar no banco.
+- **A baixa sai do `liquidado` que o banco devolve**, não do `redirect_url`. O
+  retorno traz o navegador de volta; quem confirma pagamento é a consulta.
+  Confiar no retorno do browser é confiar no cliente.
+- **Desligue o timer quando o status sair de `pendente`** — senão a página fica
+  consultando o banco para sempre.
+
+### Tela fechada: webhook em vez de polling
+
+O timer resolve enquanto a tela está aberta. Para o pagador que paga o link três
+horas depois, o caminho é o webhook: cadastre com `service: CHECKOUT` em
+`POST /config/webhook-banco` e aponte `SUB__<tenant>__URL` para um handler ORDS.
+A seção 6 do arquivo traz o handler, e o essencial dele é:
+
+- **valide o `X-Signature` antes de olhar o corpo** — sem isso, quem descobrir a
+  URL posta `{"status":"liquidado"}` e baixa a sua venda de graça;
+- **`confirmado = true`** significa que o gateway reconsultou o banco e ele
+  confirmou. `null` é "ninguém verificou"; trate como aviso, não como baixa;
+- **responda 2xx quando processar** — a API re-tenta com backoff enquanto não
+  receber 2xx, e a reentrega do mesmo evento já chega deduplicada.
+
 ## Report de itens direto em SQL
 
 Com `JSON_TABLE` dá para exibir os itens do job num Interactive Report comum —
@@ -62,6 +105,9 @@ o exemplo está comentado no fim do `apex_lote_job.sql`. Alternativa nativa:
 ## Boas práticas
 
 - Guarde a URL da API num **Application Item**, nunca fixa na página.
-- Rotas online (`/cobranca`, `/pix`) exigem o token `bapi_` — guarde em item
-  protegido de aplicação, nunca em item de página.
+- Rotas online (`/cobranca`, `/pix`, `/checkout`) exigem o token `bapi_` —
+  guarde em item protegido de aplicação, nunca em item de página.
 - Para volumes acima de 200 títulos, crie **vários jobs** (o limite é por job).
+- Mande `Idempotency-Key` em **todo POST que nasce de um botão**. Vale para
+  `/jobs` e para `/checkout`; a chave sai do domínio (competência, venda), nunca
+  do relógio.

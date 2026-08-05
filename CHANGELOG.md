@@ -14,6 +14,32 @@ changelog quer saber se precisa mexer na integração, não como o defeito surgi
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Alterado
+- ⚠️ **`POST /webhooks/{banco}` recusa (`401`) sem `WEBHOOK_TOKEN__<BANCO>`
+  configurado.** Antes aceitava, e aceitar significava que qualquer um que
+  descobrisse a URL podia forjar um `liquidado`. Configure o token e cadastre a
+  URL no banco com `?token=<segredo>`; `WEBHOOK_ALLOW_UNAUTHENTICATED=1` mantém
+  o comportamento antigo durante a migração.
+- Antes de propagar `liquidado`, o gateway **reconsulta o banco** e a resposta
+  dele prevalece. O evento ganha `confirmado` (`true` confere / `false` o banco
+  discordou / `null` não deu para perguntar). Só na rota com tenant. Desliga com
+  `WEBHOOK_CONFIRM=0`.
+- Reentrega do banco não vira push repetido: a notificação idêntica responde
+  `200` com `event: "duplicado"`. Desliga com `WEBHOOK_DEDUP=0`.
+
+### Adicionado
+- **`Idempotency-Key` no `POST /checkout`** — reenvio com a mesma chave devolve
+  o mesmo link em vez de criar outro no banco; mesma chave com corpo diferente é
+  `422`. Sem o header, nada muda.
+- Push ao consumidor com **fila e re-tentativa** (5s → 15s → 1min → 5min →
+  15min): consumidor fora do ar deixa de custar o evento. Quando não sai de
+  primeira, a resposta traz `pendente_de_entrega: true`.
+- **Retenção por idade** das tabelas de entrega: marcas de dedup 7 dias, linhas
+  de fila já resolvidas 30, chaves de idempotência 30. Passado o prazo, a mesma
+  `Idempotency-Key` volta a criar um checkout novo.
+
 ## [2.2.0] — previsto para setembro de 2026
 
 ### Adicionado

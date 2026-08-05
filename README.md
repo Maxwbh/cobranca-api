@@ -489,8 +489,8 @@ uvicorn app.main:app --reload --port 8000
 |---|---|
 | **[PyCobrança](https://github.com/Maxwbh/pyCobranca)** | A **engine** desta plataforma — boletos, CNAB, PIX e PDF em Python puro. Use direto se sua app é Python. |
 | **[coleção Postman](./postman/README.md)** | 98 requests com IDs de rastreabilidade — smoke (<5 min) e regressão completa. |
-| **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB e lote de dentro do banco. |
-| **[exemplos APEX](./examples/apex/)** | Páginas de emissão e de lote com progresso, download de PDF e zip. |
+| **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB, lote e **link de cartão** de dentro do banco. |
+| **[exemplos APEX](./examples/apex/)** | Páginas de emissão, de lote com progresso e de **checkout com cartão** — download de PDF, zip e webhook em ORDS. |
 | **[exemplos Python](./examples/python/)** | Scripts executáveis que chamam a API por HTTP (boleto, remessa, lote). |
 
 ---
