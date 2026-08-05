@@ -1,0 +1,1417 @@
+{
+  "executado_em": "2026-08-04T20:31:53",
+  "alvo": "app em processo (ASGI)",
+  "banco": "sicoob",
+  "ambiente": "https://sandbox.sicoob.com.br/sicoob/sandbox",
+  "limitacao": "sandbox do Sicoob é mock de schema: devolve dados aleatórios válidos, sem relação com o que foi enviado. Esta evidência atesta roteamento, contrato e normalização — não o comportamento do banco.",
+  "resultados": [
+    {
+      "caso": "AT_01",
+      "nome": "Token da API sobre a credencial do banco",
+      "ok": true,
+      "status_code": 201,
+      "response_body": {
+        "token": "bapi_MbjnO8RafGaQ8g4O9TMq4uS6t48_YEnhQspVtgigrjc",
+        "tenant_id": "homologacao",
+        "provider": "sicoob"
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "B_01",
+      "nome": "Emissão de boleto registrado",
+      "ok": false,
+      "status_code": 422,
+      "response_body": {
+        "detail": "o banco recusou os dados enviados",
+        "upstream": {
+          "status": 400,
+          "url": "https://sandbox.sicoob.com.br/sicoob/sandbox/cobranca-bancaria/v3/boletos",
+          "body": {
+            "mensagens": [
+              {
+                "mensagem": "string",
+                "codigo": "string"
+              }
+            ]
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "B_02",
+      "nome": "Consulta de boleto",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "id": "17654321",
+        "status": "registrado",
+        "linha_digitavel": "42297115040000195441184217468127172300000023124",
+        "codigo_barras": null,
+        "pix_copia_cola": null,
+        "pdf_base64": null,
+        "raw": {
+          "resultado": {
+            "numeroCliente": 25546454,
+            "codigoModalidade": 1,
+            "numeroContaCorrente": -2147483648,
+            "codigoEspecieDocumento": "DM",
+            "dataEmissao": "2018-09-20",
+            "nossoNumero": -2147483648,
+            "seuNumero": "1235512",
+            "identificacaoBoletoEmpresa": "4562",
+            "codigoBarras": "07092501614004706610157633070651479470000006500",
+            "linhaDigitavel": "42297115040000195441184217468127172300000023124",
+            "identificacaoEmissaoBoleto": 1,
+            "identificacaoDistribuicaoBoleto": 1,
+            "valor": 156.23,
+            "dataVencimento": "2018-09-20",
+            "dataLimitePagamento": "2018-09-20",
+            "valorAbatimento": 1,
+            "tipoDesconto": 1,
+            "dataPrimeiroDesconto": "2018-09-20",
+            "valorPrimeiroDesconto": 1,
+            "dataSegundoDesconto": "2018-09-20",
+            "valorSegundoDesconto": 0,
+            "dataTerceiroDesconto": "2018-09-20",
+            "valorTerceiroDesconto": 0,
+            "tipoMulta": 1,
+            "dataMulta": "2018-09-20",
+            "valorMulta": 5,
+            "tipoJurosMora": 1,
+            "dataJurosMora": "2018-09-20",
+            "valorJurosMora": 4,
+            "numeroParcela": 1,
+            "aceite": true,
+            "numeroDiasNegativacao": 60,
+            "numeroDiasProtesto": 30,
+            "quantidadeDiasFloat": 2,
+            "pagador": {
+              "numeroCpfCnpj": "98765432185",
+              "nome": "Marcelo dos Santos",
+              "endereco": "Rua 87 Quadra 1 Lote 1 casa 1",
+              "bairro": "Santa Rosa",
+              "cidade": "Luziânia",
+              "cep": "72320000",
+              "uf": "DF",
+              "email": "pagador@dominio.com.br"
+            },
+            "beneficiarioFinal": {
+              "numeroCpfCnpj": "98784978699",
+              "nome": "Lucas de Lima"
+            },
+            "mensagensInstrucao": [
+              "Descrição da Instrução 1",
+              "Descrição da Instrução 2",
+              "Descrição da Instrução 3",
+              "Descrição da Instrução 4",
+              "Descrição da Instrução 5"
+            ],
+            "listaHistorico": [
+              {
+                "dataHistorico": "2019-05-31",
+                "tipoHistorico": 1,
+                "descricaoHistorico": "TARIFA - TAR. MANUTENÇÃO DE TÍTULO VENCIDO - R$ 0,75"
+              }
+            ],
+            "situacaoBoleto": "Em Aberto",
+            "rateioCreditos": [
+              {
+                "numeroBanco": 756,
+                "numeroAgencia": 4027,
+                "numeroContaCorrente": "987654",
+                "contaPrincipal": true,
+                "codigoTipoValorRateio": 1,
+                "valorRateio": "100",
+                "codigoTipoCalculoRateio": 1,
+                "numeroCpfCnpjTitular": "98765432185",
+                "nomeTitular": "Marcelo dos Santos",
+                "codigoFinalidadeTed": "10",
+                "codigoTipoContaDestinoTed": "CC",
+                "quantidadeDiasFloat": 1,
+                "dataFloatCredito": "2020-12-30"
+              }
+            ],
+            "qrCode": "00020101021226950014br.gov.bcb.pix2573pix.sicoob.com.br/qr/payload/v2/cobv/e736df1b-1389-4b96-a070-c8dddac768de5204000053039865802BR5924JULIO PEREIRA DE OLIVEIRA6008Brasilia62070503***630435A3",
+            "numeroContratoCobranca": 1
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "B_03",
+      "nome": "Segunda via em PDF",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "id": "17654321",
+        "status": "pendente",
+        "linha_digitavel": null,
+        "codigo_barras": null,
+        "pix_copia_cola": null,
+        "pdf_base64": "<137 chars de base64>",
+        "raw": {
+          "resultado": {
+            "numeroCliente": 25546454,
+            "codigoModalidade": 1,
+            "codigoEspecieDocumento": "DM",
+            "dataEmissao": "2018-09-20",
+            "nossoNumero": 1234,
+            "seuNumero": "1235512",
+            "codigoBarras": "01234567890123456789012345678901234567890123",
+            "linhaDigitavel": "012345678901234567890123456789012345678901234567",
+            "valor": 156.23,
+            "dataVencimento": "2018-09-20",
+            "valorAbatimento": 1,
+            "numeroParcela": 1,
+            "aceite": true,
+            "tipoMulta": 1,
+            "valorMulta": 5.01,
+            "tipoJurosMora": 1,
+            "valorJurosMora": 4,
+            "pagador": {
+              "numeroCpfCnpj": "98765432185",
+              "nome": "Marcelo dos Santos",
+              "endereco": "Rua 87 Quadra 1 Lote 1 casa 1",
+              "bairro": "Santa Rosa",
+              "cidade": "Luziânia",
+              "cep": "72320000",
+              "uf": "DF",
+              "email": "pagador@dominio.com.br"
+            },
+            "beneficiarioFinal": {
+              "numeroCpfCnpj": "98784978699",
+              "nome": "Lucas de Lima"
+            },
+            "mensagensInstrucao": [
+              "Descrição da Instrução 1",
+              "Descrição da Instrução 2",
+              "Descrição da Instrução 3",
+              "Descrição da Instrução 4",
+              "Descrição da Instrução 5"
+            ],
+            "pdfBoleto": "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9UeXBlL1hPYmplY3QvU3VidHlwZS9JbWFnZS9XaWR0aCA1Nzgv+PgolaVRleHQtNS41LjExCnN0YXJ0eHJlZgoyNzAxOQolJUVPRgo=",
+            "qrCode": "00020101021226950014br.gov.bcb.pix2573pix.sicoob.com.br/qr/payload/v2/cobv/e736df1b-1389-4b96-a070-c8dddac768de5204000053039865802BR5924JULIO PEREIRA DE OLIVEIRA6008Brasilia62070503***630435A3",
+            "numeroContratoCobranca": 1,
+            "tipoDesconto": 1
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "B_04",
+      "nome": "Baixa / cancelamento",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "id": "17654321",
+        "status": "baixado",
+        "linha_digitavel": null,
+        "codigo_barras": null,
+        "pix_copia_cola": null,
+        "pdf_base64": null,
+        "raw": {}
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_01",
+      "nome": "Cobrança Pix imediata (cob)",
+      "ok": true,
+      "status_code": 201,
+      "response_body": {
+        "txid": "eQHAFOYQafPofdiE7wXEyJDHTvX7yS6RoQ",
+        "status": "baixado",
+        "valor": "20466.08",
+        "pix_copia_cola": "quis dolore qui",
+        "location": "http://lYPujyUIkKnHXrgyrTZlvrGaQdIQ.yfAqG,ez4HmXeWzDBDZA2Zhsnnnn,n8TCVufo1FX6",
+        "expira_em": "2053-10-25T17:44:36Z",
+        "raw": {
+          "brcode": "quis dolore qui",
+          "calendario": {
+            "criacao": "2014-04-02T00:00:00.0Z",
+            "expiracao": 1248630276
+          },
+          "chave": "qui non",
+          "devedor": {
+            "cpf": "42478370889",
+            "nome": "ad ut"
+          },
+          "infoAdicionais": [
+            {
+              "nome": "voluptate sit Duis dolore",
+              "valor": "c"
+            },
+            {
+              "nome": "",
+              "valor": "dolore mollit tempor velit"
+            },
+            {
+              "nome": "et ",
+              "valor": "deserunt qui dolor"
+            }
+          ],
+          "loc": {
+            "brcode": "dolore amet ipsum consequat",
+            "criacao": "1978-12-12T00:00:00.0Z",
+            "id": 6032010645429301000,
+            "location": "http://lYPujyUIkKnHXrgyrTZlvrGaQdIQ.yfAqG,ez4HmXeWzDBDZA2Zhsnnnn,n8TCVufo1FX6",
+            "tipoCob": "cobv",
+            "txid": 54973164
+          },
+          "location": "http://oYlPmjk.ztOE,r8eVXDdMgN2D5PVc4TFVFq--nFL+VXHMv.qsW",
+          "revisao": 18118756,
+          "solicitacaoPagador": "sed",
+          "status": "REMOVIDA_PELO_USUARIO_RECEBEDOR",
+          "txid": "eQHAFOYQafPofdiE7wXEyJDHTvX7yS6RoQ",
+          "valor": {
+            "modalidadeAlteracao": 0,
+            "original": "20466.08"
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_02",
+      "nome": "Consulta da cob",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "txid": "asW1ToUTJmP60L90Rnfi008SCcL3bbq",
+        "status": "liquidado",
+        "valor": "4783.05",
+        "pix_copia_cola": "reprehenderit sint Lorem",
+        "location": "http://DScUSnwDCQvnLLUQblbHDAksjekNBI.yulhOROoreYVuf2IEyDnj4iwpIw+-QuBGYvrr,4",
+        "expira_em": "1966-03-08T13:11:02Z",
+        "raw": {
+          "brcode": "reprehenderit sint Lorem",
+          "calendario": {
+            "criacao": "1965-01-17T00:00:00.0Z",
+            "expiracao": 35903462
+          },
+          "chave": "ullamco laboris in Ut",
+          "devedor": {
+            "cnpj": "92822172835831",
+            "nome": "enim do"
+          },
+          "infoAdicionais": [
+            {
+              "nome": "amet dolor veniam in",
+              "valor": "est dolor ut do laborum"
+            },
+            {
+              "nome": "labore anim",
+              "valor": "dolore amet"
+            },
+            {
+              "nome": "Excepteur adipisicing",
+              "valor": "adipisicing cillum"
+            }
+          ],
+          "loc": {
+            "brcode": "amet",
+            "criacao": "1980-09-02T00:00:00.0Z",
+            "id": -2538546768668332000,
+            "location": "http://DScUSnwDCQvnLLUQblbHDAksjekNBI.yulhOROoreYVuf2IEyDnj4iwpIw+-QuBGYvrr,4",
+            "tipoCob": "cob",
+            "txid": false
+          },
+          "location": "http://axvrGJPBqOs.oyoTpbkXRnf+WoeIidpGyBl39lVBy2k3WVHjkV4cxWOiughAHqS7lWvzV",
+          "pix": [
+            {
+              "endToEndId": "0Lcd527rDo6o62ZjzH5VamI6erhnEB5s",
+              "valor": "5.38",
+              "horario": "1975-04-23T00:00:00.0Z",
+              "txid": "0PyDGobah5yA2aUC9hgiXEiBEIyWfHfF3",
+              "chave": "nisi id Lorem consequat labore",
+              "devolucoes": [
+                {
+                  "id": "dzHHcevkx",
+                  "rtrId": "PR02xfj2WqiHnrFFniprPn0GRkCTzXvo",
+                  "valor": "5147730714.51",
+                  "horario": {
+                    "liquidacao": "1990-06-25T00:00:00.0Z",
+                    "solicitacao": "1956-09-29T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "consectetur dolore et "
+                },
+                {
+                  "id": "bVtdjKK9fHwNy05Dp2Vt8SOgW9Z",
+                  "rtrId": "j2FOi9TS2h3k3RbgInBoPFrNFf8KlwAf",
+                  "valor": "7940252198.39",
+                  "horario": {
+                    "liquidacao": "1971-07-28T00:00:00.0Z",
+                    "solicitacao": "1987-01-25T00:00:00.0Z"
+                  },
+                  "status": "DEVOLVIDO",
+                  "motivo": "magna qui Excepteur labore quis"
+                },
+                {
+                  "id": "GME07qrdBOECq1ZwKk2UuRcWMBmhUC5RHjW",
+                  "rtrId": "2aBfITZxpgXLFnjkVEq8owaqEZPAQO6T",
+                  "valor": "4.45",
+                  "horario": {
+                    "solicitacao": "2017-06-01T00:00:00.0Z",
+                    "liquidacao": "1956-03-21T00:00:00.0Z"
+                  },
+                  "status": "EM_PROCESSAMENTO",
+                  "motivo": "sit enim cupidatat"
+                },
+                {
+                  "id": "Q1lmcrxwhqmc5x",
+                  "rtrId": "OPk0g6LgpyFEb3UL3e2CMU7T5YquKIAw",
+                  "valor": "4289286573.69",
+                  "horario": {
+                    "solicitacao": "1954-09-15T00:00:00.0Z",
+                    "liquidacao": "2013-10-04T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "pariatur in sit Ut consectetur"
+                }
+              ],
+              "infoPagador": "ex sed"
+            },
+            {
+              "endToEndId": "geFvvdKL7UpU2hl0oq1dAoqJS7AIcvIg",
+              "valor": "4918289.01",
+              "horario": "2024-01-20T00:00:00.0Z",
+              "txid": "34sB1satXMQMoedHEpvjclulLOAmWbLlct",
+              "infoPagador": "enim dolore laboris",
+              "chave": "consequat occaecat aliqua culpa qui",
+              "devolucoes": [
+                {
+                  "id": "NIFrieaZXWBE7wSvKIHcYnTVB61yjEgX",
+                  "rtrId": "yuz051KEl1NJyrMzcrmhuQBNQDpOfNCC",
+                  "valor": "70870888.24",
+                  "horario": {
+                    "liquidacao": "1947-03-26T00:00:00.0Z",
+                    "solicitacao": "1989-03-12T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "fugiat consectetur"
+                },
+                {
+                  "id": "98FnYGzxr",
+                  "rtrId": "f8ferwzzpY2lTL5XbYusRVuORGgU4eOz",
+                  "valor": "71.80",
+                  "horario": {
+                    "solicitacao": "1955-05-31T00:00:00.0Z",
+                    "liquidacao": "1952-09-03T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "cillum"
+                },
+                {
+                  "id": "nuMaT",
+                  "rtrId": "F6cfEc1gVSZtRk1aFeoCWaybtmSw3FUB",
+                  "valor": "312.45",
+                  "horario": {
+                    "liquidacao": "2018-03-29T00:00:00.0Z",
+                    "solicitacao": "2005-09-10T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "pariatur"
+                },
+                {
+                  "id": "gI8Bp6SgsUDjxGLpmcoi6Ip8kfwv48qix67",
+                  "rtrId": "2UHPNAFSbeS5tD5AfU3vJmyNOpY8zuza",
+                  "valor": "968.05",
+                  "horario": {
+                    "solicitacao": "1957-09-12T00:00:00.0Z",
+                    "liquidacao": "2024-07-20T00:00:00.0Z"
+                  },
+                  "status": "DEVOLVIDO",
+                  "motivo": "ut sint aliquip dolor"
+                }
+              ]
+            },
+            {
+              "endToEndId": "0FW8oC6cJv1JBl80YxbBRc4ldxNdExue",
+              "valor": "6307.52",
+              "horario": "1955-04-23T00:00:00.0Z",
+              "txid": "SWPOsIudJQ5l1FiQPshnh7ezPftgQ81ZSMn",
+              "infoPagador": "laboris sit aute",
+              "devolucoes": [
+                {
+                  "id": "0EuzBv3wagwvtMih",
+                  "rtrId": "VIpD4HCIy15CctZd8TgdZXd26hdXaDcn",
+                  "valor": "81.60",
+                  "horario": {
+                    "solicitacao": "1991-08-11T00:00:00.0Z",
+                    "liquidacao": "1993-06-25T00:00:00.0Z"
+                  },
+                  "status": "EM_PROCESSAMENTO",
+                  "motivo": "quis ex"
+                },
+                {
+                  "id": "mMkKkNHzZ7",
+                  "rtrId": "BswAWqyhRTehxTwca6u3jrsSY1zcUk8T",
+                  "valor": "6512183719.91",
+                  "horario": {
+                    "liquidacao": "1973-11-04T00:00:00.0Z",
+                    "solicitacao": "1969-08-26T00:00:00.0Z"
+                  },
+                  "status": "DEVOLVIDO",
+                  "motivo": "o"
+                },
+                {
+                  "id": "wF6I6",
+                  "rtrId": "yoIfwBbuGd0SXb47D0YOji8bm3JjP65K",
+                  "valor": "199307.75",
+                  "horario": {
+                    "solicitacao": "1958-10-26T00:00:00.0Z",
+                    "liquidacao": "1976-03-07T00:00:00.0Z"
+                  },
+                  "status": "DEVOLVIDO",
+                  "motivo": "non aliquip nulla"
+                },
+                {
+                  "id": "dOgUlqcgucTwmU59DZjehtAC1",
+                  "rtrId": "qBDrLi7vQr4f0CeAaydPHlxI7wE6v4kH",
+                  "valor": "53794.86",
+                  "horario": {
+                    "liquidacao": "1953-10-18T00:00:00.0Z",
+                    "solicitacao": "1972-04-04T00:00:00.0Z"
+                  },
+                  "status": "EM_PROCESSAMENTO",
+                  "motivo": "sed anim commodo nulla"
+                },
+                {
+                  "id": "VlBf8AV",
+                  "rtrId": "j5kh3lj7LnVxneFzFvf2IFbjGGhpY3JG",
+                  "valor": "7471212136.09",
+                  "horario": {
+                    "liquidacao": "1953-04-13T00:00:00.0Z",
+                    "solicitacao": "2022-07-03T00:00:00.0Z"
+                  },
+                  "status": "NAO_REALIZADO",
+                  "motivo": "ut consequat nostrud commodo"
+                }
+              ],
+              "chave": "in commodo exercitation"
+            }
+          ],
+          "revisao": 898582523,
+          "solicitacaoPagador": "ut in adipisicing aliqua",
+          "status": "CONCLUIDA",
+          "txid": "asW1ToUTJmP60L90Rnfi008SCcL3bbq",
+          "valor": {
+            "modalidadeAlteracao": 0,
+            "original": "4783.05"
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_03",
+      "nome": "Revisão da cob",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "txid": "EjA0KYEXjBUqbVvhHoCfPbhSCW",
+        "status": "baixado",
+        "valor": "21148.83",
+        "pix_copia_cola": "do labore non",
+        "location": "http://CnLuKtIuaFjTbpYQ.ibAQlrlmqUysZVRKjqeO2d1",
+        "expira_em": "2024-08-23T19:51:29Z",
+        "raw": {
+          "brcode": "do labore non",
+          "calendario": {
+            "criacao": "1982-07-04T00:00:00.0Z",
+            "expiracao": 1329853889
+          },
+          "chave": "nulla el",
+          "devedor": {
+            "cpf": "72268524070",
+            "nome": "proident"
+          },
+          "infoAdicionais": [
+            {
+              "nome": "sunt ea",
+              "valor": "cillum qui"
+            },
+            {
+              "nome": "con",
+              "valor": "eu aliqua pariatur"
+            },
+            {
+              "nome": "ad",
+              "valor": "dolore enim Excepteur"
+            },
+            {
+              "nome": "amet Ut magna dolore",
+              "valor": "elit"
+            },
+            {
+              "nome": "ut sit",
+              "valor": "ad veniam"
+            }
+          ],
+          "loc": {
+            "brcode": "mollit",
+            "criacao": "1981-10-02T00:00:00.0Z",
+            "id": -4384827497447059500,
+            "location": "http://CnLuKtIuaFjTbpYQ.ibAQlrlmqUysZVRKjqeO2d1",
+            "tipoCob": "cobv",
+            "txid": false
+          },
+          "location": "https://adQVDGfTJCHtcgp.qqxeo-nI+bup8VgjHKimYBnu",
+          "revisao": -618781040,
+          "solicitacaoPagador": "dolore ex ad ips",
+          "status": "REMOVIDA_PELO_USUARIO_RECEBEDOR",
+          "txid": "EjA0KYEXjBUqbVvhHoCfPbhSCW",
+          "valor": {
+            "modalidadeAlteracao": 0,
+            "original": "21148.83"
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_04",
+      "nome": "Lista de cobranças do período",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "cobs": [
+          {
+            "status": "CONCLUIDA",
+            "valor": {
+              "original": "2.29",
+              "modalidadeAlteracao": 0
+            },
+            "chave": "consectetur eiusmod in quis",
+            "calendario": {
+              "expiracao": 1169186625,
+              "criacao": "1969-05-29T00:00:00.0Z"
+            },
+            "txid": "BGQGO2j57aWumEP49JvTLshavH7WFd",
+            "revisao": -520494632,
+            "brcode": "minim elit cillum",
+            "solicitacaoPagador": "consequat veniam officia",
+            "infoAdicionais": [
+              {
+                "nome": "officia dolo",
+                "valor": "irure dolore des"
+              },
+              {
+                "nome": "fugiat eiusmod",
+                "valor": "commodo"
+              },
+              {
+                "nome": "fugi",
+                "valor": "laborum culpa"
+              },
+              {
+                "nome": "elit",
+                "valor": "exercitation et"
+              }
+            ],
+            "loc": {
+              "id": 5375708880801878000,
+              "tipoCob": "cob",
+              "criacao": "2022-10-21T00:00:00.0Z",
+              "location": "https://twKsfcWdkOSVdpvWlnKSZsvYny.lbBTA9deWlYyVbL,VM.b-9i7lINCzak4eRrgfL8Eht",
+              "brcode": "est quis officia nostrud non",
+              "txid": 23422153
+            },
+            "pix": [
+              {
+                "endToEndId": "hbwFa8fC0iLvYOsBkEK1PyfT8oWIxqmR",
+                "valor": "8.88",
+                "horario": "1972-12-18T00:00:00.0Z",
+                "devolucoes": [
+                  {
+                    "id": "vuPwRGMBnLB0Kgswn",
+                    "rtrId": "nSHI4Mu46EQY4nYwB6jHvm1aEoGgC08B",
+                    "valor": "899429116.22",
+                    "horario": {
+                      "solicitacao": "2009-05-22T00:00:00.0Z",
+                      "liquidacao": "2015-07-28T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "velit anim"
+                  },
+                  {
+                    "id": "ZEgP",
+                    "rtrId": "jLSLLAIWdaag1L6sXoCWOBnh261Z43pq",
+                    "valor": "2.12",
+                    "horario": {
+                      "solicitacao": "1985-06-21T00:00:00.0Z",
+                      "liquidacao": "1958-05-24T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "labore exercitation minim quis enim"
+                  }
+                ],
+                "infoPagador": "labore",
+                "txid": "W3YIdiKUg2ZlFLQ1bl8dN3QeBMh8wmn",
+                "chave": "eiusmod sunt dolor"
+              },
+              {
+                "endToEndId": "NYrjnVO1KdpgduKflknQzEolgT2MXDqI",
+                "valor": "3411613.04",
+                "horario": "1970-05-13T00:00:00.0Z",
+                "chave": "Ut Excepteur in",
+                "devolucoes": [
+                  {
+                    "id": "LBlDmLJUOP1VDqROrvEL",
+                    "rtrId": "Et4gTlSchkAyaMTYexzaHJjARxCHGDAm",
+                    "valor": "391482.24",
+                    "horario": {
+                      "liquidacao": "1952-07-11T00:00:00.0Z",
+                      "solicitacao": "1960-10-22T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "in esse veniam qui est"
+                  }
+                ],
+                "txid": "uV1Nw7ZLplJKI5Pix4Qz5qehgCf9C",
+                "infoPagador": "consequat officia in occaecat pariatur"
+              },
+              {
+                "endToEndId": "M4cOcuwiXrrDmnrdh9LMzf2jTb292g8F",
+                "valor": "084383.75",
+                "horario": "1958-10-04T00:00:00.0Z",
+                "txid": "0SLlqUNT3LCirPQbaO2wkFsOmm",
+                "chave": "vel",
+                "infoPagador": "Duis anim s",
+                "devolucoes": [
+                  {
+                    "id": "mdyqoKibD1qnAVPRGfd18yKK5sll6hTFnim",
+                    "rtrId": "H0PVredz9rCQzAR2qFsx9V1lqrvcsoyb",
+                    "valor": "04.80",
+                    "horario": {
+                      "solicitacao": "1984-08-21T00:00:00.0Z",
+                      "liquidacao": "1963-09-17T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "elit"
+                  }
+                ]
+              }
+            ],
+            "location": "https://eIVwkekEHkYlKYXFvFLTMhaSpCr.zuxfa3aT",
+            "devedor": {
+              "cnpj": "11828959704291",
+              "nome": "aliqua elit deserunt"
+            }
+          },
+          {
+            "status": "ATIVA",
+            "valor": {
+              "original": "207273757.38",
+              "modalidadeAlteracao": 0
+            },
+            "chave": "velit sit qui esse",
+            "calendario": {
+              "expiracao": 964501249,
+              "criacao": "1975-05-17T00:00:00.0Z"
+            },
+            "txid": "SxvQxKx17zAEU0SYuTNpXQh3r0vYWz",
+            "revisao": 1163601612,
+            "brcode": "amet id exercitation",
+            "infoAdicionais": [
+              {
+                "nome": "ut do laborum ea culpa",
+                "valor": "ut aliqua incididunt adipisicing cillum"
+              },
+              {
+                "nome": "",
+                "valor": "in ea ipsum cupidatat magna"
+              },
+              {
+                "nome": "velit",
+                "valor": "aute sint reprehenderit cillum fugiat"
+              },
+              {
+                "nome": "sit",
+                "valor": "in"
+              }
+            ],
+            "devedor": {
+              "cpf": "40693097831",
+              "nome": "eu elit dolore"
+            },
+            "loc": {
+              "id": -1308319469933019100,
+              "tipoCob": "cobv",
+              "criacao": "2022-08-18T00:00:00.0Z",
+              "location": "https://UGeCKVGkpVyqGiRduWmllZldxzAHHUaJt.jdrby1qaV8Dirfh",
+              "brcode": "elit ipsum sint sed sunt",
+              "txid": false
+            },
+            "location": "http://ATdyYmdWqOGyaB.ibn.QitPYxv2sM7NoK4wlpPiGSDT3k2,MNlfIG5e",
+            "pix": [
+              {
+                "endToEndId": "1Xyho7guDWEIB2aZ2H9iUNK7MqWCpQH0",
+                "valor": "741.16",
+                "horario": "2012-03-05T00:00:00.0Z",
+                "devolucoes": [
+                  {
+                    "id": "MP3pNzXP50p",
+                    "rtrId": "3syYEeMIYhkVWcrt1ENwR2yH26azUOU2",
+                    "valor": "75438116.94",
+                    "horario": {
+                      "liquidacao": "2012-07-15T00:00:00.0Z",
+                      "solicitacao": "1977-04-27T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "do fugiat minim"
+                  }
+                ],
+                "txid": "4rq5k9XfHE0o5b7eTvib8FmHna",
+                "chave": "sunt ut magna quis",
+                "infoPagador": "in consequat ad ea"
+              },
+              {
+                "endToEndId": "ltYtPvuRYJYh6T0sZcIAAaqTllAffWgM",
+                "valor": "62.26",
+                "horario": "1992-01-21T00:00:00.0Z",
+                "devolucoes": [
+                  {
+                    "id": "87mD9neS",
+                    "rtrId": "AEwHpBYOlpGtmtRNDtEITPt3frwQT1Ju",
+                    "valor": "415.50",
+                    "horario": {
+                      "solicitacao": "1988-07-19T00:00:00.0Z",
+                      "liquidacao": "1964-04-12T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "id adipisicing ea"
+                  },
+                  {
+                    "id": "ouwSTyiOQiTY0dqNrdpksYay",
+                    "rtrId": "hm3fKHLpL925QINUZpjl3PHsFrPoNG3D",
+                    "valor": "7920816.95",
+                    "horario": {
+                      "liquidacao": "1991-09-29T00:00:00.0Z",
+                      "solicitacao": "2008-04-05T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "veniam"
+                  }
+                ],
+                "chave": "laboris consectetur fugiat",
+                "infoPagador": "ea ut",
+                "txid": "uWRrCu3M926V4tjC5peczcQmQ2y0OZ9fF0"
+              },
+              {
+                "endToEndId": "a1PMwO1OhXNtHCyuDXV0DP0e9wsp6uxo",
+                "valor": "518839.69",
+                "horario": "1998-12-25T00:00:00.0Z",
+                "infoPagador": "molli",
+                "chave": "culpa aliqua incididunt deserunt consectetur",
+                "txid": "QmyI0uEnL7WC8aI9skoxQshRTRxzKdEdVuK",
+                "devolucoes": [
+                  {
+                    "id": "Fih5H2H8S51QvinyF",
+                    "rtrId": "AHmq7jXp3iLr3h0SHVaJTfhW3t8pAccG",
+                    "valor": "30303908.74",
+                    "horario": {
+                      "liquidacao": "1997-07-04T00:00:00.0Z",
+                      "solicitacao": "1958-05-14T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "quis officia ullamco ad"
+                  }
+                ]
+              },
+              {
+                "endToEndId": "f9yuCCBnw20TeuglMHs11VrdumzfkH3Y",
+                "valor": "3648473054.26",
+                "horario": "2006-10-25T00:00:00.0Z",
+                "devolucoes": [
+                  {
+                    "id": "kz0sQ8jTzdjrC3fr3qVDJvD7SmQm",
+                    "rtrId": "gfnyrUfYJSzWMFEelelPDeoXNNvFmpLI",
+                    "valor": "83201.38",
+                    "horario": {
+                      "solicitacao": "1967-02-26T00:00:00.0Z",
+                      "liquidacao": "2014-09-26T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "incididunt enim deserunt est"
+                  },
+                  {
+                    "id": "yaMVt1A1okopaLv",
+                    "rtrId": "sGoXNEj8Vyp3wncy6KVPyRuzAdO8ei5K",
+                    "valor": "295244809.62",
+                    "horario": {
+                      "liquidacao": "1952-03-05T00:00:00.0Z",
+                      "solicitacao": "1952-10-25T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "nulla Ut id nostrud"
+                  },
+                  {
+                    "id": "DM6LS",
+                    "rtrId": "jVz6Tmfg5AqwVBS9ru7LRCk9X4tp0ejw",
+                    "valor": "7913015.49",
+                    "horario": {
+                      "solicitacao": "1999-12-18T00:00:00.0Z",
+                      "liquidacao": "1988-05-23T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "culpa Duis nostrud sed"
+                  },
+                  {
+                    "id": "5OEzOpgfHQb",
+                    "rtrId": "JQ97HgEdVszcBdcqvqTjxPNjPuOkh4hY",
+                    "valor": "8314319508.56",
+                    "horario": {
+                      "liquidacao": "1965-03-21T00:00:00.0Z",
+                      "solicitacao": "1985-06-25T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "ipsum"
+                  }
+                ],
+                "chave": "culpa voluptate",
+                "infoPagador": "incididunt sint",
+                "txid": "bq3FaxaHUOt7ug7rKbLmjlMFdnKdiDMEkJi"
+              }
+            ],
+            "solicitacaoPagador": "minim anim"
+          },
+          {
+            "status": "REMOVIDA_PELO_USUARIO_RECEBEDOR",
+            "valor": {
+              "original": "592353.88",
+              "modalidadeAlteracao": 0
+            },
+            "chave": "laborum ut",
+            "calendario": {
+              "expiracao": 1358558409,
+              "criacao": "1962-12-30T00:00:00.0Z"
+            },
+            "txid": "FekmP5Zkx29kwpAdi1ps5U58GpR7WUr6",
+            "revisao": 616569404,
+            "solicitacaoPagador": "dolor exercitation veniam",
+            "brcode": "sunt occaecat nostrud exercitation minim",
+            "loc": {
+              "id": 7038763974104490000,
+              "tipoCob": "cob",
+              "criacao": "1961-05-18T00:00:00.0Z",
+              "location": "https://qLCPNFAwOKoiAvOYIvhePoxyJoTaTOxO.futjo7pMhmQ1ATBH-GfLk1T,FC4ofYkaSG6t",
+              "brcode": "aute Ut",
+              "txid": -99095522.03517097
+            },
+            "location": "http://DwCaHqMiIIZdzko.gjsNbinhGL8d,1hW-egfdog2EjioUek",
+            "infoAdicionais": [
+              {
+                "nome": "elit cupidatat ve",
+                "valor": "o"
+              }
+            ],
+            "devedor": {
+              "cnpj": "19004141543956",
+              "nome": "in"
+            },
+            "pix": [
+              {
+                "endToEndId": "xQGmWNwqhtWbKLRQGlAWr5BfOWdox1Hi",
+                "valor": "8159491611.11",
+                "horario": "1993-01-25T00:00:00.0Z",
+                "infoPagador": "eu labore Duis dolore",
+                "devolucoes": [
+                  {
+                    "id": "KEnsucYKqDO15W",
+                    "rtrId": "5UmU8HQoni00l91yEhkDL3rNdEtk1Uoo",
+                    "valor": "64.13",
+                    "horario": {
+                      "liquidacao": "2000-02-13T00:00:00.0Z",
+                      "solicitacao": "1984-01-23T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "in cillum"
+                  }
+                ],
+                "chave": "irure",
+                "txid": "wh2LjuBwnZmFBCROdZcYTwrByAr"
+              },
+              {
+                "endToEndId": "M1LwgU48KgkWawREwzFtEqyTPrf2ezZM",
+                "valor": "316340419.48",
+                "horario": "2016-03-08T00:00:00.0Z",
+                "devolucoes": [
+                  {
+                    "id": "bMWX8ICA",
+                    "rtrId": "eNm4xqUofEYfo3q1TUKZKE68c3fO19XU",
+                    "valor": "990057060.80",
+                    "horario": {
+                      "liquidacao": "2007-07-28T00:00:00.0Z",
+                      "solicitacao": "2019-12-28T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "eu"
+                  },
+                  {
+                    "id": "H2vU64mn3UsvKDKRtWP6Ko020GLbG9",
+                    "rtrId": "QnFqAWIg98ngFWIHfqQlJYZhFAOBTxrF",
+                    "valor": "5232556.62",
+                    "horario": {
+                      "solicitacao": "1951-02-13T00:00:00.0Z",
+                      "liquidacao": "1949-12-19T00:00:00.0Z"
+                    },
+                    "status": "NAO_REALIZADO",
+                    "motivo": "veniam pariatur commodo Duis aliquip"
+                  },
+                  {
+                    "id": "jHAldYnYauWSaGP1FmVQKaoqlgnc7WEtEr",
+                    "rtrId": "ABDc4UCjoawJ36wCTAxYxT5iZNPOcBIO",
+                    "valor": "93801.48",
+                    "horario": {
+                      "liquidacao": "1989-02-17T00:00:00.0Z",
+                      "solicitacao": "1949-03-04T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "nostrud sunt"
+                  }
+                ],
+                "chave": "ipsum",
+                "txid": "eO6PUd2iLMgcwKUjol0d3rk3EPmGl",
+                "infoPagador": "nulla"
+              }
+            ]
+          },
+          {
+            "status": "REMOVIDA_PELO_PSP",
+            "valor": {
+              "original": "010807032.18",
+              "modalidadeAlteracao": 0
+            },
+            "chave": "deserunt",
+            "calendario": {
+              "expiracao": 969048696,
+              "criacao": "2014-07-16T00:00:00.0Z"
+            },
+            "txid": "US6c8g5UWzpQXFvKcGuYRAWjIWyHo6V",
+            "revisao": 1904428929,
+            "brcode": "sunt aute quis non",
+            "solicitacaoPagador": "do tempor",
+            "devedor": {
+              "cpf": "51858444780",
+              "nome": "exercitation in dolor deserunt aliquip"
+            },
+            "infoAdicionais": [
+              {
+                "nome": "nulla irure eiusmod",
+                "valor": "consequat"
+              }
+            ],
+            "loc": {
+              "id": -3160771068626194400,
+              "tipoCob": "cobv",
+              "criacao": "1986-12-23T00:00:00.0Z",
+              "location": "http://kzML.glnk16qONRdfzdc7+zCZC-LTjQV83UBAWq39I+.N+NSuhL,bVI9CqSA",
+              "brcode": "in id ad deserunt",
+              "txid": -89594478.78492592
+            },
+            "pix": [
+              {
+                "endToEndId": "a0g3PTYca91vzcL8uwtZtYgDejCPmGcL",
+                "valor": "400608.94",
+                "horario": "2011-02-15T00:00:00.0Z",
+                "infoPagador": "magn",
+                "devolucoes": [
+                  {
+                    "id": "WZ3cd0UFpZsOvdT3mscxqHYOScODO",
+                    "rtrId": "VM15E2Tl42VSEuqvFXA2Y0C8cTUjNkBS",
+                    "valor": "327.23",
+                    "horario": {
+                      "liquidacao": "1955-07-07T00:00:00.0Z",
+                      "solicitacao": "1972-08-15T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "aliqua esse elit proident"
+                  },
+                  {
+                    "id": "XWclroBnSYfg",
+                    "rtrId": "7YKiZVGVVr4f2zT0vBbRgML4TrrLytYP",
+                    "valor": "2208230209.87",
+                    "horario": {
+                      "solicitacao": "1987-12-22T00:00:00.0Z",
+                      "liquidacao": "2002-07-07T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "deserunt eiusmod"
+                  },
+                  {
+                    "id": "ewkmwGO9WdshsZO1TdRaXWr0",
+                    "rtrId": "SOsUsj5KauVWKmFaZZYWdRsGjGlJBqlR",
+                    "valor": "6963.47",
+                    "horario": {
+                      "liquidacao": "1981-10-31T00:00:00.0Z",
+                      "solicitacao": "1947-10-29T00:00:00.0Z"
+                    },
+                    "status": "DEVOLVIDO",
+                    "motivo": "non cillum"
+                  },
+                  {
+                    "id": "X85",
+                    "rtrId": "IgTofbPWgsy4WS00oFfbOdgCvu897Zcw",
+                    "valor": "4140130599.14",
+                    "horario": {
+                      "liquidacao": "1972-02-26T00:00:00.0Z",
+                      "solicitacao": "1969-06-28T00:00:00.0Z"
+                    },
+                    "status": "EM_PROCESSAMENTO",
+                    "motivo": "incididunt ex anim esse labore"
+                  }
+                ],
+                "chave": "commodo reprehenderit culpa eu consequat",
+                "txid": "GFkQXxwiKOCgfzlS6EMmTQss2wOgbU7eaes"
+              }
+            ],
+            "location": "https://RkWfqGApJsQFUTUcceGevQkFPEF.ahrZxvRadEyEnqQ13bCO9vJYtCOo-BQvDqfYgUDmG"
+          }
+        ],
+        "parametros": {
+          "cnpj": "19890651620132",
+          "cpf": "59255818535",
+          "fim": "1975-04-19T00:00:00.0Z",
+          "inicio": "1959-08-22T00:00:00.0Z",
+          "locationPresente": false,
+          "paginacao": {
+            "itensPorPagina": 74485617,
+            "paginaAtual": 53623621,
+            "quantidadeDePaginas": 60187765,
+            "quantidadeTotalDeItens": 59902089
+          },
+          "status": "reprehenderit eu"
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_05",
+      "nome": "Cobrança Pix com vencimento (cobv)",
+      "ok": true,
+      "status_code": 201,
+      "response_body": {
+        "txid": "yENkGyTGkhYeDStbXYdfvy8qel1X",
+        "status": "baixado",
+        "valor": "99.14",
+        "pix_copia_cola": "et",
+        "location": "https://hIvmYWwSxgcmBFXfa.qrbcl0K6IGtpfBfTZiO8Jm1WZUK7RJ8eW2iVPr,iAvs",
+        "expira_em": null,
+        "raw": {
+          "brcode": "et",
+          "calendario": {
+            "criacao": "1963-01-14T00:00:00.0Z",
+            "dataDeVencimento": "1987-09-14",
+            "validadeAposVencimento": 486733348
+          },
+          "chave": "dolore in ullamco velit fugiat",
+          "devedor": {
+            "cep": "dolore",
+            "cidade": "sunt ipsum",
+            "cnpj": "96341653999702",
+            "email": "et reprehenderit sunt",
+            "logradouro": "sed dolore reprehenderit",
+            "nome": "anim",
+            "uf": "do"
+          },
+          "infoAdicionais": [
+            {
+              "nome": "proident quis",
+              "valor": "commodo proident aliqua sunt"
+            },
+            {
+              "nome": "nulla",
+              "valor": "ipsum magna cillum consequat"
+            },
+            {
+              "nome": "sed non sint volupta",
+              "valor": "L"
+            }
+          ],
+          "loc": {
+            "brcode": "cillum esse Duis proident",
+            "criacao": "1960-01-13T00:00:00.0Z",
+            "id": 2709855841717244000,
+            "location": "https://hIvmYWwSxgcmBFXfa.qrbcl0K6IGtpfBfTZiO8Jm1WZUK7RJ8eW2iVPr,iAvs",
+            "tipoCob": "cob",
+            "txid": false
+          },
+          "location": false,
+          "recebedor": {
+            "cep": "an",
+            "cidade": "quis proident nisi esse in",
+            "cnpj": "12073192322853",
+            "logradouro": "tempor ea sint ex dolore",
+            "nome": "in ad exercitation",
+            "nomeFantasia": "esse ea nostrud ull",
+            "uf": "vo"
+          },
+          "revisao": 1180823778,
+          "solicitacaoPagador": "sunt",
+          "status": "REMOVIDA_PELO_USUARIO_RECEBEDOR",
+          "txid": "yENkGyTGkhYeDStbXYdfvy8qel1X",
+          "valor": {
+            "abatimento": {
+              "modalidade": 1,
+              "valorPerc": "450607.81"
+            },
+            "desconto": {
+              "modalidade": 5,
+              "valorPerc": "9014685.87"
+            },
+            "juros": {
+              "modalidade": 4,
+              "valorPerc": "18798760.63"
+            },
+            "multa": {
+              "modalidade": 1,
+              "valorPerc": "0.59"
+            },
+            "original": "99.14"
+          }
+        }
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_06",
+      "nome": "Pix recebidos no período",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "parametros": {
+          "cnpj": "/17018947910077/",
+          "cpf": "/62549216039/",
+          "devolucaoPresente": true,
+          "fim": "1967-03-16T00:00:00.0Z",
+          "inicio": "1981-05-21T00:00:00.0Z",
+          "paginacao": {
+            "itensPorPagina": 97212946,
+            "paginaAtual": 27350393,
+            "quantidadeDePaginas": 22494931,
+            "quantidadeTotalDeItens": 28225738
+          },
+          "txIdPresente": false,
+          "txid": "lGQUoXYcWaojkFX7lh1FMXkNX5mxC1X"
+        },
+        "pix": [
+          {
+            "endToEndId": "lclwXozoBroU6tnYrIYQnIM2L4Tid8iK",
+            "valor": "606.02",
+            "horario": "1989-10-01T00:00:00.0Z",
+            "devolucoes": [
+              {
+                "id": "yVmP7XCmrWlG",
+                "rtrId": "6H5d9vQku7rEtT8KZl9xyV2oBoPscPIB",
+                "valor": "64334.52",
+                "horario": {
+                  "liquidacao": "1984-08-28T00:00:00.0Z",
+                  "solicitacao": "2003-05-11T00:00:00.0Z"
+                },
+                "status": "NAO_REALIZADO",
+                "motivo": "eiusmod est Ut"
+              },
+              {
+                "id": "Jvb81JoTSnIjfUFsONB7PQ38Ih00dJa",
+                "rtrId": "t3Xys6L32k3UhPW2hTm3GzTsloFpsDvA",
+                "valor": "5089038.35",
+                "horario": {
+                  "solicitacao": "1948-08-16T00:00:00.0Z",
+                  "liquidacao": "1965-08-18T00:00:00.0Z"
+                },
+                "status": "EM_PROCESSAMENTO",
+                "motivo": "nostrud"
+              }
+            ],
+            "txid": "N50DeGB7F4Ydeev3FoZHHTqkj5udzXPTrhk",
+            "infoPagador": "do",
+            "chave": "do sit Excepte"
+          },
+          {
+            "endToEndId": "8gS13uwSVeOeAYKhhfjYNDU2ueScdjno",
+            "valor": "403100127.26",
+            "horario": "1989-12-25T00:00:00.0Z",
+            "txid": "h90YvxY9w9jbOw",
+            "chave": "consequat dolore ea sit dolor",
+            "devolucoes": [
+              {
+                "id": "s5ulNZbzUWO0KeOV55SbR",
+                "rtrId": "gyVnpAYLO53snFrvgrGD6QOIWxx9yHCZ",
+                "valor": "952252.63",
+                "horario": {
+                  "liquidacao": "2005-08-30T00:00:00.0Z",
+                  "solicitacao": "2004-04-06T00:00:00.0Z"
+                },
+                "status": "EM_PROCESSAMENTO",
+                "motivo": "quis in in volup"
+              },
+              {
+                "id": "gsJE06YgWiNattCNVh4d380rNPsvj",
+                "rtrId": "ZINpJMmUGTveX4NdA07IAvkrlaDzCBHb",
+                "valor": "855205162.32",
+                "horario": {
+                  "solicitacao": "1983-06-17T00:00:00.0Z",
+                  "liquidacao": "2000-04-22T00:00:00.0Z"
+                },
+                "status": "NAO_REALIZADO",
+                "motivo": "in cillum veniam amet consectetur"
+              },
+              {
+                "id": "yMyUkDdQWxLvqeh5NCJdAgAxLxSdgHJkztX",
+                "rtrId": "xDFExGqRJPAkeK7SHAxshGVYP1vXOQQD",
+                "valor": "13.66",
+                "horario": {
+                  "solicitacao": "1993-03-03T00:00:00.0Z",
+                  "liquidacao": "1983-03-05T00:00:00.0Z"
+                },
+                "status": "DEVOLVIDO",
+                "motivo": "Ut adipisicing eu "
+              },
+              {
+                "id": "IbvuK4JRUXBsdq2eE6Y6OlE",
+                "rtrId": "1rUcODWDfCIsU9Ac0nyQlcRCbFYAUYDq",
+                "valor": "41733581.17",
+                "horario": {
+                  "solicitacao": "2024-06-09T00:00:00.0Z",
+                  "liquidacao": "1977-08-31T00:00:00.0Z"
+                },
+                "status": "DEVOLVIDO",
+                "motivo": "ex Ut"
+              }
+            ],
+            "infoPagador": "Excepteur deserunt labore"
+          }
+        ]
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_07",
+      "nome": "Webhook Pix por chave — cadastro",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {},
+      "mock_do_banco": true
+    },
+    {
+      "caso": "P_08",
+      "nome": "Webhook Pix por chave — consulta",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "chave": "aliqua nostrud exercitation Duis",
+        "criacao": "2001-02-19T00:00:00.0Z",
+        "webhookUrl": "http://GytADfcoxTDHoRptiBiIggkrSFTYYeTMx.ndi-blAMS-ZIM5jGS0XnyvZuTlRf8Ip71dnbW"
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "PA_01",
+      "nome": "Pix Automático — criar recorrência",
+      "ok": true,
+      "status_code": 201,
+      "response_body": {
+        "conteudo": "<html><head><title>Request Rejected</title></head><body>The requested URL was rejected. Please consult with your administrator.<br><br>Your support ID is: 10462988663298202402<br><br><a href='javascript:history.back();'>[Go Back]</a></body></html>"
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "PA_02",
+      "nome": "Pix Automático — consultar recorrência",
+      "ausente": true,
+      "motivo": "PA_01 não devolveu idRec — o mock do Sicoob não ecoa o recurso criado",
+      "ok": null,
+      "status_code": null,
+      "response_body": null
+    },
+    {
+      "caso": "E_01",
+      "nome": "Extrato de conta corrente",
+      "ok": true,
+      "status_code": 200,
+      "response_body": {
+        "saldoAnterior": "mollit cupidatat",
+        "saldoAtual": "commodo sit ea",
+        "saldoBloqueado": "officia do magna laborum sint",
+        "saldoBloqueioJudicial": "ullamco reprehenderit officia",
+        "saldoBloqueioJudicialAnterior": "consequat ullamco esse tempor sunt",
+        "saldoLimite": "et sint Ut velit in",
+        "transacoes": [
+          {
+            "dataLote": "irure adipisicing in in fugiat",
+            "descInfComplementar": "cillum in magna",
+            "descricao": "aliquip in",
+            "numeroDocumento": "commodo dolor pariatur in aliqua",
+            "valor": "nisi",
+            "cpfCnpj": "sunt cupidatat",
+            "tipo": "anim",
+            "data": "laborum fugiat dolor aute"
+          },
+          {
+            "dataLote": "in",
+            "valor": "tempor velit eu reprehenderit esse",
+            "cpfCnpj": "eu reprehenderit dolore velit elit",
+            "tipo": "deserunt fugiat ex",
+            "descInfComplementar": "id dolor in mollit",
+            "numeroDocumento": "cillum",
+            "descricao": "sint irure aliqua Lorem",
+            "data": "sed exercitation"
+          },
+          {
+            "numeroDocumento": "incididunt",
+            "tipo": "ea tempor magna sint",
+            "descInfComplementar": "elit",
+            "data": "officia dolor occaecat",
+            "cpfCnpj": "occaecat culpa irure laboris enim",
+            "dataLote": "Duis",
+            "valor": "magna eiusmod culpa consectetur sit",
+            "descricao": "pariatur nostrud commodo mollit in"
+          }
+        ]
+      },
+      "mock_do_banco": true
+    },
+    {
+      "caso": "PG_01",
+      "nome": "Pagamentos / transferências (spb, pix-pagamentos, convênios)",
+      "ausente": true,
+      "motivo": "fora do escopo do produto: saída de dinheiro; a Cobranca-API é cobrança (entrada). Vale para as APIs Pix Pagamentos, SPB Transferências e Convênios Pagamentos do catálogo do Sicoob",
+      "ok": null,
+      "status_code": null,
+      "response_body": null
+    },
+    {
+      "caso": "IN_01",
+      "nome": "Investimentos (RDC) e Poupança",
+      "ausente": true,
+      "motivo": "fora do escopo do produto: não é cobrança nem conciliação de cobrança",
+      "ok": null,
+      "status_code": null,
+      "response_body": null
+    },
+    {
+      "caso": "OF_01",
+      "nome": "Open Finance — Iniciação de Pagamento",
+      "ausente": true,
+      "motivo": "fora do escopo do produto: iniciação de pagamento é saída de dinheiro",
+      "ok": null,
+      "status_code": null,
+      "response_body": null
+    },
+    {
+      "caso": "B_05",
+      "nome": "Alteração de boleto emitido",
+      "ausente": true,
+      "motivo": "LACUNA DE SUPERFÍCIE, não de escopo: o C6 expõe PUT /cobranca/{id} e o Sicoob não implementa `alterar` no provider — a rota responde 422 pelo exige_capacidade, dizendo para onde ir",
+      "ok": null,
+      "status_code": null,
+      "response_body": null
+    }
+  ]
+}

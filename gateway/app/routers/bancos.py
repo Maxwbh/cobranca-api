@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from app.providers.base import BankProvider
 from app.providers.offline_engine import PyCobrancaProvider
 from app.providers.c6 import C6Provider
+from app.providers.inter import InterProvider
 from app.providers.sicoob import SicoobProvider
 
 router = APIRouter(prefix="/bancos", tags=["bancos"])
@@ -26,6 +27,10 @@ _CAPACIDADES = {
     "configurar_webhook_pix": "webhook_pix_por_chave",
     "criar_recorrencia": "pix_automatico",
     "criar_bolepix": "bolepix",
+    # O catálogo é como o consumidor DESCOBRE o que cada banco faz. Sem esta
+    # linha, quem consultava /bancos não tinha como saber que existe link de
+    # pagamento com cartão — a rota existia e era invisível.
+    "criar_checkout": "checkout_cartao",
     "extrato": "extrato",
     "listar_recebiveis": "conciliacao_cartao",
     "cadastrar_webhook": "webhook_banco",
@@ -59,6 +64,17 @@ _ESQUEMA_SICOOB = {
     "client_secret": "produção: OAuth client_credentials com scopes",
     "pfx_base64": "produção: certificado mTLS/e-CNPJ (PKCS12 em base64)",
     "pfx_password": "senha do certificado",
+    "scopes": "opcional (lista; default do provider)",
+}
+
+_ESQUEMA_INTER = {
+    "client_id": "obrigatório (aplicação no Internet Banking do Inter)",
+    "client_secret": "obrigatório",
+    "cert_pem": "certificado da aplicação (.crt em PEM ou base64) — é o que o Inter entrega",
+    "key_pem": "chave privada (.key em PEM ou base64)",
+    "pfx_base64": "alternativa ao par acima: o mesmo material em PKCS12/base64",
+    "pfx_password": "senha do certificado, quando houver",
+    "conta_corrente": "obrigatório quando a aplicação enxerga mais de uma conta (header x-conta-corrente)",
     "scopes": "opcional (lista; default do provider)",
 }
 
@@ -105,6 +121,18 @@ def listar() -> dict:
                 "credentials": _ESQUEMA_SICOOB,
                 "sandbox": "https://sandbox.sicoob.com.br/sicoob/sandbox (token estático do portal)",
                 "documentacao": "docs/development/sicoob-rest.md",
+            },
+            {
+                "id": "inter",
+                "nome": "Banco Inter",
+                "codigo_banco": "077",
+                "tipo": "rest",
+                "capacidades": _capacidades(InterProvider),
+                "credentials": _ESQUEMA_INTER,
+                "sandbox": "https://cdpj-sandbox.partners.uatinter.co (OAuth + mTLS)",
+                "documentacao": "docs/development/inter-rest.md",
+                "observacao": ("sem fallback offline: a engine pyCobrança não tem o layout do "
+                               "077, e cair em outro banco emitiria boleto errado"),
             },
             {
                 "id": "pycobranca",

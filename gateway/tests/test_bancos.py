@@ -6,7 +6,7 @@ def test_bancos_lista_capacidades_reais(client):
     assert r.status_code == 200
     data = r.json()
     bancos = {b["id"]: b for b in data["bancos"]}
-    assert set(bancos) == {"c6", "sicoob", "pycobranca"}
+    assert set(bancos) == {"c6", "sicoob", "inter", "pycobranca"}
 
     # capacidades refletem o código (introspecção)
     assert "pix_automatico" in bancos["c6"]["capacidades"]
@@ -40,7 +40,7 @@ def test_mecanismo_da_api_igual_nos_dois_bancos(client, monkeypatch):
                 "account_config": {"chave_pix": "k"}, "pix": {"valor": "1.00"},
                 "credentials": {"client_id": "cid", "access_token": "tok-estatico-sandbox"}}
         r = client.post("/pix", json=body)
-        assert r.status_code == 200, (prov, r.text)
+        assert r.status_code == 201, (prov, r.text)
 
     # o token estático foi usado direto (sem fluxo OAuth) em AMBOS
     assert [c["token"] for c in chamadas] == ["tok-estatico-sandbox"] * 2
@@ -68,3 +68,27 @@ def test_extrato_sicoob_mapeia_mes_ano(client, monkeypatch):
                                        "start_date": "2026-06-15", "end_date": "2026-07-15"})
     assert r.status_code == 422
     assert "mesmo mês" in r.json()["detail"]
+
+
+def test_catalogo_anuncia_checkout_so_no_banco_que_oferece(client):
+    """O catálogo e' como o consumidor DESCOBRE o que cada banco faz, e a rota de
+    checkout existia sem aparecer nele.
+
+    So o C6 lista `checkout_cartao` -- e' a decisao 4 virada em dado: cartao
+    existe onde a instituicao OFERECE, e o catalogo tem de dizer onde."""
+    bancos = {b["id"]: b["capacidades"] for b in client.get("/bancos").json()["bancos"]}
+    assert "checkout_cartao" in bancos["c6"]
+    assert "checkout_cartao" not in bancos["sicoob"]
+    assert "checkout_cartao" not in bancos["pycobranca"]
+
+
+def test_inter_nao_anuncia_capacidade_que_nao_tem(client):
+    """O Inter herda os mixins BACEN, entao Pix vem de graca — mas boleto com
+    cartao e conciliacao de cartao sao do C6, e o catalogo nao pode sugerir
+    que existam aqui."""
+    inter = {b["id"]: b for b in client.get("/bancos").json()["bancos"]}["inter"]
+    assert inter["codigo_banco"] == "077"
+    for tem in ("boleto", "boleto_pdf", "boleto_baixa", "pix", "extrato", "webhook_banco"):
+        assert tem in inter["capacidades"], tem
+    for nao_tem in ("checkout_cartao", "conciliacao_cartao", "bolepix", "boleto_alteracao"):
+        assert nao_tem not in inter["capacidades"], nao_tem

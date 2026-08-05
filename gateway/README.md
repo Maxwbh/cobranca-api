@@ -1,7 +1,7 @@
 # Cobranca-API — Gateway (Python/FastAPI)
 
 Gateway de cobrança multi-banco e **porta única da plataforma**, **100% Python**:
-serve as rotas REST online (C6/Sicoob) na raiz e a superfície offline em `/api/*`,
+serve as rotas REST online (C6, Sicoob, Inter) na raiz e a superfície offline em `/api/*`,
 gerada **nativamente** pela engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)
 dentro do próprio processo (sem sidecar, sem proxy HTTP).
 
@@ -20,7 +20,7 @@ docker compose up --build   # (na raiz do repo)
 
 | | Produto | Repo / dir | Papel | Versão |
 |---|---|---|---|---|
-| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
+| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob/Inter, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
 | Outro | **pyCobrança** (engine) | biblioteca Python (pip) | boleto/CNAB/OFX/PIX-QR — chamada in-process por `app/core/pycob.py` | `pycobranca.__version__` |
 
 - A engine offline é a biblioteca [pyCobrança](https://github.com/Maxwbh/pyCobranca)
@@ -32,7 +32,7 @@ docker compose up --build   # (na raiz do repo)
   aparece em `GET /api/metadata`.
 
 ## Por que a engine é uma biblioteca (e não um serviço)
-- No caminho **registrado** (C6/Sicoob) o **banco devolve** linha digitável/PDF/QR →
+- No caminho **registrado** (C6, Sicoob, Inter) o **banco devolve** linha digitável/PDF/QR →
   o serviço só orquestra OAuth+mTLS+JSON. **Não usa a engine.**
 - No caminho **offline/CNAB/carnê** (18 bancos) → `core/pycob.py` chama a engine
   **pyCobrança** no próprio processo (sem HTTP, sem sidecar).
@@ -163,6 +163,12 @@ homologada, o gateway **cai no caminho offline** (engine pyCobrança) — gera o
 documento localmente, sem precisar de credencial de banco. Quando homologar,
 ligue por banco: `C6_REGISTERED_READY=true` / `SICOOB_REGISTERED_READY=true`.
 O roteamento fica em `registry.build_provider`.
+
+> **O Inter está fora desse mecanismo, de propósito.** A engine offline não tem
+> o layout do 077: cair nela emitiria um boleto **registrado no banco errado** —
+> falha silenciosa, e cara. Sem credencial, `provider=inter` responde `424`.
+> `registry._OFFLINE_BANK` não tem entrada para ele, e isso é a decisão, não um
+> esquecimento.
 
 ## Configuração (env)
 | Var | Para quê |

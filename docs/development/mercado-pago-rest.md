@@ -35,8 +35,8 @@
 | MP-S04 | Refunds | Estorno/devolução | 🔜 | `PUT /pix/recebidos/.../devolucao` (mapear) |
 | MP-S05 | Assinaturas (Preapproval) | Recorrência nativa do PSP | 🔜 | Mapear em `/pix-automatico` ou rota própria |
 | MP-S06 | Webhooks (IPN) | Notificações de pagamento | 🔜 | `/webhooks/mercadopago[/{tenant}]` |
-| MP-S07 | Checkout Pro (página hospedada) | Redirect de pagamento | ⛔ | Sem previsão (mesma decisão do Checkout C6) |
-| MP-S08 | Point (maquininha) / Marketplace (OAuth) | Presencial / agir por terceiros | ⛔ | Fora de escopo |
+| MP-S07 | Checkout Pro (página hospedada) | `POST /checkout/preferences` → `init_point` (URL do checkout) | 🔜 | Possibilidade — página hospedada, PAN fora daqui, atende à restrição de **modo link**. Coerente com o critério de entrada: cartão existe onde a instituição **oferece** — o Mercado Pago oferece, o Sicoob não |
+| MP-S08 | Marketplace (OAuth) | Agir em nome de terceiros | ⛔ | Fora de escopo |
 
 ## Esquema de credenciais (proposto — ver `GET /bancos`)
 

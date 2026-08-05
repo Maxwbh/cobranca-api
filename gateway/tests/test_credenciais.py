@@ -54,7 +54,7 @@ def test_bearer_usa_credenciais_do_token(client, monkeypatch):
     body = {"tenant_id": "empresa1", "provider": "c6",
             "account_config": {"chave_pix": "k"}, "pix": {"valor": "1.00"}}
     r = client.post("/pix", json=body, headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert used["client_id"] == "cid-token"  # veio do token, sem VAULT e sem corpo
 
 
@@ -129,7 +129,7 @@ def test_bearer_tem_prioridade_sobre_corpo_e_vault(client, monkeypatch):
             "account_config": {"chave_pix": "k"}, "pix": {"valor": "1.00"},
             "credentials": {"client_id": "cid-corpo", "client_secret": "sc"}}
     r = client.post("/pix", json=body, headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
+    assert r.status_code == 201
     assert used["client_id"] == "cid-token"  # bearer > corpo > vault
 
 

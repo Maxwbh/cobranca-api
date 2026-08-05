@@ -8,12 +8,13 @@ from fastapi import APIRouter, HTTPException, Request
 from app.core.forwarder import forward_event
 from app.core.subscriptions import resolve_callback
 from app.providers.c6 import C6Provider
+from app.providers.inter import InterProvider
 from app.providers.sicoob import SicoobProvider
 from app.schemas import WebhookEvent
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-_NORMALIZERS = {"c6": C6Provider, "sicoob": SicoobProvider}
+_NORMALIZERS = {"c6": C6Provider, "sicoob": SicoobProvider, "inter": InterProvider}
 
 
 def _check_token(banco: str, request: Request) -> None:

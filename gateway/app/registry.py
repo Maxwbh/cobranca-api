@@ -11,6 +11,7 @@ from app.core.vault import Vault
 from app.providers.base import BankProvider
 from app.providers.offline_engine import PyCobrancaProvider
 from app.providers.c6 import C6Provider
+from app.providers.inter import InterProvider
 from app.providers.sicoob import SicoobProvider
 from app.schemas import Provider, eh_offline
 
@@ -18,6 +19,7 @@ _PROVIDERS: dict[Provider, type[BankProvider]] = {
     Provider.pycobranca: PyCobrancaProvider,
     Provider.c6: C6Provider,
     Provider.sicoob: SicoobProvider,
+    Provider.inter: InterProvider,
 }
 
 # Slug do banco na engine offline para o fallback (método antigo).
@@ -25,6 +27,10 @@ _OFFLINE_BANK: dict[Provider, str] = {
     Provider.c6: "banco_c6",
     Provider.sicoob: "sicoob",
 }
+# O Inter (077) NÃO entra aqui de propósito: a engine offline não tem o layout
+# dele. Sem fallback, `provider=inter` sem credencial falha dizendo isso; com
+# fallback para outro banco, sairia um boleto REGISTRADO NO BANCO ERRADO — que
+# é falha silenciosa e cara. Ausência aqui é a decisão, não esquecimento.
 
 
 def registered_ready(provider: Provider) -> bool:

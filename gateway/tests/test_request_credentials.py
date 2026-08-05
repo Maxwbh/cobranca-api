@@ -25,7 +25,7 @@ def test_pix_com_credenciais_no_corpo_sem_vault(client, monkeypatch):
         "credentials": {"client_id": "cid-req", "client_secret": "sec-req"},
     }
     r = client.post("/pix", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert used["client_id"] == "cid-req"  # usou a credencial do request
 
 
@@ -45,7 +45,7 @@ def test_cobranca_com_credenciais_no_corpo(client, cobranca_payload, monkeypatch
         "credentials": {"client_id": "cid-req", "client_secret": "s"},
     }
     r = client.post("/cobranca", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert used["client_id"] == "cid-req"
 
 
@@ -65,7 +65,7 @@ def test_request_credentials_tem_prioridade_sobre_vault(client, monkeypatch):
         "pix": {"valor": "1.00"},
         "credentials": {"client_id": "cid-req", "client_secret": "s-req"},
     }
-    assert client.post("/pix", json=body).status_code == 200
+    assert client.post("/pix", json=body).status_code == 201
     assert used["client_id"] == "cid-req"  # request > cofre
 
 

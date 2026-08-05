@@ -30,6 +30,10 @@
 | SIC-S07 | Pagamentos (pagar boletos/convênios) | Saída de dinheiro | ⛔ | Fora de escopo — produto é cobrança |
 | SIC-S08 | SPB (TED) / Poupança | Transferências / aplicações | ⛔ | Fora de escopo |
 | SIC-S09 | Open Finance | Compartilhamento de dados | ⛔ | Fora de escopo |
+| SIC-S10 | Cobrança v3 — alteração de pagador | Corrigir dados do sacado de boleto emitido | 🔜 | Sem rota; hoje o `PUT /cobranca/{id}` não é implementado pelo provider |
+| SIC-S11 | Cobrança v3 — negativação | Negativar pagador de título vencido | 🔜 | É cobrança (régua de recebimento), não pagamento — cabe no escopo |
+| SIC-S12 | Cobrança v3 — protesto | Protestar título vencido | 🔜 | Idem SIC-S11 |
+| SIC-S13 | Cobrança v3 — movimentação | Solicitar, consultar e baixar arquivo de movimentação | 🔜 | Equivale ao retorno CNAB pela API; hoje a conciliação é por `/extrato` e OFX |
 
 ## Autenticação no banco
 
@@ -37,9 +41,41 @@
 |---|---|
 | Fluxo | OAuth2 `client_credentials` + **scopes** + **mTLS** |
 | Token | `https://auth.sicoob.com.br/auth/realms/cooperado/protocol/openid-connect/token` |
-| Certificado | PFX cadastrado no portal (produção: e-CNPJ ICP-Brasil) |
+| Certificado | PFX cadastrado no portal. Produção: **A1** e-CNPJ (PJ) ou e-CPF (PF) **ICP-Brasil**, com *Uso Avançado da Chave* contendo **Autenticação de Cliente** (`1.3.6.1.5.5.7.3.2`) — sem esse atributo o mTLS não estabelece |
 | Peculiaridade | header **`client_id` em toda request** |
-| Sandbox | `https://sandbox.sicoob.com.br/sicoob/sandbox` — token estático do portal, **sem mTLS** (aponte com `SICOOB_BASE_URL`/`SICOOB_AUTH_URL`) |
+| Sandbox | `https://sandbox.sicoob.com.br/sicoob/sandbox` — token estático do portal, **sem mTLS** (aponte com `SICOOB_BASE_URL`/`SICOOB_AUTH_URL`). É **mock de schema**: devolve dado aleatório válido, sem relação com o enviado — ver [homologação](../homologacao/README.md#sicoob--o-que-o-roteiro-dele-prova-e-o-que-não-prova) |
+
+> **Token dura 300 s e não há refresh token** (FAQ do portal). O
+> `OAuthMtlsClient` já respeita o `expires_in` devolvido pelo banco, com 30 s de
+> margem — não há nada a ajustar, mas quem for medir latência precisa saber que
+> uma re-autenticação cai a cada 5 min.
+
+> **Aplicativo PJ nasce "Pendente".** Em produção, criar a credencial não basta:
+> um responsável pela conta precisa autorizar no **Sicoobnet Empresarial**
+> (*Transações Pendentes → Autorização para Uso de APIs*). É passo humano, fora
+> da API, e costuma ser o que trava o go-live.
+
+### Limite de requisições
+
+O Sicoob aplica *rate limit* por segundo e devolve **`429`** ao estourar. Os
+números publicados no portal:
+
+| Endpoint | Limite |
+|---|---|
+| Cobrança — movimentações (solicitar, consultar, download) | **10/s** |
+| Cobrança — consultar boleto | **20/s** |
+
+A API repassa o `429` com o `Retry-After` do banco quando ele vem
+(`gateway/app/main.py`), mas **não enfileira nem re-tenta**: quem chama é que
+decide a política, porque só o consumidor sabe se o pedido pode esperar. O
+próprio Sicoob recomenda fila e reenvio com espera.
+
+⚠️ **O Pix de recebimento caiu de 50 para 25 req/s em 13/07/2026**, e o motivo
+publicado nos diz respeito: *"padrões de consumo incompatíveis com o uso
+esperado, especialmente em consultas recorrentes de status de QR Codes"* — ou
+seja, polling. Quem consome esta API para saber se um Pix foi pago deve usar o
+**webhook por chave** (`PUT /config/webhook-pix`), não laço de consulta. O
+limite tende a apertar de novo se o padrão continuar.
 
 Scopes usados (pedidos no token): `cobranca_boletos_incluir/consultar/baixa`,
 `cob.*`, `cobv.*`, `lotecobv.*`, `pix.*`, `webhook.*`, `payloadlocation.*`.

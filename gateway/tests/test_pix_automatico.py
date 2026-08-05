@@ -121,21 +121,57 @@ def test_webhooks_pix_automatico(client, envs, monkeypatch):
 # --- P_05 Pix recebidos + P_06 webhook por chave -----------------------------------
 
 def test_pix_recebidos_e_devolucao(client, envs, monkeypatch):
+    """As quatro etapas do P_05 do roteiro do C6, ponta a ponta.
+
+    Recebimento e' o coracao do produto: Pix e cartao sao as duas modalidades de
+    pagamento, e o que confirma que o dinheiro entrou pelo Pix e' esta cadeia.
+    O sandbox do C6 nao tem massa -- a conta nunca recebeu Pix, e o unico
+    lancamento do extrato e' uma tarifa -- entao a homologacao nao consegue
+    exercitar P_05_01/03/04 contra o banco. Isso torna ESTES testes a unica
+    prova de que as rotas funcionam, e por isso eles afirmam status e caminho,
+    nao so que a chamada aconteceu.
+
+    P_05_04 (consultar devolucao) nao tinha teste nenhum: a rota existia e
+    nunca era exercitada."""
+    P = {"tenant_id": "empresa1", "provider": "c6"}
     calls = _capture(monkeypatch, {"pix": []})
-    client.get("/pix/recebidos", params={"tenant_id": "empresa1", "provider": "c6",
-                                         "inicio": "2026-07-01T00:00:00Z", "fim": "2026-07-31T23:59:59Z"})
+
+    # P_05_02 — listar recebidos no periodo
+    r = client.get("/pix/recebidos", params={**P, "inicio": "2026-07-01T00:00:00Z",
+                                             "fim": "2026-07-31T23:59:59Z"})
+    assert r.status_code == 200, r.text
     assert calls[0]["path"] == "/v2/pix/pix"
-    client.get("/pix/recebidos/E2E123", params={"tenant_id": "empresa1", "provider": "c6"})
+    assert calls[0]["params"]["inicio"] == "2026-07-01T00:00:00Z"
+
+    # P_05_01 — consultar um recebido pelo e2eid
+    r = client.get("/pix/recebidos/E2E123", params=P)
+    assert r.status_code == 200, r.text
     assert calls[1]["path"] == "/v2/pix/pix/E2E123"
-    r = client.put("/pix/recebidos/E2E123/devolucao/D1",
-                   params={"tenant_id": "empresa1", "provider": "c6"}, json={"valor": "10.00"})
-    assert r.status_code == 201
+
+    # P_05_03 — solicitar devolucao
+    r = client.put("/pix/recebidos/E2E123/devolucao/D1", params=P, json={"valor": "10.00"})
+    assert r.status_code == 201, r.text
     assert calls[2] == {"method": "PUT", "path": "/v2/pix/pix/E2E123/devolucao/D1",
                         "json": {"valor": "10.00"}, "params": None}
-    # sicoob: mesmo dialeto
+
+    # P_05_04 — consultar a devolucao criada
+    r = client.get("/pix/recebidos/E2E123/devolucao/D1", params=P)
+    assert r.status_code == 200, r.text
+    assert calls[3] == {"method": "GET", "path": "/v2/pix/pix/E2E123/devolucao/D1",
+                        "json": None, "params": None}
+
+    # sicoob: mesmo dialeto BACEN, base diferente
     client.get("/pix/recebidos", params={"tenant_id": "empresa1", "provider": "sicoob",
                                          "inicio": "2026-07-01T00:00:00Z", "fim": "2026-07-31T23:59:59Z"})
-    assert calls[3]["path"] == "/pix/api/v2/pix"
+    assert calls[4]["path"] == "/pix/api/v2/pix"
+
+
+def test_pix_recebidos_sem_credencial_nao_chama_o_banco(client):
+    """424 antes do request: tenant sem credencial nao deve virar erro do banco."""
+    r = client.get("/pix/recebidos", params={"tenant_id": "ghost", "provider": "c6",
+                                             "inicio": "2026-07-01T00:00:00Z",
+                                             "fim": "2026-07-31T23:59:59Z"})
+    assert r.status_code == 424, r.text
 
 
 def test_webhook_pix_por_chave(client, envs, monkeypatch):
@@ -153,3 +189,46 @@ def test_webhook_pix_por_chave(client, envs, monkeypatch):
                                                  "chave": "minha-chave-evp"})
     assert calls[2]["method"] == "DELETE"
     assert client.put("/config/webhook-pix", json={"tenant_id": "empresa1"}).status_code == 422
+
+
+# --- locations do QR de adesao (locrec) — PA_01/PA_02 do roteiro C6 -----------------
+# Eram as unicas rotas do gateway sem teste algum: nem de rota, nem de provider.
+
+def test_criar_location_de_recorrencia(client, envs, monkeypatch):
+    calls = _capture(monkeypatch, {"id": 7, "location": "pix.example.com/qr/7"})
+    r = client.post("/pix-automatico/locations", params={"tenant_id": "empresa1", "provider": "c6"})
+    assert r.status_code == 201, r.text
+    assert r.json()["location"] == "pix.example.com/qr/7"
+    assert calls[0] == {"method": "POST", "path": "/v2/pix/locrec", "json": None, "params": None}
+
+
+def test_consultar_location_de_recorrencia(client, envs, monkeypatch):
+    calls = _capture(monkeypatch, {"id": 7, "idRec": "RR1"})
+    r = client.get("/pix-automatico/locations/7", params={"tenant_id": "empresa1", "provider": "c6"})
+    assert r.status_code == 200, r.text
+    assert calls[0]["path"] == "/v2/pix/locrec/7"
+
+
+def test_desvincular_recorrencia_da_location(client, envs, monkeypatch):
+    """DELETE em /locrec/{id}/idRec — invalida o QR sem apagar a location."""
+    calls = _capture(monkeypatch, {"id": 7})
+    r = client.delete("/pix-automatico/locations/7/recorrencia",
+                      params={"tenant_id": "empresa1", "provider": "c6"})
+    assert r.status_code == 200, r.text
+    assert calls[0]["method"] == "DELETE"
+    assert calls[0]["path"] == "/v2/pix/locrec/7/idRec"
+
+
+def test_location_no_sicoob_usa_o_mesmo_dialeto(client, envs, monkeypatch):
+    """locrec e BACEN: muda so o PIX_BASE do provider."""
+    calls = _capture(monkeypatch, {"id": 9})
+    r = client.post("/pix-automatico/locations", params={"tenant_id": "empresa1", "provider": "sicoob"})
+    assert r.status_code == 201, r.text
+    assert calls[0]["path"].endswith("/locrec")
+    assert calls[0]["path"] != "/v2/pix/locrec"  # base propria do Sicoob
+
+
+def test_location_em_provider_offline_recusa(client, envs):
+    r = client.post("/pix-automatico/locations",
+                    params={"tenant_id": "empresa1", "provider": "pycobranca"})
+    assert r.status_code == 422, r.text

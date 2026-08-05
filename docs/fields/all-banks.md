@@ -394,7 +394,6 @@ boleto.documento_numero  // ✅
 - [Documentação de Campos](./README.md)
 - [Exemplos Práticos](../../examples/python/README.md)
 - [Engine PyCobrança](https://github.com/Maxwbh/pyCobranca) - quem gera o boleto
-- [Histórico da engine anterior](../development/brcobranca-fork.md) - descontinuada na 2.0.0
 
 ---
 

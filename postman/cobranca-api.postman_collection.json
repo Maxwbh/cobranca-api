@@ -29,7 +29,7 @@
           "pm.collectionVariables.set('inicio_multimes', d(-90));",
           "pm.collectionVariables.set('inicio_iso', d(-27) + 'T00:00:00Z');",
           "pm.collectionVariables.set('fim_iso', d(0) + 'T23:59:59Z');",
-          "if (!pm.collectionVariables.get('seu_numero')) pm.collectionVariables.set('seu_numero', 'HML-' + Date.now());"
+          "if (!pm.collectionVariables.get('seu_numero')) pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6: ^[a-zA-Z0-9]{1,10}$ — 'HML-'+Date.now() dava 17 com hifen"
         ]
       }
     }
@@ -45,7 +45,7 @@
     },
     {
       "key": "cob_utils",
-      "value": "// ==== Utils da coleção (funções planas: escopo compartilhado coleção->request; \n// NÃO usar globalThis — o sandbox do newman não suporta) ====\nfunction novoTxid(p) { return (p + Date.now() + 'XXXXXXXXXX').replace(/[^a-zA-Z0-9]/g, 'X').slice(0, 30); }\nfunction novoExtRef() { return Array.from({length: 26}, function () { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]; }).join(''); }\nfunction saveToken(varName, ativo) {\n  const t = pm.response.json().token;\n  pm.expect(t).to.match(/^bapi_/);\n  pm.environment.set(varName, t);\n  if (ativo) pm.environment.set('bapi_token', t);\n}\nfunction saveIfPresent(varName, field) {\n  try { const v = pm.response.json()[field]; if (v) pm.environment.set(varName, String(v)); } catch (e) {}\n}\nfunction assertPdfBinario() {\n  pm.test('status 200', () => pm.response.to.have.status(200));\n  pm.test('content-type pdf', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('pdf'));\n  pm.test('magic bytes %PDF', () => pm.expect(pm.response.text().substring(0, 4)).to.eql('%PDF'));\n  ['X-Nosso-Numero', 'X-Nosso-Numero-Formatado', 'X-Nosso-Numero-DV', 'X-Codigo-Barras', 'X-Linha-Digitavel']\n    .forEach(h => pm.test('header ' + h, () => pm.expect(pm.response.headers.has(h)).to.be.true));\n  pm.test('sem content-encoding residual (T2)', () => pm.expect(pm.response.headers.has('Content-Encoding')).to.be.false);\n}\nfunction assertCamposNossoNumero() {\n  const b = pm.response.json();\n  ['nosso_numero', 'nosso_numero_formatado', 'nosso_numero_dv', 'codigo_barras', 'linha_digitavel']\n    .forEach(c => pm.test('campo ' + c, () => pm.expect(b).to.have.property(c)));\n}\n\n// ---- status esperado, com 424/422 sensivel a CREDENCIAL ---------------------\n// Regra por banco:\n//   C6     -> exige TODAS (client_id, client_secret, pfx_base64, pfx_password).\n//   Sicoob -> client_id + UMA das duas vias:\n//               (a) access_token  (sandbox, dispensa OAuth/mTLS)\n//               (b) client_secret + pfx_base64 + pfx_password  (OAuth + mTLS)\n//             NENHUMA das duas = ERRO GRAVE (nao e aviso: e ma configuracao).\n// 424/422-por-credencial com credencial AUSENTE -> AVISO nomeando o que falta.\n// Com a credencial PRESENTE                     -> FALHA (erro real do banco).\nvar CRED_BANCO = {\n  C6: {\n    obrigatorias: ['c6_client_id', 'c6_client_secret', 'c6_pfx_base64', 'c6_pfx_password'],\n    vias: []\n  },\n  SICOOB: {\n    obrigatorias: ['sicoob_client_id'],\n    vias: [\n      { nome: 'access_token (sandbox)', chaves: ['sicoob_access_token'] },\n      { nome: 'OAuth+mTLS', chaves: ['sicoob_client_secret', 'sicoob_pfx_base64',\n                                      'sicoob_pfx_password'] }\n    ]\n  }\n};\nfunction vazia(k) { return !pm.variables.get(k); }\n// Diagnostico de um banco: { faltam: [...], grave: bool }\nfunction diagnosticoBanco(banco) {\n  var def = CRED_BANCO[banco];\n  if (!def) { return { faltam: [], grave: false }; }\n  var faltam = def.obrigatorias.filter(vazia);\n  if (def.vias.length) {\n    var completa = def.vias.filter(function (v) { return v.chaves.every(function (k) { return !vazia(k); }); });\n    if (!completa.length) {\n      // nenhuma via satisfeita: e ma configuracao, nao so ausencia\n      var parcial = def.vias.some(function (v) { return v.chaves.some(function (k) { return !vazia(k); }); });\n      def.vias.forEach(function (v) { faltam = faltam.concat(v.chaves.filter(vazia)); });\n      return { faltam: faltam, grave: true, parcial: parcial,\n               vias: def.vias.map(function (v) { return v.nome; }) };\n    }\n  }\n  return { faltam: faltam, grave: false };\n}\nfunction expandeRequisitos(requer) {\n  var out = [];\n  (requer || []).forEach(function (k) {\n    if (k === 'C6' || k === 'SICOOB') { out = out.concat(diagnosticoBanco(k).faltam); return; }\n    if (k === 'BANCO') {\n      out = out.concat(diagnosticoBanco((pm.variables.get('provider') || 'c6').toUpperCase()).faltam);\n      return;\n    }\n    if (vazia(k)) { out.push(k); }\n  });\n  return out.filter(function (v, i, a) { return a.indexOf(v) === i; });\n}\nfunction faltantesDe(requer) { return expandeRequisitos(requer); }\nfunction registraAviso(nomes) {\n  var a = JSON.parse(pm.environment.get('avisos_cred') || '[]');\n  a.push({ req: pm.info.requestName, faltam: nomes });\n  pm.environment.set('avisos_cred', JSON.stringify(a));\n}\nfunction statusEsperado(esperados, requer) {\n  var code = pm.response.code;\n  var faltam = faltantesDe(requer);\n  var corpo = '';\n  try { corpo = pm.response.text() || ''; } catch (e) { corpo = ''; }\n  var porCredencial = (code === 424) || (code === 422 && /ausente|obrigat|credenc/i.test(corpo));\n  if (porCredencial && faltam.length) {\n    registraAviso(faltam);\n    console.log('AVISO ' + code + ' em ' + pm.info.requestName + ' -> FALTA: ' + faltam.join(', '));\n    pm.test('AVISO . ' + code + ' por credencial ausente: ' + faltam.join(', '),\n      function () { return true; });\n    return;\n  }\n  pm.test('status em [' + esperados.join(', ') + ']', function () {\n    pm.expect(esperados, code === 424\n      ? 'credencial configurada e AINDA ASSIM rejeitada pelo banco - erro real'\n      : 'status inesperado').to.include(code);\n  });\n}"
+      "value": "// ==== Utils da coleção (funções planas: escopo compartilhado coleção->request; \n// NÃO usar globalThis — o sandbox do newman não suporta) ====\nfunction novoTxid(p) { return (p + Date.now() + 'XXXXXXXXXX').replace(/[^a-zA-Z0-9]/g, 'X').slice(0, 30); }\nfunction novoExtRef() { return Array.from({length: 26}, function () { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]; }).join(''); }\nfunction saveToken(varName, ativo) {\n  const t = pm.response.json().token;\n  pm.expect(t).to.match(/^bapi_/);\n  pm.environment.set(varName, t);\n  if (ativo) pm.environment.set('bapi_token', t);\n}\nfunction saveIfPresent(varName, field) {\n  try { const v = pm.response.json()[field]; if (v) pm.environment.set(varName, String(v)); } catch (e) {}\n}\nfunction assertPdfBinario() {\n  pm.test('status 200', () => pm.response.to.have.status(200));\n  pm.test('content-type pdf', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('pdf'));\n  pm.test('magic bytes %PDF', () => pm.expect(pm.response.text().substring(0, 4)).to.eql('%PDF'));\n  ['X-Nosso-Numero', 'X-Nosso-Numero-Formatado', 'X-Nosso-Numero-DV', 'X-Codigo-Barras', 'X-Linha-Digitavel']\n    .forEach(h => pm.test('header ' + h, () => pm.expect(pm.response.headers.has(h)).to.be.true));\n  pm.test('sem content-encoding residual (T2)', () => pm.expect(pm.response.headers.has('Content-Encoding')).to.be.false);\n}\nfunction assertCamposNossoNumero() {\n  const b = pm.response.json();\n  ['nosso_numero', 'nosso_numero_formatado', 'nosso_numero_dv', 'codigo_barras', 'linha_digitavel']\n    .forEach(c => pm.test('campo ' + c, () => pm.expect(b).to.have.property(c)));\n}\n\n// ---- status esperado, com 424/422 sensivel a CREDENCIAL ---------------------\n// Regra por banco:\n//   C6     -> exige TODAS (client_id, client_secret, pfx_base64, pfx_password).\n//   Sicoob -> client_id + UMA das duas vias:\n//               (a) access_token  (sandbox, dispensa OAuth/mTLS)\n//               (b) client_secret + pfx_base64 + pfx_password  (OAuth + mTLS)\n//             NENHUMA das duas = ERRO GRAVE (nao e aviso: e ma configuracao).\n// 424/422-por-credencial com credencial AUSENTE -> AVISO nomeando o que falta.\n// Com a credencial PRESENTE                     -> FALHA (erro real do banco).\nvar CRED_BANCO = {\n  C6: {\n    obrigatorias: ['c6_client_id', 'c6_client_secret', 'c6_pfx_base64'],\n    vias: []\n  },\n  SICOOB: {\n    obrigatorias: ['sicoob_client_id'],\n    vias: [\n      { nome: 'access_token (sandbox)', chaves: ['sicoob_access_token'] },\n      { nome: 'OAuth+mTLS', chaves: ['sicoob_client_secret', 'sicoob_pfx_base64'] }\n    ]\n  }\n};\nfunction vazia(k) { return !pm.variables.get(k); }\n// Diagnostico de um banco: { faltam: [...], grave: bool }\nfunction diagnosticoBanco(banco) {\n  var def = CRED_BANCO[banco];\n  if (!def) { return { faltam: [], grave: false }; }\n  var faltam = def.obrigatorias.filter(vazia);\n  if (def.vias.length) {\n    var completa = def.vias.filter(function (v) { return v.chaves.every(function (k) { return !vazia(k); }); });\n    if (!completa.length) {\n      // nenhuma via satisfeita: e ma configuracao, nao so ausencia\n      var parcial = def.vias.some(function (v) { return v.chaves.some(function (k) { return !vazia(k); }); });\n      def.vias.forEach(function (v) { faltam = faltam.concat(v.chaves.filter(vazia)); });\n      return { faltam: faltam, grave: true, parcial: parcial,\n               vias: def.vias.map(function (v) { return v.nome; }) };\n    }\n  }\n  return { faltam: faltam, grave: false };\n}\nfunction expandeRequisitos(requer) {\n  var out = [];\n  (requer || []).forEach(function (k) {\n    if (k === 'C6' || k === 'SICOOB') { out = out.concat(diagnosticoBanco(k).faltam); return; }\n    if (k === 'BANCO') {\n      out = out.concat(diagnosticoBanco((pm.variables.get('provider') || 'c6').toUpperCase()).faltam);\n      return;\n    }\n    if (vazia(k)) { out.push(k); }\n  });\n  return out.filter(function (v, i, a) { return a.indexOf(v) === i; });\n}\nfunction faltantesDe(requer) { return expandeRequisitos(requer); }\nfunction registraAviso(nomes) {\n  var a = JSON.parse(pm.environment.get('avisos_cred') || '[]');\n  a.push({ req: pm.info.requestName, faltam: nomes });\n  pm.environment.set('avisos_cred', JSON.stringify(a));\n}\nfunction statusEsperado(esperados, requer) {\n  var code = pm.response.code;\n  var faltam = faltantesDe(requer);\n  var corpo = '';\n  try { corpo = pm.response.text() || ''; } catch (e) { corpo = ''; }\n  var porCredencial = (code === 424) || (code === 422 && /ausente|obrigat|credenc/i.test(corpo));\n  if (porCredencial && faltam.length) {\n    registraAviso(faltam);\n    console.log('AVISO ' + code + ' em ' + pm.info.requestName + ' -> FALTA: ' + faltam.join(', '));\n    pm.test('AVISO . ' + code + ' por credencial ausente: ' + faltam.join(', '),\n      function () { return true; });\n    return;\n  }\n  pm.test('status em [' + esperados.join(', ') + ']', function () {\n    pm.expect(esperados, code === 424\n      ? 'credencial configurada e AINDA ASSIM rejeitada pelo banco - erro real'\n      : 'status inesperado').to.include(code);\n  });\n}"
     },
     {
       "key": "tenant_id",
@@ -371,7 +371,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"{{provider}}\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"{{provider}}\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -382,12 +382,21 @@
           "response": [],
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6 recusa seu_numero repetido: 'Ja existe o titulo'"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 409], [\"BANCO\", \"agencia\", \"conta\", \"convenio\"]);",
+                  "statusEsperado([201, 409], [\"BANCO\", \"agencia\", \"conta\", \"convenio\"]);",
                   "saveIfPresent('cobranca_id', 'id');"
                 ]
               }
@@ -539,7 +548,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200], [\"BANCO\", \"chave_pix\"]);",
+                  "statusEsperado([201], [\"BANCO\", \"chave_pix\"]);",
                   "saveIfPresent('txid', 'txid');"
                 ]
               }
@@ -1062,7 +1071,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"{{provider}}\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"{{provider}}\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1073,12 +1082,21 @@
           "response": [],
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6 recusa seu_numero repetido: 'Ja existe o titulo'"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 409], [\"BANCO\", \"agencia\", \"conta\", \"convenio\"]);",
+                  "statusEsperado([201, 409], [\"BANCO\", \"agencia\", \"conta\", \"convenio\"]);",
                   "saveIfPresent('cobranca_id', 'id');"
                 ]
               }
@@ -1198,7 +1216,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200], [\"BANCO\"]);",
+                  "// PDF online e alteracao online sao capacidades que so o C6 oferece. Com outro provider ativo o 422 do exige_capacidade E' o comportamento certo -- por isso a espera segue o provider, em vez de afrouxar para todos e esconder uma quebra do C6.",
+                  "statusEsperado(pm.variables.get('provider') === 'c6' ? [200] : [200, 422], [\"BANCO\"]);",
                   "// So valida o CORPO quando houve sucesso: em 424/422 por credencial",
                   "// ausente nao ha payload para conferir, e a falha seria enganosa.",
                   "if (pm.response.code < 300) {",
@@ -1276,7 +1295,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 409, 404, 405], [\"BANCO\"]);"
+                  "// PDF online e alteracao online sao capacidades que so o C6 oferece. Com outro provider ativo o 422 do exige_capacidade E' o comportamento certo -- por isso a espera segue o provider, em vez de afrouxar para todos e esconder uma quebra do C6.",
+                  "statusEsperado(pm.variables.get('provider') === 'c6' ? [200, 409, 404, 405] : [200, 409, 404, 405, 422], [\"BANCO\"]);"
                 ]
               }
             }
@@ -1572,7 +1592,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
                   "pm.test('registrado', () => pm.expect(pm.response.json().status).to.eql('registrado'));"
                 ]
               }
@@ -1664,7 +1684,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
                   "pm.test('carne_pdf_base64', () => pm.expect(pm.response.json().carne_pdf_base64).to.be.a('string'));"
                 ]
               }
@@ -1718,7 +1738,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200], [\"BANCO\", \"chave_pix\"]);",
+                  "statusEsperado([201], [\"BANCO\", \"chave_pix\"]);",
                   "saveIfPresent('txid', 'txid');",
                   "const b = pm.response.json();",
                   "// So valida o CORPO quando houve sucesso: em 424/422 por credencial",
@@ -1779,7 +1799,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 404, 405], [\"BANCO\", \"chave_pix\"]);"
+                  "statusEsperado([201, 404, 405], [\"BANCO\", \"chave_pix\"]);"
                 ]
               }
             }
@@ -2322,7 +2342,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 201, 202, 404, 405], [\"BANCO\", \"chave_pix\"]);"
+                  "statusEsperado([202, 404, 405], [\"BANCO\", \"chave_pix\"]);"
                 ]
               }
             }
@@ -5266,6 +5286,1875 @@
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
                   "statusEsperado([200, 422]);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 · Checkout (cartão — C6)",
+      "item": [
+        {
+          "name": "BC-081 · Criar link de pagamento (cartão)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"checkout\": {\n    \"valor\": \"{{valor}}\",\n    \"descricao\": \"Checkout HML\",\n    \"redirect_url\": \"https://exemplo.com.br/retorno\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 404, 405], [\"C6\"]);",
+                  "if (pm.response.code === 201) pm.environment.set('checkout_id', pm.response.json().id || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-082 · Criar link com Pix no mesmo objeto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"checkout\": {\n    \"valor\": \"{{valor}}\",\n    \"pix\": true,\n    \"descricao\": \"Checkout HML cartão+Pix\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 404, 405], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-085 · Criar link parcelado (juros_por)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"checkout\": {\n    \"valor\": \"{{valor}}\",\n    \"parcelas\": 6,\n    \"juros_por\": \"loja\",\n    \"descricao\": \"Checkout HML 6x\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 404, 405], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-083 · Consultar link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/checkout/{{checkout_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout",
+                "{{checkout_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 404, 405], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio (o request que o cria falhou, ex.: janela do sandbox)",
+                  "// colapsa a URL e o servidor responde 405 — falha ENGANOSA. Pula em vez disso.",
+                  "const _ids = [\"checkout_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName);",
+                  "  pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-084 · Cancelar link",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/checkout/{{checkout_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout",
+                "{{checkout_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 404, 405, 409], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio (o request que o cria falhou, ex.: janela do sandbox)",
+                  "// colapsa a URL e o servidor responde 405 — falha ENGANOSA. Pula em vez disso.",
+                  "const _ids = [\"checkout_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName);",
+                  "  pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HML · Roteiro de homologação C6 v3.0",
+      "item": [
+        {
+          "name": "AT_01 · Geração do token de sessão",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/credenciais",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credenciais"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"credentials\": {\n    \"client_id\": \"{{c6_client_id}}\",\n    \"client_secret\": \"{{c6_client_secret}}\",\n    \"pfx_base64\": \"{{c6_pfx_base64}}\",\n    \"pfx_password\": \"{{c6_pfx_password}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201], []);",
+                  "if ([200,201].includes(pm.response.code)) pm.environment.set('bapi_token_c6', pm.response.json().token || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_01 · Emissão de boleto simples",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6 recusa seu_numero repetido: 'Ja existe o titulo'"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 424], [\"C6\"]);",
+                  "if (pm.response.code < 300) pm.environment.set('cobranca_id', pm.response.json().id || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_02 · Emissão com juros e multa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    },\n    \"multa\": {\n      \"type\": \"P\",\n      \"value\": 2.0,\n      \"dead_line\": 1\n    },\n    \"juros\": {\n      \"type\": \"P\",\n      \"value\": 1.0,\n      \"dead_line\": 1\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6 recusa seu_numero repetido: 'Ja existe o titulo'"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_03 · Emissão com desconto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia}}\",\n    \"conta\": \"{{conta}}\",\n    \"convenio\": \"{{convenio}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    },\n    \"desconto\": {\n      \"discount_type\": \"V\",\n      \"first\": {\n        \"value\": 1.0,\n        \"dead_line\": 5\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seu_numero', String(Date.now()).slice(-10));  // C6 recusa seu_numero repetido: 'Ja existe o titulo'"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_05 · Consulta de boleto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cobranca/{{cobranca_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca",
+                "{{cobranca_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"cobranca_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_06 · Geração de PDF do boleto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cobranca/{{cobranca_id}}/pdf?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca",
+                "{{cobranca_id}}",
+                "pdf"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"cobranca_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_04 · Alteração de dados do boleto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca/{{cobranca_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca",
+                "{{cobranca_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"due_date\": \"{{vencimento_novo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 409, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"cobranca_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_07 · Cadastro do webhook de boleto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/config/webhook-banco",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "config",
+                "webhook-banco"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"url\": \"https://exemplo.com.br/webhooks/c6\",\n  \"service\": \"BANK_SLIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B_08 · Baixa / cancelamento",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cobranca/{{cobranca_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca",
+                "{{cobranca_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 409, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"cobranca_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P_01 · Cobrança Pix imediata",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pix",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pix"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"pix\": {\n    \"valor\": \"1.00\",\n    \"descricao\": \"homologacao\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 424], [\"C6\"]);",
+                  "if (pm.response.code === 201) pm.environment.set('txid', pm.response.json().txid || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P_02 · Cobrança Pix com vencimento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pix",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pix"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"pix\": {\n    \"valor\": \"1.00\",\n    \"descricao\": \"homologacao cobv\",\n    \"data_vencimento\": \"{{vencimento}}\",\n    \"txid\": \"{{txid_novo}}\",\n    \"devedor\": {\n      \"documento\": \"{{pagador_documento}}\",\n      \"nome\": \"{{pagador_nome}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.environment.set('txid_novo', novoTxid('hml'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P_03 · Cobrança Pix em lote",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pix/lote/{{lote_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pix",
+                "lote",
+                "{{lote_id}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"descricao\": \"homologacao\",\n  \"cobrancas\": [\n    {\n      \"valor\": \"1.00\",\n      \"txid\": \"{{txid_novo}}\",\n      \"data_vencimento\": \"{{vencimento}}\",\n      \"devedor\": {\n        \"nome\": \"{{pagador_nome}}\",\n        \"documento\": \"{{pagador_documento}}\"\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([202, 424, 502], [\"C6\"]);  // 502 conhecido no sandbox (lotecobv)"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils')); pm.environment.set('txid_novo', novoTxid('hml'));",
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.environment.set('lote_id', novoTxid('hml').slice(0, 20));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P_05 · Pix recebidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pix/recebidos?tenant_id={{tenant_id}}&provider=c6&inicio={{inicio_iso}}&fim={{fim_iso}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pix",
+                "recebidos"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                },
+                {
+                  "key": "inicio",
+                  "value": "{{inicio_iso}}"
+                },
+                {
+                  "key": "fim",
+                  "value": "{{fim_iso}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P_06 · Webhooks Pix",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/config/webhook-pix",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "config",
+                "webhook-pix"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"chave\": \"{{chave_pix}}\",\n  \"url\": \"https://exemplo.com.br/webhooks/c6/pix\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E_01 · Consulta de extrato",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/extrato?tenant_id={{tenant_id}}&provider=c6&start_date={{inicio_data}}&end_date={{fim_data}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "extrato"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{inicio_data}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{fim_data}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "TR_01 · Consulta de recebíveis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conciliacao/recebiveis?tenant_id={{tenant_id}}&provider=c6&start_date={{inicio_data}}&end_date={{fim_data}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conciliacao",
+                "recebiveis"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{inicio_data}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{fim_data}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "TR_02 · Consulta de transações",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/conciliacao/transacoes?tenant_id={{tenant_id}}&provider=c6&start_date={{inicio_data}}&end_date={{fim_data}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "conciliacao",
+                "transacoes"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{inicio_data}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{fim_data}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BP_01 · Criar cobrança Bolepix",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bolepix",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bolepix"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"account_config\": {\n    \"chave_pix\": \"{{chave_pix}}\"\n  },\n  \"bolepix\": {\n    \"external_reference_id\": \"{{external_reference_id}}\",\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"descricao\": \"Bolepix homologacao\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\",\n      \"endereco\": {\n        \"logradouro\": \"Rua Ministro Gabriel Passos\",\n        \"numero\": \"412\",\n        \"bairro\": \"Canaa\",\n        \"cidade\": \"Sete Lagoas\",\n        \"uf\": \"MG\",\n        \"cep\": \"35701206\"\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.environment.set('external_reference_id', novoExtRef());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BP_02 · Consultar cobrança Bolepix",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bolepix/{{external_reference_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bolepix",
+                "{{external_reference_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"external_reference_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BP_03 · Consultar PDF de Bolepix",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bolepix/{{external_reference_id}}/pdf?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bolepix",
+                "{{external_reference_id}}",
+                "pdf"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"external_reference_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BP_04 · Cancelar Bolepix",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/bolepix/{{external_reference_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bolepix",
+                "{{external_reference_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 409, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"external_reference_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C_01 · Criação de checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/checkout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"checkout\": {\n    \"valor\": \"150.00\",\n    \"descricao\": \"Checkout homologacao\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201, 424], [\"C6\"]);",
+                  "if (pm.response.code === 201) pm.environment.set('checkout_id', pm.response.json().id || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C_02 · Consulta de checkout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/checkout/{{checkout_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout",
+                "{{checkout_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"checkout_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C_03 · Cancelamento de checkout",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/checkout/{{checkout_id}}?tenant_id={{tenant_id}}&provider=c6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "checkout",
+                "{{checkout_id}}"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "c6"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 424], [\"C6\"]);"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Id encadeado vazio: pula em vez de colapsar a URL e virar 405 enganoso.",
+                  "const _ids = [\"checkout_id\"];",
+                  "if (_ids.some((v) => !pm.variables.get(v))) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  postman.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C_04 · Cadastro de webhook de checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/config/webhook-banco",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "config",
+                "webhook-banco"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_c6}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"c6\",\n  \"url\": \"https://exemplo.com.br/webhooks/c6\",\n  \"service\": \"CHECKOUT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 201, 424], [\"C6\"]);"
                 ]
               }
             }

@@ -11,7 +11,11 @@ from app.schemas import CarneIn, CarneOut
 router = APIRouter(prefix="/carne", tags=["carne"])
 
 
-@router.post("", response_model=CarneOut)
+# 201 acompanha as demais rotas de criação da API. Sem `Location`: o carnê não
+# é recurso consultável — é o PDF montado mais as N cobranças, e cada uma já
+# volta no corpo com o próprio id. Apontar para um único /carne/{id} seria
+# inventar um recurso que não existe.
+@router.post("", response_model=CarneOut, status_code=201)
 def gerar_carne(body: CarneIn, vault: Vault = Depends(get_vault)) -> CarneOut:
     """Registra N parcelas no provider e monta o carnê (3-vias A4) no engine.
 

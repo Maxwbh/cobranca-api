@@ -354,7 +354,6 @@ boleto_sicoob = {
 - [Exemplos Python](../../examples/python/README.md) - Scripts executáveis
 - [Troubleshooting](../api/troubleshooting.md) - Solução de problemas
 - [Engine PyCobrança](https://github.com/Maxwbh/pyCobranca) - quem gera o boleto
-- [Histórico da engine anterior](../development/brcobranca-fork.md) - descontinuada na 2.0.0
 
 ---
 

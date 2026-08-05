@@ -56,7 +56,30 @@ def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any]) -> di
         "sacado_documento": pagador.documento,
         **{k: v for k, v in account_config.items() if k != "bank"},
     }
-    endereco = pagador.endereco or {}
-    if endereco.get("logradouro"):
-        dados["sacado_endereco"] = endereco["logradouro"]
+    dados.update(_endereco_do_sacado(pagador.endereco or {}))
     return {k: v for k, v in dados.items() if v not in (None, "")}
+
+
+def _endereco_do_sacado(end: dict[str, Any]) -> dict[str, Any]:
+    """Endereço do pagador para o motor offline.
+
+    Aqui NÃO se converte o número para inteiro, ao contrário do C6: o
+    `endereco_sacado` da engine é uma linha de texto livre ("Rua Teste, 100"),
+    então "126A" e "S/N" entram como estão. A conversão é exigência do
+    /v1/bank_slips e mora no provider que a sofre.
+
+    O que existia era pior que a falta de conversão: só o logradouro seguia, e
+    número, bairro, cidade, UF e CEP eram descartados em silêncio — apesar de a
+    engine ter posição para todos no CNAB. Boleto com rua e sem número é
+    endereço incompleto, e o registro sai assim mesmo, sem ninguém reclamar.
+    """
+    logradouro = end.get("logradouro") or end.get("street")
+    numero = end.get("numero") or end.get("number")
+    linha = f"{logradouro}, {numero}" if logradouro and numero else logradouro
+    return {
+        "sacado_endereco": linha,
+        "sacado_bairro": end.get("bairro") or end.get("neighborhood"),
+        "sacado_cidade": end.get("cidade") or end.get("city"),
+        "sacado_uf": end.get("uf") or end.get("state"),
+        "sacado_cep": end.get("cep") or end.get("zip_code"),
+    }
