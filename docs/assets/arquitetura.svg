@@ -85,13 +85,13 @@
   <rect x="110" y="338" width="500" height="104" rx="12" fill="url(#eng)"/>
   <text x="360" y="374" text-anchor="middle" class="t wht" font-size="20" font-weight="700">PyCobrança</text>
   <text x="360" y="396" text-anchor="middle" class="t" font-size="13" fill="#0F172A">engine open source · Python puro · sem libs de sistema</text>
-  <text x="360" y="424" text-anchor="middle" class="t" font-size="12.5" fill="#083344">boleto · CNAB 240/400 · carnê · PIX/Bolepix · PDF</text>
+  <text x="360" y="424" text-anchor="middle" class="t" font-size="12.5" fill="#083344">boleto · CNAB 240/400 · carnê · QR Pix · PDF</text>
 
   <!-- ================= bancos ================= -->
   <rect x="640" y="338" width="450" height="104" rx="12" fill="#fff" stroke="#CBD5E1" stroke-width="2"/>
   <text x="865" y="374" text-anchor="middle" class="t lbl" font-size="20">APIs dos bancos</text>
-  <text x="865" y="396" text-anchor="middle" class="t sub">C6 Bank · Sicoob — Inter e BB no roadmap</text>
-  <text x="865" y="424" text-anchor="middle" class="t sub">boleto registrado · Pix · Pix Automático · conciliação</text>
+  <text x="865" y="396" text-anchor="middle" class="t sub">C6 (336) · Sicoob (756) · Banco Inter (077)</text>
+  <text x="865" y="424" text-anchor="middle" class="t sub">boleto registrado · Pix · Pix Automático · cartão · Bolepix</text>
 
   <!-- ================= saídas ================= -->
   <line x1="360" y1="448" x2="360" y2="492" stroke="#06B6D4" stroke-width="2.5" marker-end="url(#setac)"/>
@@ -110,13 +110,17 @@
     <text x="521" y="527" text-anchor="middle" class="lbl">Carnê · OFX</text>
     <text x="521" y="546" text-anchor="middle" class="sub">3 vias · conciliação</text>
 
-    <rect x="640" y="500" width="200" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
-    <text x="740" y="527" text-anchor="middle" class="lbl">Cobrança registrada</text>
-    <text x="740" y="546" text-anchor="middle" class="sub">CIP em tempo real</text>
+    <rect x="640" y="500" width="148" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
+    <text x="714" y="527" text-anchor="middle" class="lbl" font-size="14">Boleto registrado</text>
+    <text x="714" y="546" text-anchor="middle" class="sub">CIP em tempo real</text>
 
-    <rect x="858" y="500" width="232" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
-    <text x="974" y="527" text-anchor="middle" class="lbl">Pix · Bolepix · Webhooks</text>
-    <text x="974" y="546" text-anchor="middle" class="sub">BACEN · notificação assinada</text>
+    <rect x="800" y="500" width="140" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
+    <text x="870" y="527" text-anchor="middle" class="lbl" font-size="14">Cartão</text>
+    <text x="870" y="546" text-anchor="middle" class="sub">link de pagamento</text>
+
+    <rect x="952" y="500" width="138" height="62" rx="10" fill="#fff" stroke="#CBD5E1"/>
+    <text x="1021" y="527" text-anchor="middle" class="lbl" font-size="14">Pix · Webhooks</text>
+    <text x="1021" y="546" text-anchor="middle" class="sub">BACEN · HMAC</text>
   </g>
 
   <text x="600" y="594" text-anchor="middle" class="t sub" fill="#94A3B8">Cobranca-API · plataforma open source de cobrança bancária (MIT)</text>

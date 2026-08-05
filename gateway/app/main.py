@@ -412,7 +412,7 @@ _SWAGGER_HTML = """<!DOCTYPE html>
     <h1>Cobranca-API</h1>
     <span class="surface">Gateway REST &middot; multi-banco</span>
     <span class="pill">100% Python &middot; FastAPI + pyCobran&ccedil;a</span>
-    <small>v__VERSION__ &middot; C6 &middot; Sicoob &middot; Inter &middot; Pix BACEN &middot; pyCobrança</small>
+    <small>v__VERSION__ &middot; C6 &middot; Sicoob &middot; Inter &middot; Pix BACEN</small>
     <div class="links">
       <a href="https://github.com/Maxwbh/cobranca-api" target="_blank" rel="noopener">GitHub</a>
       <a href="/api/docs">Offline / pyCobrança &rarr;</a>

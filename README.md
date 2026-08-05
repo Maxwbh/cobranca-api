@@ -116,7 +116,7 @@ linguagem, ou precisa falar com a **API do banco** → **Cobranca-API**.
 
 <p align="center">
   <img src="./docs/assets/arquitetura.svg" width="100%"
-       alt="Arquitetura: aplicações em qualquer linguagem chamam a Cobranca-API via REST; a API usa a engine PyCobrança (offline, in-process) e as APIs dos bancos (online), produzindo boleto PDF, CNAB 240/400, carnê, OFX, cobrança registrada e Pix." />
+       alt="Arquitetura: aplicações em qualquer linguagem chamam a Cobranca-API via REST; a API usa a engine PyCobrança (offline, in-process) e as APIs dos bancos (online), produzindo boleto PDF, CNAB 240/400, carnê, OFX, cobrança registrada, Pix e link de pagamento com cartão." />
 </p>
 
 **Dois caminhos, um contrato:** o **offline** roda a engine PyCobrança dentro do

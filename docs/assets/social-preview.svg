@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Cobranca-API — plataforma open source de cobrança bancária: boleto, Pix, CNAB e OFX para 18 bancos brasileiros, 100% Python">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Cobranca-API — plataforma open source de cobrança bancária: boleto, Pix, cartão, CNAB e OFX para 18 bancos brasileiros, 100% Python">
   <!--
     Social preview do GitHub (Settings > General > Social preview): 1280x640.
     O banner.svg tem 1200x270 e não serve reescalado — o GitHub recorta para
@@ -59,7 +59,7 @@
   <rect x="99" y="248" width="250" height="8" rx="4" fill="#06B6D4"/>
 
   <text x="96" y="330" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="600" fill="#E2E8F0">Cobrança bancária brasileira</text>
-  <text x="96" y="382" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="34" font-weight="400" fill="#CBD5E1">Boleto · Pix · Pix Automático · CNAB · OFX</text>
+  <text x="96" y="382" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="34" font-weight="400" fill="#CBD5E1">Boleto · Pix · Cartão · CNAB · OFX</text>
 
   <!-- números: o que diferencia, em vez de adjetivo -->
   <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">

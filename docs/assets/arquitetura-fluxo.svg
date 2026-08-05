@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-label="Fluxo de POST /cobranca: router valida, token bapi_ e decifrado, registry escolhe o provider, o provider chama a API do banco ou a engine offline, e a resposta volta normalizada">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-label="Fluxo de POST /cobranca: router valida, token bapi_ e decifrado, registry escolhe o provider, o provider chama a API do banco ou a engine offline, e a resposta volta normalizada">
   <defs>
     <marker id="f1" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
       <path d="M0,0 L10,4 L0,8 Z" fill="#94A3B8"/>
@@ -15,7 +15,7 @@
     </style>
   </defs>
 
-  <rect width="1200" height="470" fill="#F8FAFC"/>
+  <rect width="1200" height="500" fill="#F8FAFC"/>
   <text x="600" y="30" text-anchor="middle" class="t cap">FLUXO DE UMA REQUISIÇÃO — POST /cobranca</text>
 
   <!-- etapas -->
@@ -52,8 +52,8 @@
     <rect x="1000" y="60" width="160" height="86" rx="10" fill="#0F172A"/>
     <circle cx="1024" cy="84" r="13" fill="#06B6D4"/><text x="1024" y="89" text-anchor="middle" class="num">5</text>
     <text x="1046" y="89" class="n" fill="#fff">Resposta</text>
-    <text x="1016" y="112" class="d" fill="#E2E8F0">CobrancaOut</text>
-    <text x="1016" y="130" class="d" fill="#67E8F9">mesmo shape</text>
+    <text x="1016" y="112" class="d" fill="#E2E8F0">201 + Location</text>
+    <text x="1016" y="130" class="d" fill="#67E8F9">CobrancaOut</text>
   </g>
 
   <!-- setas entre etapas -->
@@ -77,7 +77,7 @@
   <text x="1040" y="283" text-anchor="middle" class="t d">OAuth + mTLS · online</text>
 
   <!-- erros -->
-  <rect x="40" y="236" width="480" height="180" rx="10" fill="#fff" stroke="#CBD5E1"/>
+  <rect x="40" y="236" width="480" height="242" rx="10" fill="#fff" stroke="#CBD5E1"/>
   <text x="64" y="262" class="t n">Tradução de erro — nunca 500 opaco</text>
   <g class="t" font-size="12">
     <text x="64" y="288" fill="#B45309" font-weight="700">424</text>
@@ -90,7 +90,11 @@
     <text x="106" y="360" fill="#475569">banco não oferece a operação (aponta alternativa)</text>
     <text x="64" y="384" fill="#B45309" font-weight="700">400</text>
     <text x="106" y="384" fill="#475569">dados do boleto inválidos + validation_errors</text>
-    <text x="64" y="406" fill="#94A3B8" font-size="11">o 424 separa "o banco recusou" de "o serviço quebrou"</text>
+    <text x="64" y="408" fill="#B45309" font-weight="700">502</text>
+    <text x="106" y="408" fill="#475569">falha do banco — re-tentar com backoff</text>
+    <text x="64" y="432" fill="#B45309" font-weight="700">504</text>
+    <text x="106" y="432" fill="#475569">banco indisponível ou tempo esgotado</text>
+    <text x="64" y="458" fill="#94A3B8" font-size="11">o 424 separa "o banco recusou" de "o serviço quebrou"</text>
   </g>
 
   <text x="860" y="330" text-anchor="middle" class="t d" fill="#94A3B8">o consumidor recebe o mesmo contrato nos dois caminhos</text>

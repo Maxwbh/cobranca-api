@@ -7,7 +7,7 @@ requisição e as decisões que explicam por que está assim.
 
 <p align="center">
   <img src="./assets/arquitetura-camadas.svg" width="100%"
-       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
+       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, Inter, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
 </p>
 
 ---
@@ -217,12 +217,12 @@ postman/               # 128 requests com IDs de rastreabilidade
 |---|---|
 | Linguagem | 100% Python |
 | Processos no container | 1 |
-| Módulos Python (`gateway/app`) | 38 |
-| Linhas em `gateway/app` | ~5.800 |
-| Providers REST | 2 (C6, Sicoob) |
+| Módulos Python (`gateway/app`) | 39 |
+| Linhas em `gateway/app` | ~6.560 |
+| Providers REST | 3 (C6, Sicoob, Inter) |
 | Bancos no caminho offline | 18 |
-| Rotas online (`/docs`) | 48 |
-| Testes do gateway | 315 |
+| Rotas online (`/docs`) | 66 |
+| Testes do gateway | 387 |
 | Requests na regressão Postman | 128 |
 
 ---
