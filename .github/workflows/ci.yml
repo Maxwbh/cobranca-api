@@ -6,6 +6,19 @@ on:
       - main
       - "hml/**"
   pull_request:
+  # Disparo manual, por branch. `push` e `pull_request` chegam pelo pipeline de
+  # EVENTOS do GitHub; quando ele degrada, o commit fica sem veredito e não há o
+  # que re-rodar — não existe run para clicar. Já o `workflow_dispatch` entra
+  # pela API, então continua funcionando: foi assim que se confirmou, no
+  # incidente de 06/08/2026, que runner e execução estavam de pé enquanto os
+  # eventos não chegavam.
+  #
+  # Vale além do incidente: todo CI deveria poder ser rodado à mão sem precisar
+  # de commit vazio para forçar evento.
+  #
+  # Só aparece no seletor se o arquivo estiver no branch DEFAULT — é regra do
+  # GitHub, não escolha nossa.
+  workflow_dispatch:
   schedule:
     - cron: "0 4 * * 0"
 
