@@ -20,7 +20,7 @@
      + 18 offline —, OpenAPI) porque são contrato, não métrica. -->
 <p align="center">
   <a href="https://github.com/Maxwbh/cobranca-api/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Maxwbh/cobranca-api/ci.yml?branch=main&style=for-the-badge&label=build&labelColor=0F172A" alt="Status do build" /></a>
-  <a href="https://github.com/Maxwbh/cobranca-api/tags"><img src="https://img.shields.io/github/v/tag/Maxwbh/cobranca-api?style=for-the-badge&label=versão&color=1E40AF&labelColor=0F172A" alt="Última versão" /></a>
+  <a href="https://github.com/Maxwbh/cobranca-api/releases/latest"><img src="https://img.shields.io/github/v/release/Maxwbh/cobranca-api?style=for-the-badge&label=vers%C3%A3o&color=1E40AF&labelColor=0F172A" alt="Última versão" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/Maxwbh/cobranca-api?style=for-the-badge&color=10B981&labelColor=0F172A" alt="Licença MIT" /></a>
   <a href="https://github.com/Maxwbh/cobranca-api/stargazers"><img src="https://img.shields.io/github/stars/Maxwbh/cobranca-api?style=for-the-badge&color=F59E0B&labelColor=0F172A" alt="Stars" /></a>
   <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 3 online (C6, Sicoob, Inter) e 18 offline" />
