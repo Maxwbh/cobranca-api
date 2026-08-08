@@ -3,7 +3,7 @@
 
 Compara:
   1. paths+methods do OpenAPI do gateway (importa o app FastAPI); e
-  2. o inventário offline /api/* do roadmap (§7.1)
+  2. o inventário offline /api/* (lista OFFLINE abaixo)
 contra os requests da coleção Postman. Uso:
   python postman/check_coverage.py            # da raiz do repo
 Saída: tabela endpoint x testado (o snapshot de cobertura da evidência).

@@ -31,18 +31,21 @@
   <rect x="60" y="124" width="1080" height="96" rx="12" fill="url(#cRouter)"/>
   <text x="86" y="152" class="t h w">routers/ — superfície HTTP</text>
   <text x="86" y="172" class="t" font-size="12.5" fill="#BFDBFE">valida entrada · traduz erro do banco · monta a resposta</text>
-  <g class="t" font-size="11.5" fill="#0F172A">
-    <rect x="86"  y="184" width="88"  height="24" rx="12" fill="#DBEAFE"/><text x="130" y="200" text-anchor="middle">cobranca</text>
-    <rect x="182" y="184" width="96"  height="24" rx="12" fill="#DBEAFE"/><text x="230" y="200" text-anchor="middle">credenciais</text>
-    <rect x="286" y="184" width="60"  height="24" rx="12" fill="#DBEAFE"/><text x="316" y="200" text-anchor="middle">pix</text>
-    <rect x="354" y="184" width="74"  height="24" rx="12" fill="#DBEAFE"/><text x="391" y="200" text-anchor="middle">bolepix</text>
-    <rect x="436" y="184" width="110" height="24" rx="12" fill="#DBEAFE"/><text x="491" y="200" text-anchor="middle">pix-automatico</text>
-    <rect x="554" y="184" width="64"  height="24" rx="12" fill="#DBEAFE"/><text x="586" y="200" text-anchor="middle">jobs</text>
-    <rect x="626" y="184" width="74"  height="24" rx="12" fill="#DBEAFE"/><text x="663" y="200" text-anchor="middle">extrato</text>
-    <rect x="708" y="184" width="94"  height="24" rx="12" fill="#DBEAFE"/><text x="755" y="200" text-anchor="middle">conciliacao</text>
-    <rect x="810" y="184" width="88"  height="24" rx="12" fill="#DBEAFE"/><text x="854" y="200" text-anchor="middle">webhooks</text>
-    <rect x="906" y="184" width="64"  height="24" rx="12" fill="#DBEAFE"/><text x="938" y="200" text-anchor="middle">carne</text>
-    <rect x="978" y="184" width="136" height="24" rx="12" fill="#A5F3FC"/><text x="1046" y="200" text-anchor="middle">offline · /api/*</text>
+  <g class="t" font-size="11" fill="#0F172A">
+    <rect x="86" y="184" width="65" height="24" rx="12" fill="#DBEAFE"/><text x="118" y="200" text-anchor="middle">cobranca</text>
+    <rect x="159" y="184" width="83" height="24" rx="12" fill="#DBEAFE"/><text x="200" y="200" text-anchor="middle">credenciais</text>
+    <rect x="250" y="184" width="53" height="24" rx="12" fill="#DBEAFE"/><text x="276" y="200" text-anchor="middle">bancos</text>
+    <rect x="311" y="184" width="36" height="24" rx="12" fill="#DBEAFE"/><text x="329" y="200" text-anchor="middle">pix</text>
+    <rect x="355" y="184" width="59" height="24" rx="12" fill="#DBEAFE"/><text x="384" y="200" text-anchor="middle">bolepix</text>
+    <rect x="422" y="184" width="101" height="24" rx="12" fill="#DBEAFE"/><text x="472" y="200" text-anchor="middle">pix-automatico</text>
+    <rect x="531" y="184" width="65" height="24" rx="12" fill="#DBEAFE"/><text x="563" y="200" text-anchor="middle">checkout</text>
+    <rect x="604" y="184" width="47" height="24" rx="12" fill="#DBEAFE"/><text x="627" y="200" text-anchor="middle">carne</text>
+    <rect x="659" y="184" width="42" height="24" rx="12" fill="#DBEAFE"/><text x="680" y="200" text-anchor="middle">jobs</text>
+    <rect x="709" y="184" width="59" height="24" rx="12" fill="#DBEAFE"/><text x="738" y="200" text-anchor="middle">extrato</text>
+    <rect x="776" y="184" width="83" height="24" rx="12" fill="#DBEAFE"/><text x="817" y="200" text-anchor="middle">conciliacao</text>
+    <rect x="867" y="184" width="53" height="24" rx="12" fill="#DBEAFE"/><text x="893" y="200" text-anchor="middle">config</text>
+    <rect x="928" y="184" width="65" height="24" rx="12" fill="#DBEAFE"/><text x="960" y="200" text-anchor="middle">webhooks</text>
+    <rect x="1001" y="184" width="106" height="24" rx="12" fill="#A5F3FC"/><text x="1054" y="200" text-anchor="middle">offline · /api/*</text>
   </g>
 
   <line x1="600" y1="224" x2="600" y2="250" stroke="#94A3B8" stroke-width="2.5" marker-end="url(#s1)"/>
@@ -60,18 +63,21 @@
   <text x="86" y="404" class="t h" fill="#0F172A">providers/ — um dialeto por banco</text>
   <text x="86" y="424" class="t s">interface comum: obrigatórios + capacidades opcionais (introspecção)</text>
   <g class="t chip">
-    <rect x="86"  y="438" width="120" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
-    <text x="146" y="456" text-anchor="middle" font-weight="700">c6.py</text>
-    <text x="146" y="472" text-anchor="middle" font-size="11" fill="#475569">REST · mTLS</text>
-    <rect x="218" y="438" width="120" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
-    <text x="278" y="456" text-anchor="middle" font-weight="700">sicoob.py</text>
-    <text x="278" y="472" text-anchor="middle" font-size="11" fill="#475569">REST · mTLS</text>
-    <rect x="350" y="438" width="140" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
-    <text x="420" y="456" text-anchor="middle" font-weight="700">bacen_pix.py</text>
-    <text x="420" y="472" text-anchor="middle" font-size="11" fill="#475569">dialeto Pix comum</text>
-    <rect x="502" y="438" width="140" height="44" rx="9" fill="#CFFAFE" stroke="#06B6D4"/>
-    <text x="572" y="456" text-anchor="middle" font-weight="700">offline_engine</text>
-    <text x="572" y="472" text-anchor="middle" font-size="11" fill="#475569">sem credencial</text>
+    <rect x="86"  y="438" width="104" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="138" y="456" text-anchor="middle" font-weight="700">c6.py</text>
+    <text x="138" y="472" text-anchor="middle" font-size="10.5" fill="#475569">REST · mTLS</text>
+    <rect x="196" y="438" width="104" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="248" y="456" text-anchor="middle" font-weight="700">sicoob.py</text>
+    <text x="248" y="472" text-anchor="middle" font-size="10.5" fill="#475569">REST · mTLS</text>
+    <rect x="306" y="438" width="104" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="358" y="456" text-anchor="middle" font-weight="700">inter.py</text>
+    <text x="358" y="472" text-anchor="middle" font-size="10.5" fill="#475569">REST · mTLS</text>
+    <rect x="416" y="438" width="112" height="44" rx="9" fill="#EFF6FF" stroke="#BFDBFE"/>
+    <text x="472" y="456" text-anchor="middle" font-weight="700">bacen_pix.py</text>
+    <text x="472" y="472" text-anchor="middle" font-size="10.5" fill="#475569">dialeto Pix comum</text>
+    <rect x="534" y="438" width="112" height="44" rx="9" fill="#CFFAFE" stroke="#06B6D4"/>
+    <text x="590" y="456" text-anchor="middle" font-weight="700">offline_engine</text>
+    <text x="590" y="472" text-anchor="middle" font-size="10.5" fill="#475569">sem credencial</text>
   </g>
 
   <!-- core -->
@@ -89,12 +95,12 @@
   <!-- engine -->
   <rect x="330" y="542" width="490" height="60" rx="11" fill="#06B6D4"/>
   <text x="575" y="568" text-anchor="middle" class="t h w">PyCobrança — engine in-process</text>
-  <text x="575" y="590" text-anchor="middle" class="t" font-size="12" fill="#083344">boleto · CNAB 240/400 · carnê · PIX/Bolepix · PDF — 18 bancos</text>
+  <text x="575" y="590" text-anchor="middle" class="t" font-size="12" fill="#083344">boleto · CNAB 240/400 · carnê · QR Pix · PDF — 18 bancos</text>
 
   <!-- conector: providers REST -> APIs dos bancos -->
   <path d="M200,496 L200,520 L1000,520 L1000,536" fill="none" stroke="#94A3B8"
         stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#s1)"/>
-  <text x="880" y="514" text-anchor="end" class="t s" font-size="11.5">c6 · sicoob → online</text>
+  <text x="880" y="514" text-anchor="end" class="t s" font-size="11.5">c6 · sicoob · inter → online</text>
 
   <!-- bancos -->
   <rect x="860" y="542" width="280" height="60" rx="11" fill="#fff" stroke="#CBD5E1" stroke-width="2"/>

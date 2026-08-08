@@ -40,7 +40,7 @@ def test_pix_cob_imediata(client, c6_env, monkeypatch):
         "pix": {"valor": "10.00", "expiracao_segundos": 1800, "descricao": "Pedido 42"},
     }
     r = client.post("/pix", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     data = r.json()
     assert data["txid"].startswith("TX")
     assert data["status"] == "registrado"
@@ -83,7 +83,7 @@ def test_pix_cobv_com_vencimento(client, c6_env, monkeypatch):
         },
     }
     r = client.post("/pix", json=body)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
 
     # cobv: PUT /cobv/{txid} com calendario de vencimento e devedor completo
     assert captured["method"] == "PUT"
@@ -136,7 +136,7 @@ def test_pix_multi_tenant_resolve_credencial_do_tenant(client, monkeypatch):
             "tenant_id": tenant, "provider": "c6",
             "account_config": {"chave_pix": "k"}, "pix": {"valor": "1.00"},
         }
-        assert client.post("/pix", json=body).status_code == 200
+        assert client.post("/pix", json=body).status_code == 201
 
     assert used == ["cid-t1", "cid-t2"]  # cada tenant com a própria credencial
 
@@ -145,3 +145,100 @@ def test_pix_tenant_sem_credencial_retorna_424(client):
     body = {"tenant_id": "ghost", "provider": "c6", "account_config": {"chave_pix": "k"}, "pix": {"valor": "1.00"}}
     r = client.post("/pix", json=body)
     assert r.status_code == 424
+
+
+def test_pix_cobv_aponta_o_location_para_a_cobv_e_nao_para_a_cob(client, c6_env, monkeypatch):
+    """cob e cobv moram na mesma rota e se distinguem por `vencimento`. Sem esse
+    parametro o Location de uma cobv apontaria para uma cob que nao existe."""
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, method, path, json=None, params=None: {
+                            "txid": "T1", "status": "ATIVA"})
+    r = client.post("/pix", json={
+        "tenant_id": "empresa1", "provider": "c6", "account_config": {"chave_pix": "k"},
+        "pix": {"valor": "1.00", "txid": "T1", "data_vencimento": "2026-12-31",
+                "devedor": {"nome": "T", "documento": "12345678909"}}})
+    assert r.status_code == 201, r.text
+    assert r.headers["Location"] == "/pix/T1?tenant_id=empresa1&provider=c6&vencimento=true"
+
+
+def test_pix_cob_imediata_nao_marca_vencimento_no_location(client, c6_env, monkeypatch):
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, method, path, json=None, params=None: {
+                            "txid": "T2", "status": "ATIVA"})
+    r = client.post("/pix", json={
+        "tenant_id": "empresa1", "provider": "c6", "account_config": {"chave_pix": "k"},
+        "pix": {"valor": "1.00"}})
+    assert r.status_code == 201, r.text
+    assert r.headers["Location"] == "/pix/T2?tenant_id=empresa1&provider=c6"
+
+
+# --- valor e prazo de pagamento na resposta ---------------------------------------
+
+def test_cob_devolve_valor_e_expira_em(client, c6_env, monkeypatch):
+    """`expira_em` existia no schema e saia SEMPRE nulo, e `valor` nem existia.
+
+    O BACEN nao devolve o instante de expiracao: manda `criacao` mais
+    `expiracao` em segundos. Sem somar, cada consumidor tinha de ir ao `raw`
+    refazer a conta -- e o valor so era conhecido por quem tinha enviado, o que
+    nao ajuda em nada na consulta."""
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, m, p, json=None, params=None: {
+                            "txid": "T1", "status": "ATIVA", "valor": {"original": "1.00"},
+                            "pixCopiaECola": "00020101…",
+                            "calendario": {"criacao": "2026-08-04T17:47:12.639Z",
+                                           "expiracao": 3600}})
+    r = client.post("/pix", json={"tenant_id": "empresa1", "provider": "c6",
+                                  "account_config": {"chave_pix": "k"},
+                                  "pix": {"valor": "1.00"}})
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["valor"] == "1.00"
+    assert d["expira_em"].startswith("2026-08-04T18:47:12")  # criacao + 1h
+
+
+def test_cobv_expira_no_vencimento_mais_a_validade(client, c6_env, monkeypatch):
+    """Na cobv a regra e' outra: vencimento + dias de validade apos ele."""
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, m, p, json=None, params=None: {
+                            "txid": "T2", "status": "ATIVA", "valor": {"original": "2.00"},
+                            "calendario": {"dataDeVencimento": "2026-09-03",
+                                           "validadeAposVencimento": 30}})
+    r = client.post("/pix", json={
+        "tenant_id": "empresa1", "provider": "c6", "account_config": {"chave_pix": "k"},
+        "pix": {"valor": "2.00", "txid": "T" * 30, "data_vencimento": "2026-09-03",
+                "devedor": {"nome": "T", "documento": "12345678909"}}})
+    assert r.status_code == 201, r.text
+    assert r.json()["expira_em"].startswith("2026-10-03")
+
+
+def test_sem_calendario_nao_inventa_prazo(client, c6_env, monkeypatch):
+    """Banco que nao mandou calendario nao ganha um prazo estimado."""
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, m, p, json=None, params=None: {"txid": "T3", "status": "ATIVA"})
+    r = client.post("/pix", json={"tenant_id": "empresa1", "provider": "c6",
+                                  "account_config": {"chave_pix": "k"},
+                                  "pix": {"valor": "1.00"}})
+    assert r.json()["expira_em"] is None
+    assert r.json()["valor"] is None
+
+
+@pytest.mark.parametrize("calendario", [
+    {"dataDeVencimento": "2026-09-03", "validadeAposVencimento": 1025541278},
+    {"criacao": "2026-08-04T17:47:12.639Z", "expiracao": 10**18},
+    {"dataDeVencimento": "9999-12-31", "validadeAposVencimento": 999999},
+])
+def test_prazo_absurdo_do_banco_nao_derruba_a_rota(client, c6_env, monkeypatch, calendario):
+    """O sandbox do Sicoob devolveu validadeAposVencimento de 1.025.541.278 dias
+    e o timedelta estourou, derrubando a rota com 500.
+
+    Data vinda do banco e' entrada nao confiavel como qualquer outra, e o prazo
+    e' campo acessorio: melhor devolver a cobranca sem `expira_em` do que trocar
+    a resposta inteira por um erro."""
+    monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
+                        lambda self, m, p, json=None, params=None: {
+                            "txid": "T1", "status": "ATIVA", "calendario": calendario})
+    r = client.post("/pix", json={"tenant_id": "empresa1", "provider": "c6",
+                                  "account_config": {"chave_pix": "k"},
+                                  "pix": {"valor": "1.00"}})
+    assert r.status_code == 201, r.text
+    assert r.json()["expira_em"] is None

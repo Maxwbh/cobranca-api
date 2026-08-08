@@ -14,7 +14,44 @@ changelog quer saber se precisa mexer na integração, não como o defeito surgi
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Não lançado]
+## [2.2.0] - 2026-08-08
+
+### Adicionado
+- **Banco Inter (077)**: boleto registrado, Pix, extrato e webhook
+  (`provider=inter`). Sem fallback offline.
+- **`POST/GET/DELETE /checkout`**: link de pagamento com cartão no C6, em modo
+  link.
+- `Idempotency-Key` no `POST /checkout`: mesma chave devolve o mesmo link;
+  corpo diferente é `422`.
+- Push ao consumidor com fila e re-tentativa (5s a 15min); pendência sinalizada
+  em `pendente_de_entrega`.
+- Limpeza por idade das tabelas de entrega: dedup 7 dias; fila e idempotência
+  30.
+- Imagem Docker publicada no GHCR a cada release:
+  `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`.
+- OpenAPI declara os erros de banco (`404`, `409`, `424`, `429`, `502`, `504`).
+
+### Alterado
+- ⚠️ `POST /webhooks/{banco}` exige `WEBHOOK_TOKEN__<BANCO>` e responde `401`
+  sem ele; cadastre a URL no banco com `?token=<segredo>`.
+  `WEBHOOK_ALLOW_UNAUTHENTICATED=1` mantém o modo antigo na migração.
+- `liquidado` só propaga após reconsulta ao banco; o evento ganha `confirmado`.
+  Desliga com `WEBHOOK_CONFIRM=0`.
+- Notificação repetida do banco responde `200` com `event: "duplicado"`.
+  Desliga com `WEBHOOK_DEDUP=0`.
+- ⚠️ `POST /cobranca`, `/carne` e `/pix` respondem `201` com `Location`;
+  `PUT /pix/lote/{id}` responde `202`.
+- Erro no endpoint de token do banco responde `424`, não `422`.
+- `POST /credenciais` aceita certificado em PEM, além de PKCS12.
+
+### Corrigido
+- Consultar, imprimir e baixar boleto do Sicoob: as rotas de leitura aceitam
+  `numero_cliente` e `codigo_modalidade` (antes iam sem conta e falhavam).
+- Evento de criação de checkout do C6 chegava como `cobranca.atualizada`.
+- Número de endereço com sufixo (`126A`) fazia o C6 recusar o registro.
+- Boleto offline levava só o logradouro do pagador para o CNAB.
+- Prazo absurdo devolvido pelo banco derrubava a rota Pix com `500`.
+- Cancelar boleto no C6 podia transformar sucesso em erro.
 
 ## [2.1.1] - 2026-08-01
 

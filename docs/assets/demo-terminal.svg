@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 312" width="780" height="312"
+     role="img" aria-label="Demonstração: POST /cobranca com um payload de boleto devolve id, status registrado, linha digitável, código de barras e o PDF em base64 — pelo caminho offline, sem credencial de banco.">
+  <!--
+    Demo animado do README — um POST /cobranca de verdade.
+
+    A resposta abaixo NÃO é inventada: foi capturada da API em processo
+    (TestClient, caminho offline, banco sicoob) em 07/08/2026, e o comando foi
+    conferido de verdade — sem o -H de Content-Type o curl manda form-urlencoded
+    e a API responde 422, não isto. Os cortes são MARCADOS: "…" no pdf_base64 e
+    no raw. Todas as chaves da resposta aparecem, na ordem em que a API devolve
+    (jq preserva a ordem de entrada). Se o contrato mudar, atualize este arquivo
+    junto — demo que mente é pior que nenhum.
+
+    Animação em CSS puro (opacity com animation-delay), que o GitHub renderiza
+    dentro de <img>. Ciclo de 14s: comando, resposta em cascata, pausa, repete.
+    prefers-reduced-motion desliga tudo e mostra o quadro final estático.
+  -->
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 13px; }
+    .l { opacity: 0; animation: aparece 14s infinite; }
+    .d05 { animation-delay: 0.5s; }
+    .d25 { animation-delay: 2.5s; }
+    .d28 { animation-delay: 2.8s; }
+    .d30 { animation-delay: 3.0s; }
+    .d32 { animation-delay: 3.2s; }
+    .d34 { animation-delay: 3.4s; }
+    .d36 { animation-delay: 3.6s; }
+    .d38 { animation-delay: 3.8s; }
+    .d40 { animation-delay: 4.0s; }
+    .d42 { animation-delay: 4.2s; }
+    .d44 { animation-delay: 4.4s; }
+    @keyframes aparece {
+      0% { opacity: 0; } 1.5% { opacity: 1; }
+      92% { opacity: 1; } 96% { opacity: 0; } 100% { opacity: 0; }
+    }
+    .cursor { animation: pisca 1s step-end infinite; }
+    @keyframes pisca { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .l { animation: none; opacity: 1; }
+      .cursor { animation: none; }
+    }
+  </style>
+
+  <rect width="780" height="312" rx="12" fill="#0F172A"/>
+  <rect width="780" height="34" rx="12" fill="#0B1220"/>
+  <rect y="22" width="780" height="12" fill="#0B1220"/>
+  <line y1="34" x2="780" y2="34" stroke="#334155" stroke-width="1"/>
+  <text x="16" y="22" fill="#94A3B8" font-size="12">cobranca-api — caminho offline: sem credencial, sem convênio</text>
+
+  <g transform="translate(20 56)">
+    <text class="l d05" y="0"><tspan fill="#34D399">$</tspan><tspan fill="#F8FAFC" dx="8">curl -s :8000/cobranca -H 'content-type: application/json' -d @cobranca.json | jq</tspan></text>
+
+    <text class="l d25" y="28"  fill="#CBD5E1">{</text>
+    <text class="l d28" y="52"  ><tspan x="18" fill="#38BDF8">"id"</tspan><tspan fill="#CBD5E1">: "4021",</tspan></text>
+    <text class="l d30" y="76"  ><tspan x="18" fill="#38BDF8">"status"</tspan><tspan fill="#CBD5E1">: </tspan><tspan fill="#34D399">"registrado"</tspan><tspan fill="#CBD5E1">,</tspan></text>
+    <text class="l d32" y="100" ><tspan x="18" fill="#38BDF8">"linha_digitavel"</tspan><tspan fill="#CBD5E1">: "75691.30730 01123.456707 00402.150015 8 15650000014990",</tspan></text>
+    <text class="l d34" y="124" ><tspan x="18" fill="#38BDF8">"codigo_barras"</tspan><tspan fill="#CBD5E1">: "75698156500000149901307301123456700040215001",</tspan></text>
+    <text class="l d36" y="148" ><tspan x="18" fill="#38BDF8">"pix_copia_cola"</tspan><tspan fill="#CBD5E1">: null,</tspan></text>
+    <text class="l d38" y="172" ><tspan x="18" fill="#38BDF8">"pdf_base64"</tspan><tspan fill="#CBD5E1">: "JVBERi0xLjQKJZOMi54gUmVw…",  </tspan><tspan fill="#94A3B8">// o PDF já vem na resposta</tspan></text>
+    <text class="l d40" y="196" ><tspan x="18" fill="#38BDF8">"raw"</tspan><tspan fill="#CBD5E1">: { … }</tspan></text>
+    <text class="l d42" y="220" fill="#CBD5E1">}</text>
+
+    <text class="l d44" y="246"><tspan fill="#34D399">$</tspan><tspan class="cursor" fill="#F8FAFC" dx="8">▌</tspan></text>
+  </g>
+</svg>

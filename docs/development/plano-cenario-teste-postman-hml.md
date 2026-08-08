@@ -81,8 +81,7 @@ ou campo `credentials` no body (precedência já implementada no gateway).
 ## 4. Matriz de Rastreabilidade (seção principal)
 
 Cobertura = esta matriz completa. Endpoint novo ⇒ nova linha com ID ⇒ novo
-request (verificado pelo §8). Coluna **Roadmap** liga aos testes T1–T10 e ao
-aceite §10 do roadmap de migração.
+request (verificado pelo §8). Coluna **Roadmap** liga aos critérios T1–T10 (§4.2b).
 
 ### 4.1 Cenários funcionais (BC)
 
@@ -139,6 +138,20 @@ aceite §10 do roadmap de migração.
 > retentativa, PATCH de revisão) entram na matriz na geração da coleção,
 > seguindo a numeração — a regra do §8 impede que fiquem de fora.
 
+| ID | Funcionalidade | Endpoint | Cobre |
+|---|---|---|---|
+| BC-088 | Revisar cobranças dentro do lote de cobv | `PATCH /pix/lote/{id}` | `P_03_02` do roteiro C6 — encadeia no `lote_id`/`txid_lote1` do BC-052 |
+
+> **BC-088 fechou uma ausência de homologação, não só uma linha de matriz.**
+> `revisar_lote_cobv` existia no mixin BACEN e o router não expunha, então
+> `P_03_02` saía do roteiro do C6 como caso ausente. A cobrança individual já
+> tinha o seu `PATCH /pix/{txid}`; a assimetria era o defeito.
+>
+> O teste aceita `502` entre os status esperados: o sandbox do C6 devolve `502`
+> em `/lotecobv` no `PUT` e no `GET`, e isso está registrado em
+> [docs/homologacao/](../homologacao/README.md) como defeito do banco. Marcar o
+> request como falho por causa disso apontaria para o lugar errado.
+
 ### 4.2 Cenários negativos (NEG) — enxutos, só comportamento já implementado
 
 | ID | Cenário | Esperado |
@@ -151,14 +164,92 @@ aceite §10 do roadmap de migração.
 | NEG-006 | Extrato Sicoob multi-mês | 422 |
 | NEG-007 | Pix em provider offline (`brcobranca`) | 422 |
 
-> NEG-003 cobre o **T6** do roadmap (propagação de erro de validação pelo proxy).
+> NEG-003 cobre o **T6** (§4.2b): propagação do erro de validação.
 
-### 4.3 Critérios do roadmap NÃO cobertos pelo Postman (cobertos por pytest)
+### 4.2b Critérios de aceite T1–T10 (herdados da migração)
+
+Vinham do roadmap de migração para o serviço único, que foi **concluído e
+removido**. Ficam aqui porque a coluna *Roadmap* da matriz acima os cita por
+nome — e porque descrevem comportamento da superfície offline que continua
+valendo, mesmo sem o proxy que os originou.
+
+| # | Critério | Onde é verificado hoje |
+|---|---|---|
+| T1 | `GET /api/boleto` devolve binário: `%PDF`, 5 headers `X-*`, `Content-Disposition` | BC-017 · `test_pdf_binario_com_headers_x` |
+| T2 | ~~Resposta gzip íntegra, sem `content-encoding` na saída~~ | **Sem objeto.** Era problema do proxy HTTP; a engine é in-process desde a 2.0.0 |
+| T3 | `POST /api/remessa` multipart → CNAB intacto | BC-038 · `test_remessa_cnab240` |
+| T4 | `POST /api/ofx/parse` → JSON | BC-040 |
+| T5 | Query string repassada (multi-items) | BC-014, BC-015 |
+| T6 | Erro de validação: `400` com `validation_errors` | NEG-003 · `test_boleto_invalido_400_com_validation_errors` |
+| T7 | Engine indisponível → `502` | pytest (não induzível em e2e) |
+| T8 | Método não aceito → `405` | pytest |
+| T9 | `/api/docs` responde HTML | BC-019 |
+| T10 | Rotas do gateway não caem no catch-all do offline | BC-001, BC-004 |
+
+> **T2 é o único que morreu de vez**, e vale entender por quê: ele existia para
+> garantir que o proxy não corrompesse corpo comprimido a caminho do Core Ruby.
+> Sem proxy e sem Core, não há caminho onde a corrupção aconteça. Critério que
+> perdeu o objeto não vira teste órfão — sai.
+
+### 4.3 Critérios NÃO cobertos pelo Postman (cobertos por pytest)
 
 | Roadmap | Motivo | Onde é coberto |
 |---|---|---|
 | T7 (engine indisponível → 502) | não induzível em e2e sem derrubar o Core | `tests/test_offline_proxy.py` |
 | T8 (método não aceito → 405) | valor marginal em e2e | idem |
+
+### 4.4 Cartão no C6 — implementado
+
+> `POST/GET/DELETE /checkout` existem, e a pasta **`12 · Checkout (cartão — C6)`**
+> está na Collection com BC-081, BC-082, BC-083, BC-084 e BC-085 — o §8 volta a
+> 100% de cobertura. Os cenários seguem nesta seção, e não nas tabelas §4.1/§4.2,
+> porque o que os afirma é **pytest**, não Postman: o essencial do cartão são as
+> recusas (`save_card`, transparente, capacidade por provider) e o mapeamento dos
+> dez status do spec — nada disso é observável num request contra o sandbox.
+>
+> Cobertura em `gateway/tests/test_c6_checkout.py` (30 testes).
+
+| ID | Funcionalidade | Endpoint | Cobre |
+|---|---|---|---|
+| BC-081 | Criar link de pagamento (201 + `url`, `expira_em`) | `POST /checkout` | caminho feliz |
+| BC-082 | Criar link com Pix no mesmo objeto | `POST /checkout` | um link, dois meios |
+| BC-083 | Consultar link — status normalizado | `GET /checkout/{id}` | leitura |
+| BC-084 | Cancelar link (`CANCELLED` → `baixado`) | `DELETE /checkout/{id}` | encerramento deliberado |
+| BC-085 | Criar parcelado (`parcelas`, `juros_por`) | `POST /checkout` | `juros_por` no payload, default `loja` |
+| BC-086 | Webhook do banco com `service: CHECKOUT` | `POST /config/webhook-banco` | a metade que já existe |
+| BC-087 | Receber evento de checkout e repassar ao Consumidor | `POST /webhooks/c6/{tenant}` | cadeia HMAC completa |
+
+**BC-087 é o menos óbvio e o mais importante.** O evento não vai do banco para o
+Consumidor: é *banco → Cobranca-API → Consumidor*, com `resolve_callback`
+achando o dono do tenant e `forward_event` assinando em HMAC-SHA256. As três
+peças já existem — muda só o `service` no cadastro —, mas nenhuma foi exercitada
+com `CHECKOUT`.
+
+| ID | Cenário | Esperado | Por que existe |
+|---|---|---|---|
+| NEG-008 | Rota de cartão em `provider=sicoob` | **422** dizendo para onde ir | o critério de entrada executando, via `exige_capacidade` |
+| NEG-009 | Corpo com `save_card` | **422** (campo inexistente no schema) | modo link: cartão não passa por aqui |
+| NEG-010 | Pedir checkout transparente / chave pública | **422** ou rota ausente | idem |
+| NEG-011 | `parcelas > 1` sem `juros_por` | **422** daqui, não `400` do banco | recusa antes de chamar o banco |
+
+**NEG-009 e NEG-010 não são formalidade.** A decisão 3 só é real se o campo não
+existir no schema — o próprio estudo diz que documentar não segura isso. Sem
+esses dois, a decisão de não guardar dado de cartão pode ser revogada por um
+chamador, sem ninguém revisar, e o custo de descobrir tarde não é um bug: é
+escopo PCI-DSS.
+
+#### O que fica fora do Postman, e por quê
+
+| Situação | Motivo | Onde é coberto |
+|---|---|---|
+| Chegar a `PAID` | ninguém paga link de cartão por script — o PAN é digitado na página do C6, e é isso que a decisão 3 quer | roteiro manual de homologação, uma vez |
+| `EXPIRED` → `expirado` | expiração default de 7 dias; não induzível em e2e | mock (`tests/test_c6_cartao.py`) |
+| `DECLINED`/`ERROR` → `erro` | exige cartão de teste recusado no sandbox | mock; sandbox se o C6 fornecer cartão de recusa |
+| Conciliação de cartão | não existe: a baixa é fixada em `PAID` e deixa a API de Recebíveis fora do escopo | — |
+
+A divergência entre baixa e extrato por até 30 dias no crédito é **comportamento
+esperado**, não falha de integração — não há cenário que a verifique porque não
+há o que verificar deste lado.
 
 ## 5. Estrutura de pastas da Collection
 

@@ -7,7 +7,8 @@
 title: Cobranca-API
 description: >-
   Cobrança bancária brasileira em API REST: boleto, CNAB 240/400, Pix,
-  Pix Automático e OFX. 18 bancos, 100% Python, um container.
+  Pix Automático e OFX. 3 bancos online (C6, Sicoob, Inter) e 18 offline,
+  100% Python, um container.
 theme: jekyll-theme-cayman
 lang: pt-BR
 
@@ -24,6 +25,30 @@ exclude:
 # via Actions.
 plugins:
   - jekyll-relative-links
+  # Gera /sitemap.xml com toda página servida (respeitando o exclude acima).
+  # Plugin da allowlist do GitHub Pages — não exige Gemfile. O sitemap não é
+  # descoberto sozinho num site de projeto (o robots.txt teria de estar na
+  # RAIZ do domínio maxwbh.github.io, que não é deste repositório): é preciso
+  # submetê-lo uma vez no Google Search Console.
+  - jekyll-sitemap
 relative_links:
   enabled: true
   collections: false
+
+# Imagem de card para TODA página, lida pelo jekyll-seo-tag — que o tema Cayman
+# já invoca no layout, e que é plugin padrão do GitHub Pages. Sem isto, link do
+# site colado em Slack, WhatsApp ou LinkedIn sai sem imagem nenhuma, e o
+# twitter:card fica em "summary" em vez de "summary_large_image".
+#
+# Fica em `defaults`, e não no front matter da index, porque vale para as
+# páginas internas também — é delas que costuma sair o link compartilhado.
+#
+# Este bloco já foi acusado uma vez de derrubar a build do Pages, e era inocente:
+# o "stack level too deep" de 07/08/2026 vinha de docs/_includes/head-custom.html
+# incluindo a si mesmo. Os frames de frontmatter_defaults no stack eram sintoma
+# da recursão, não a causa.
+defaults:
+  - scope:
+      path: ""
+    values:
+      image: /assets/social-preview.png

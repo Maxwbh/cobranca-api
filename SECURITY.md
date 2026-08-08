@@ -237,4 +237,8 @@ Agradecemos aos seguintes pesquisadores de segurança que reportaram vulnerabili
 
 **Obrigado por ajudar a manter o Cobranca-API seguro!**
 
-Para questões gerais (não relacionadas a segurança), por favor use as [issues do GitHub](https://github.com/Maxwbh/cobranca-api/issues).
+Para questões gerais (não relacionadas a segurança), use as
+[discussões](https://github.com/Maxwbh/cobranca-api/discussions) — dúvida de
+integração raramente é defeito, e no Q&A a resposta fica pesquisável para quem
+esbarrar no mesmo ponto depois. Issue continua sendo o lugar de defeito
+reprodutível.

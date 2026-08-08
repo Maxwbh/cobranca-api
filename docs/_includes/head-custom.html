@@ -1,0 +1,97 @@
+<!--
+  Ponto de extensão do tema Cayman: o _layouts/default.html dele fecha o <head>
+  chamando este arquivo, DEPOIS do link da folha de estilo do tema. É por isso
+  que as regras abaixo vencem sem !important.
+
+  NÃO escreva a tag de include deste arquivo aqui dentro, nem como exemplo em
+  comentário: Liquid não respeita comentário de HTML e processa a tag mesmo
+  assim, o arquivo passa a incluir a si mesmo e a build do Pages morre com
+  "stack level too deep" após dez mil níveis, sem apontar o culpado. Foi o que
+  derrubou o site em 07/08/2026.
+
+  Duas coisas entram aqui: os ícones e a paleta. Sem elas o site sai com o
+  favicon genérico do GitHub e o verde padrão do Cayman, que não tem relação
+  nenhuma com a identidade do projeto.
+-->
+
+<!-- Verificação do Google Search Console. Dois métodos de propósito: a meta
+     tag aqui e o arquivo googlec*.html em docs/ — se um plugin do Pages
+     embrulhar o arquivo num layout, a meta tag segura a verificação. -->
+<meta name="google-site-verification" content="XS9wvfG-V6V1tGDI7BT0zbeqiQyE3-tkc5LhfL0tvbc" />
+
+<link rel="icon" href="{{ '/assets/favicon.svg' | relative_url }}" type="image/svg+xml">
+<link rel="icon" href="{{ '/assets/favicon.ico' | relative_url }}" sizes="32x32">
+<link rel="apple-touch-icon" href="{{ '/assets/apple-touch-icon.png' | relative_url }}">
+
+<style>
+  /* Cabeçalho na paleta do projeto — o Cayman vem com gradiente verde. */
+  .page-header {
+    background-color: #0F172A;
+    background-image: linear-gradient(120deg, #0F172A, #152449);
+  }
+
+  /* A marca acima do título. Vai por background-image porque `head-custom` só
+     alcança o <head>: não dá para inserir um <img> no corpo do cabeçalho. */
+  .project-name::before {
+    content: "";
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 14px;
+    background: url("{{ '/assets/marca-escura.svg' | relative_url }}") center / contain no-repeat;
+  }
+
+  .project-tagline { color: #CBD5E1; opacity: 1; }
+
+  /* Ciano fechado, não o #06B6D4 da identidade: link é texto pequeno sobre
+     branco, e ali o ciano aberto dá 2,43 de contraste. Este dá 3,68 no corpo
+     e sobe para 4,6 no hover. */
+  .main-content a { color: #0891B2; }
+  .main-content a:hover { color: #0E7490; }
+
+  .btn {
+    color: #F8FAFC;
+    border-color: rgba(248, 250, 252, 0.4);
+  }
+  .btn:hover {
+    border-color: rgba(248, 250, 252, 0.85);
+    background-color: rgba(248, 250, 252, 0.12);
+  }
+
+  .main-content h1, .main-content h2 { color: #0F172A; }
+  .main-content blockquote {
+    color: #475569;
+    border-left-color: #06B6D4;
+  }
+  .main-content table th { background-color: #F1F5F9; }
+</style>
+
+<!-- Dados estruturados para o Google: o jekyll-seo-tag já emite WebSite; este
+     bloco declara o SOFTWARE que o site documenta. SoftwareSourceCode é o tipo
+     certo para projeto de código (SoftwareApplication pede offers/rating para
+     rich result, que não temos). JSON com chaves entre aspas não colide com
+     Liquid — cuidado apenas para nunca escrever chaves duplas aqui. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "Cobranca-API",
+  "description": "Cobrança bancária brasileira em API REST: boleto, CNAB 240/400, Pix, Pix Automático, cartão e OFX. 3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, um container.",
+  "url": "https://maxwbh.github.io/cobranca-api/",
+  "codeRepository": "https://github.com/Maxwbh/cobranca-api",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "Python 3.12",
+  "license": "https://opensource.org/license/mit",
+  "operatingSystem": "Docker / Linux",
+  "keywords": "boleto, cnab, cnab240, cnab400, pix, pix automático, bolepix, ofx, cobrança, api rest, sicoob, banco inter, c6 bank",
+  "author": {
+    "@type": "Person",
+    "name": "Maxwell da Silva Oliveira",
+    "url": "https://github.com/Maxwbh",
+    "email": "maxwbh@gmail.com",
+    "sameAs": [ "https://www.linkedin.com/in/maxwbh", "https://github.com/Maxwbh" ],
+    "worksFor": { "@type": "Organization", "name": "M&S do Brasil LTDA", "url": "https://msbrasil.inf.br" }
+  },
+  "publisher": { "@type": "Organization", "name": "M&S do Brasil LTDA", "url": "https://msbrasil.inf.br" }
+}
+</script>

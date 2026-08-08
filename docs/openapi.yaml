@@ -61,11 +61,12 @@ info:
     | Unicred | 136 | ✅ | ✅ | ✅ | — |
     | Ailos | 085 | ✅ | ✅ | ❌ | — |
 
-  version: 2.1.1
+  version: 2.2.0
   contact:
-    name: Maxwell da Silva Oliveira
+    name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
     email: maxwbh@gmail.com
-    url: https://www.msbrasil.inf.br
+    # sem www: o www responde 301 para esta forma
+    url: https://msbrasil.inf.br
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -78,7 +79,7 @@ servers:
     description: Sua instância do serviço
     variables:
       base_url:
-        default: https://boleto-cnab-api.onrender.com
+        default: https://cobranca-api-sq67.onrender.com
         description: >-
           Base URL da sua instância. O valor padrão é a demo pública, no plano
           gratuito do Render — hiberna após 15 min e não é ambiente de produção.
@@ -1143,7 +1144,7 @@ components:
             version:
               type: string
               description: Versão da Cobranca-API
-              example: '2.1.1'
+              example: '2.2.0'
             engine:
               type: string
               example: python

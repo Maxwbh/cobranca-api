@@ -55,7 +55,7 @@ está documentado em [`../c6-rest.md`](./c6-rest.md). Sequência de integração
 | C6-S06 | Notificações / Webhooks (`/v1/webhooks`) | Avisos de pagamento/baixa de boleto | ✅ | `/config/webhook-banco` (config) + `POST /webhooks/c6[/{tenant}]` (entrada) |
 | C6-S07 | Extrato (`/v1/statement`) | Movimentações da conta PJ | ✅ | `GET /extrato` |
 | C6-S08 | Transações e Recebíveis — C6 Pay | Extrato da adquirência (cartão) | ✅ | `GET /conciliacao/recebiveis\|transacoes` |
-| C6-S09 | Checkout (cartão/Pix) | Página de pagamento hospedada | ⛔ | Sem previsão (decisão de produto) |
+| C6-S09 | Checkout (cartão/Pix) | Página de pagamento hospedada | ✅ | `POST/GET/DELETE /checkout` — **modo link apenas**; transparente e `save_card` recusados no schema |
 | C6-S10 | Agendamento de Pagamentos / DDA | Pagar contas/boletos (saída de dinheiro) | ⛔ | Fora de escopo — o produto é **cobrança** (entrada), não pagamento |
 
 ## Roteamento de provider
@@ -114,6 +114,9 @@ vigente com o time do C6 (varia por ambiente e pode mudar sem aviso).
 | Webhook no banco | `POST/GET/DELETE /v1/webhooks/` | `/config/webhook-banco` |
 | Recebíveis | `GET /v1/c6pay/statement/receivables` | `GET /conciliacao/recebiveis` |
 | Transações | `GET /v1/c6pay/statement/transactions` | `GET /conciliacao/transacoes` |
+| Criar link de pagamento | `POST /v1/checkouts/` | `POST /checkout` |
+| Consultar link | `GET /v1/checkouts/{id}` | `GET /checkout/{id}` |
+| Cancelar link | `PUT /v1/checkouts/{id}/cancel` | `DELETE /checkout/{id}` |
 | Notificações (status) | webhook do banco | `POST /webhooks/c6[/{tenant}]` |
 
 ## Pix Automático, recebidos e webhook por chave (BACEN, compartilhado)
@@ -136,6 +139,27 @@ address{street, number, city, state, zip_code}}` (endereço obrigatório),
 **Status boleto**: `CREATED→registrado`, `PAID→liquidado`, `CANCELLED→baixado`.
 **Status Pix (BACEN)**: `ATIVA→registrado`, `CONCLUIDA→liquidado`,
 `REMOVIDA_*→baixado`.
+
+**Checkout** (`/v1/checkouts/`): `valor → amount`, `parcelas → installments`,
+`juros_por → interest_type` (`loja→BY_SELLER`, `emissor→BY_ISSUER`),
+`parcelas_fixas → fixed_installments`, `autenticacao → authenticate`,
+`pix: true → payment.pix{key: AUTO}` (o QR sai do banco).
+
+`BY_SELLER` — o default — significa que **o pagador vê `valor / parcelas` sem
+acréscimo e o juro sai do repasse ao lojista**. Isto é o que faz o `amount` do
+checkout **não bater** com o crédito no extrato: a diferença é o juro absorvido
+mais o MDR, e nenhum dos dois vem pela API (são contratuais com o banco).
+
+`installments` é repassado **como veio**: não há teto nosso, e **valor mínimo de
+parcela não existe nesta API** — é política comercial da loja, resolvida por
+quem chama antes do POST. Recusa do banco volta como `422` com o corpo dele em
+`upstream`, e o ajuste é reenviar com outra configuração.
+
+> **Não medido, e não bloqueia:** o teto de parcelas do C6 e se ele impõe
+> parcela mínima própria não constam do portal que consultamos. Não são
+> pendência de homologação — o desenho já os cobre: repassamos o número e o
+> banco recusa o que não aceitar, com o motivo dele em `upstream`. Saber os
+> valores só pouparia uma ida ao banco; não muda o contrato nem o código.
 
 ## Autenticação da API (token `bapi_`)
 
@@ -199,9 +223,15 @@ Chave Pix por conta em `account_config.chave_pix` (ou por cobrança em
 
 O C6 chama a URL cadastrada a cada mudança de status. Cadastre com token:
 `https://…/webhooks/c6/<tenant>?token=<segredo>` e configure
-`WEBHOOK_TOKEN__C6=<segredo>` (validação em tempo constante; sem a env, aceita
-sem validar). O evento normalizado é encaminhado ao consumidor dono do tenant
-com HMAC (`X-Signature`), como nos demais bancos.
+`WEBHOOK_TOKEN__C6=<segredo>` (validação em tempo constante). **Sem a env a rota
+recusa com `401`** — o C6 não documenta assinatura no payload, então o token de
+rota é a única prova de origem que existe, e aceitar sem ela deixava qualquer um
+forjar um `liquidado`.
+
+O evento normalizado é encaminhado ao consumidor dono do tenant com HMAC
+(`X-Signature`), como nos demais bancos. Antes de propagar `liquidado`, o
+gateway reconsulta `/v1/bank_slips/{id}` (ou `/v1/checkouts/{id}`) e a resposta
+do banco prevalece — ver `confirmado` no `WebhookEvent`.
 
 ## Ambiente / envs
 
@@ -212,17 +242,42 @@ com HMAC (`X-Signature`), como nos demais bancos.
 | `C6_BILLING_SCHEME` | `21` | carteira (15 em produção) |
 | `C6_REGISTERED_READY` | `false` | liga boleto REST (senão CNAB) |
 | `C6_PARTNER_NAME` / `C6_PARTNER_VERSION` | `boleto-api` / — | headers `partner-software-*` |
-| `WEBHOOK_TOKEN__C6` | — | token do webhook de entrada |
+| `WEBHOOK_TOKEN__C6` | — | token do webhook de entrada — **obrigatório**, sem ele a rota responde `401` |
 
 ## Testes
 
-- `pytest` (mock): `tests/test_cobranca_c6.py`, `test_pix_c6.py`,
-  `test_conciliacao_c6.py`, `test_webhooks.py`.
-- E2E sandbox (`tests/test_sandbox_c6.py`): roda só com `C6_SANDBOX_CLIENT_ID`
-  / `C6_SANDBOX_CLIENT_SECRET` (+ `C6_SANDBOX_PFX_*`, `C6_SANDBOX_CHAVE_PIX`)
-  no ambiente, dentro da janela do sandbox.
+Mock — interceptam `OAuthMtlsClient.request` e rodam no `pytest` de sempre, sem
+credencial:
 
-## Validado no sandbox real (roteiro v3.0)
+| Arquivo | O que cobre |
+|---|---|
+| `tests/test_c6_hml.py` (14) | As operações do **roteiro de homologação v3.0**: alterar boleto, Pix (txid via PUT, PATCH de revisão, cobv, listas, lote), extrato, webhook, Bolepix (criar/consultar/PDF/cancelar + as duas recusas por endereço) e o `409` de CIP com re-tentativa |
+| `tests/test_c6_checkout.py` (30) | **Checkout**: payload, os 10 status do spec, capacidade por provider, e a recusa de `save_card`/transparente/captura |
+| `tests/test_pix_c6.py` (8) | Dialeto BACEN pelo provider C6 |
+| `tests/test_webhooks.py` (9) · `test_webhook_banco.py` | Recepção, autenticidade e cadastro do webhook no banco |
+| `tests/test_errors.py` (10) | Tradução do erro do banco em `4xx`/`5xx` |
+| `tests/test_cobranca_c6.py` (3) · `test_conciliacao_c6.py` (3) | Boleto e recebíveis/transações |
+
+### E2E contra o sandbox real
+
+`tests/test_sandbox_c6.py` — roda só com `C6_SANDBOX_CLIENT_ID` /
+`C6_SANDBOX_CLIENT_SECRET` (+ `C6_SANDBOX_PFX_*`, `C6_SANDBOX_CHAVE_PIX`) no
+ambiente e dentro da janela do sandbox. São **dois fluxos**, não mais:
+
+```
+test_sandbox_emitir_consultar_cancelar_boleto
+test_sandbox_pix_cob_imediata
+```
+
+## Homologação — o que foi validado, e como
+
+São duas coisas diferentes, e convém não lê-las como uma.
+
+### Roteiro v3.0 — manual, snapshot registrado na 2.1.0 (2026-07-31)
+
+Executado **uma vez** contra o sandbox real. **Nada re-verifica esta lista
+automaticamente**: o e2e acima cobre dois destes fluxos; o restante vale como
+registro do que passou naquela data, não como garantia de hoje.
 
 - Boleto: emitir (simples/juros+multa/desconto), alterar, consultar, PDF e
   cancelar — o **registro é assíncrono (CIP)**: cancelamentos no intervalo
@@ -234,9 +289,34 @@ com HMAC (`X-Signature`), como nos demais bancos.
 - Extrato, recebíveis/transações e cadastro de webhook no banco.
 - Indisponível no sandbox à época: `lotecobv` (502 do lado do banco).
 
+### Mudou depois do snapshot (2.1.1)
+
+O roteiro acima é anterior a estes dois, e ambos são visíveis para quem integra:
+
+- **Bolepix sem endereço do pagador recusa com `422` antes de chamar o banco.**
+  Antes, o endereço vazio virava `400` do C6 traduzido em `502`. Cobertura em
+  `test_c6_hml.py`.
+- **Erro do banco deixou de virar `502` quase sempre:** `400`/`422`/`405` → `422`,
+  `404` → `404`, `409` → `409`, `429` → `429` repassando `Retry-After`. Cobertura
+  em `test_errors.py`.
+
+Quando o roteiro for reexecutado, os dois entram na lista acima.
+
 ## Pendências
 
-1. Mecanismo de autenticidade do webhook (hoje: token na URL).
-2. Shape fino de `receivables/transactions` (tipagem passthrough).
-3. Enviar o roteiro preenchido a homologacaoapi@c6bank.com e, aprovado,
+1. **Assinatura do webhook pelo próprio banco.** O C6 não oferece, e por isso a
+   autenticidade se apoia em duas camadas nossas: token de rota (`?token=` ou
+   `x-webhook-token`, em tempo constante, **obrigatório**) e **reconsulta ao
+   banco antes de propagar `liquidado`** — ver `confirmado` no `WebhookEvent`.
+   A segunda é a que não depende do banco documentar nada; se um dia ele
+   assinar, ela vira redundância barata, não trabalho perdido.
+2. **Se o `GET /v1/checkouts/{id}` devolve o líquido do lojista** no
+   `BY_SELLER`. Se devolver, mapear no `CheckoutOut`: é a informação que fecha a
+   conciliação de cartão, hoje impossível porque `amount` é o que o pagador
+   paga, não o que a loja recebe.
+3. Shape fino de `receivables/transactions` (tipagem passthrough).
+4. Enviar o roteiro preenchido a homologacaoapi@c6bank.com e, aprovado,
    ligar `C6_REGISTERED_READY=true` + carteira 15 + `C6_BASE_URL` de produção.
+   O formulário **preenchido com o retorno real do sandbox**, a evidência crua
+   e o passo a passo para reexecutar estão em
+   [docs/homologacao/](../homologacao/README.md).

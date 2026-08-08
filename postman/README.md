@@ -6,7 +6,7 @@ As descrições das pastas citam os **IDs de catálogo de serviços** (`C6-Sxx`,
 `docs/development/<banco>-rest.md`, seção "Serviços do banco × Cobranca-API".
 Coleção **schema v2.1**, com IDs de rastreabilidade (`BC-xxx` funcional,
 `NEG-xxx` negativo, `SMK-xx` smoke) ligados à matriz §4 do plano e aos testes
-T1–T10 do [roadmap de migração](../docs/development/roadmap-migracao-servico-unico.md).
+T1–T10, na [§4.2b do plano de cenário](../docs/development/plano-cenario-teste-postman-hml.md).
 
 ## Arquivos
 

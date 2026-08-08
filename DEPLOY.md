@@ -21,6 +21,19 @@ pyCobrança embutida). Não existem variantes.
 O restante deste guia segue valendo (o `render.yaml` do repo já traz essa
 configuração para deploys via Blueprint).
 
+## 📦 Imagem pronta (qualquer host Docker)
+
+Fora do Render — VPS, Kubernetes, sua máquina — não precisa clonar nem buildar:
+cada release publica a imagem no GHCR, em amd64 e arm64.
+
+```bash
+docker run -p 8000:8000 -e LOG_LEVEL=info ghcr.io/maxwbh/cobranca-api:latest
+```
+
+Em produção, fixe a versão (ex.: `ghcr.io/maxwbh/cobranca-api:2.1.0`) — `latest`
+muda a cada release. As variáveis de ambiente deste guia valem igual para a
+imagem pronta.
+
 ## 🚀 Deploy Rápido (1-Click)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)

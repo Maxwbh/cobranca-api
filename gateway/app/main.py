@@ -6,7 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.vault import CredentialNotFound
 from app.providers.c6 import ProcessamentoPendente
-from app.routers import (bancos, bolepix, carne, cobranca, conciliacao, credenciais,
+from app.routers import (
+    bancos, bolepix, carne, checkout, cobranca, conciliacao, credenciais,
                          extrato, jobs, offline, pix, pix_automatico, webhook_banco,
                          webhooks)
 
@@ -14,6 +15,7 @@ from app.routers import (bancos, bolepix, carne, cobranca, conciliacao, credenci
 _DOC_C6 = "https://developers.c6bank.com.br"
 _DOC_SICOOB = "https://developers.sicoob.com.br/portal/"
 _DOC_BACEN_PIX = "https://bacen.github.io/pix-api/"
+_DOC_INTER = "https://developers.bancointer.com.br/"
 _DOC_REPO = "https://github.com/Maxwbh/cobranca-api/tree/main/docs/development"
 
 TAGS = [
@@ -22,18 +24,31 @@ TAGS = [
                     f"Catálogo completo de serviços por banco (incl. não implementados): [docs do repositório]({_DOC_REPO})."},
     {"name": "credenciais",
      "description": "Tokenização zero-knowledge: cadastre as credenciais do banco UMA vez e use o token `bapi_` nas demais chamadas. "
-                    "O esquema de campos de cada banco está em `GET /bancos`."},
+                    "**O mecanismo é um só; o esquema de campos é de cada banco** — C6 e Sicoob entregam "
+                    "PKCS12 (`pfx_base64` + `pfx_password`), o Inter entrega `.crt` + `.key` "
+                    "(`cert_pem` + `key_pem`, aceitos em PEM cru ou base64). Integrar banco novo não muda "
+                    "nada do lado do consumidor: o esquema vigente sai em `GET /bancos`."},
     {"name": "cobranca",
      "description": "Boleto: emitir, consultar, alterar, PDF e baixar — REST (banco) ou offline via pyCobrança, conforme `provider`. "
-                    f"Docs oficiais: [C6 Boleto]({_DOC_C6}/apis/bankslip) · [Sicoob Cobrança v3]({_DOC_SICOOB})."},
+                    f"Docs oficiais: [C6 Boleto]({_DOC_C6}/apis/bankslip) · [Sicoob Cobrança v3]({_DOC_SICOOB}) · "
+                    f"[Inter Cobrança v3]({_DOC_INTER}).\n\n"
+                    "**Alterar (`PUT`) hoje só existe no C6** — no Sicoob e no Inter o caminho é "
+                    "baixar e reemitir, e a rota responde `422` dizendo isso. `GET /bancos` "
+                    "responde a matriz exata, por introspecção."},
     {"name": "carne",
      "description": "Carnê 3-vias A4 (registra N parcelas e monta o PDF na engine pyCobrança)."},
     {"name": "pix",
      "description": "Pix BACEN: cob/cobv, revisão, listas, lote e Pix RECEBIDOS (conciliação). Dialeto idêntico em todos os bancos — "
-                    f"[spec BACEN]({_DOC_BACEN_PIX}). Docs oficiais: [C6 Pix]({_DOC_C6}/apis/pix) · [Sicoob]({_DOC_SICOOB})."},
+                    f"[spec BACEN]({_DOC_BACEN_PIX}). Docs oficiais: [C6 Pix]({_DOC_C6}/apis/pix) · "
+                    f"[Sicoob]({_DOC_SICOOB}) · [Inter]({_DOC_INTER})."},
     {"name": "bolepix",
      "description": "Boleto híbrido online com QR Pix EVP embutido (exclusivo C6, /v2/bank_slips). "
                     f"Doc oficial: [C6 Bolepix]({_DOC_C6}/apis/bolepix)."},
+    {"name": "checkout",
+     "description": "Link de pagamento com **cartão** (crédito/débito, parcelado) e, opcionalmente, Pix no mesmo link. "
+                    "**Modo link apenas:** o pagador digita o cartão na página do banco — nenhum dado de cartão passa por esta API, "
+                    "e por isso `save_card` e checkout transparente não existem no schema. Existe no banco que oferece a "
+                    f"funcionalidade (hoje o C6). Doc oficial: [C6 Checkout]({_DOC_C6}/apis/checkout)."},
     {"name": "pix-automatico",
      "description": "Débito recorrente via Pix (BACEN): recorrência, autorização do pagador, cobranças do ciclo e retentativa. "
                     "O agendamento de cada cobrança fica no produto consumidor. "
@@ -42,11 +57,14 @@ TAGS = [
      "description": "Recebíveis e transações C6 Pay (extrato da adquirência). "
                     f"Doc oficial: [C6 Pay statements]({_DOC_C6}/apis/c6pay-statements)."},
     {"name": "extrato",
-     "description": "Extrato da conta PJ (C6 /v1/statement; Sicoob conta-corrente v4 — mensal). "
-                    f"Docs oficiais: [C6 Extrato]({_DOC_C6}/apis/statement) · [Sicoob]({_DOC_SICOOB})."},
+     "description": "Extrato da conta PJ (C6 /v1/statement; Sicoob conta-corrente v4 — mensal; Inter /banking/v2/extrato). "
+                    f"Docs oficiais: [C6 Extrato]({_DOC_C6}/apis/statement) · [Sicoob]({_DOC_SICOOB}) · [Inter]({_DOC_INTER})."},
     {"name": "config",
      "description": "Configurações NO banco: URL de webhook (boleto e Pix por chave). "
-                    f"Docs oficiais: [C6 Notificações]({_DOC_C6}/apis/notifications) · [webhook Pix BACEN]({_DOC_BACEN_PIX})."},
+                    "Cadastro de webhook de boleto no **C6** e no **Inter**; o Sicoob não expõe a rota "
+                    "(responde `422`). O de Pix por chave é BACEN, igual em todos. "
+                    f"Docs oficiais: [C6 Notificações]({_DOC_C6}/apis/notifications) · [Inter]({_DOC_INTER}) · "
+                    f"[webhook Pix BACEN]({_DOC_BACEN_PIX})."},
     {"name": "jobs",
      "description": "Processamento em **lote assíncrono**: `202 Accepted` + `job_id`, itens "
                     "rastreáveis e estado persistido. A falha de um item não cancela o job "
@@ -58,17 +76,33 @@ TAGS = [
 
 app = FastAPI(
     title="Cobranca-API",
-    version="2.1.1",
+    version="2.2.0",
     docs_url=None,  # /docs customizado abaixo (tema visual da plataforma)
+    # `contact` e `license_info` saem no cabeçalho do Swagger e no openapi.json —
+    # é o "quem mantém isto" para quem chega pela demo sem passar pelo GitHub.
+    contact={
+        "name": "Maxwell da Silva Oliveira — M&S do Brasil LTDA",
+        "url": "https://msbrasil.inf.br",
+        "email": "maxwbh@gmail.com",
+    },
+    license_info={"name": "MIT", "url": "https://github.com/Maxwbh/cobranca-api/blob/main/LICENSE"},
     openapi_tags=TAGS,
     description=(
-        "Serviço único de cobrança **100% Python**: gateway multi-banco (C6/Sicoob) + "
-        "engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
-        "**Superfície offline (`/api/*`):** boleto/CNAB/OFX sem banco online, gerada "
+        "Serviço único de cobrança **100% Python** — **3 bancos ON** "
+        "(**C6** 336 · **Sicoob** 756 · **Inter** 077) **e 18 OFF** pela engine "
+        "[pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
+        "**Nem todo banco faz tudo** — e isso é dado, não parágrafo: `GET /bancos` "
+        "devolve as capacidades por **introspecção das classes de provider**, então "
+        "não há como a lista envelhecer. Pedir ao banco algo que ele não oferece "
+        "responde `422` dizendo **para onde ir**, nunca `500`.\n\n"
+        "**Superfície offline (`/api/*`):** boleto/CNAB/OFX de **18 bancos** sem banco online, gerada "
         "**nativamente** pela pyCobrança no próprio processo (sem sidecar) e sem "
         "autenticação — doc própria em [**Swagger Offline → `/api/docs`**](/api/docs) "
         "([spec](/api/openapi.yaml)).\n\n"
-        "**Produto standalone** consumido por múltiplos sistemas; escopo por `tenant_id`.\n\n"
+        "**Produto standalone** consumido por múltiplos sistemas; escopo por `tenant_id`. "
+        "**Instalação em uma linha** — imagem pronta publicada a cada release: "
+        "`docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`. "
+        "Documentação completa: [maxwbh.github.io/cobranca-api](https://maxwbh.github.io/cobranca-api/).\n\n"
         "### Emissão em lote — qual caminho usar\n\n"
         "| Volume | Caminho | O que devolve |\n"
         "|---|---|---|\n"
@@ -113,17 +147,127 @@ app = FastAPI(
 
 _openapi_original = app.openapi
 
+# --- Erros na spec -------------------------------------------------------------
+#
+# Os erros de banco NÃO nascem nas assinaturas das rotas: vêm dos exception
+# handlers abaixo (`ProcessamentoPendente`, `httpx.HTTPStatusError`,
+# `httpx.RequestError`, `CredentialNotFound`). O FastAPI não os enxerga, então a
+# spec declarava só `200/201/422` — e quem integra descobria o `409` da CIP e o
+# `424` de credencial em produção, não no Swagger.
+#
+# Declarar num pós-processamento único, e não `responses=` rota a rota, é o que
+# mantém spec e handler casados: a lista mora ao lado do `ERRO_UPSTREAM` que a
+# produz, e rota nova entra documentada sem ninguém lembrar de copiar o bloco.
 
-def _openapi_com_external_docs() -> dict:
+_ERRO_UPSTREAM = "ErroDoBanco"
+_ERRO_SIMPLES = "Erro"
+
+_SCHEMAS_DE_ERRO: dict[str, dict] = {
+    _ERRO_SIMPLES: {
+        "title": "Erro",
+        "type": "object",
+        "properties": {"detail": {"type": "string"}},
+        "required": ["detail"],
+    },
+    _ERRO_UPSTREAM: {
+        "title": "Erro do banco",
+        "description": "O status do banco é traduzido para o que o chamador precisa "
+                       "fazer, mas o original vai inteiro em `upstream` — traduzir a "
+                       "faixa não pode custar o diagnóstico.",
+        "type": "object",
+        "properties": {
+            "detail": {"type": "string", "description": "O que houve, em uma frase."},
+            "upstream": {
+                "type": "object",
+                "description": "A resposta do banco, como veio.",
+                "properties": {
+                    "status": {"type": "integer", "description": "Status HTTP do banco."},
+                    "url": {"type": "string", "description": "Endpoint do banco chamado."},
+                    "body": {"description": "Corpo do banco (JSON, ou texto truncado em 500)."},
+                },
+            },
+        },
+        "required": ["detail"],
+    },
+}
+
+
+def _resposta(descricao: str, schema: str = _ERRO_UPSTREAM) -> dict:
+    return {"description": descricao,
+            "content": {"application/json": {
+                "schema": {"$ref": f"#/components/schemas/{schema}"}}}}
+
+
+# Ordem e texto seguem a tabela de `ERRO_UPSTREAM` — se um mudar, o outro tem de
+# mudar junto, e ficam lado a lado para que a divergência salte aos olhos.
+_RESPOSTAS_DO_BANCO: dict[str, dict] = {
+    "404": _resposta("Recurso não encontrado no banco."),
+    "409": _resposta(
+        "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro "
+        "assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso "
+        "é transitório e a mesma chamada funciona em instantes."),
+    "424": _resposta(
+        "Credenciais: ausentes no cofre para o par tenant/provider, ou rejeitadas "
+        "pelo banco. Todo erro no endpoint de **token** responde `424`, qualquer "
+        "que seja o status do banco — o Inter, por exemplo, devolve `400` para "
+        "`client_credentials` inválido, e chamar aquilo de payload inválido manda "
+        "procurar defeito no lugar errado."),
+    "429": _resposta(
+        "Limite de requisições do banco atingido. O `Retry-After` é repassado "
+        "quando o banco o envia."),
+    "502": _resposta("Falha do banco (`5xx` ou status não mapeado) — re-tentar com backoff."),
+    "504": _resposta("Banco indisponível ou tempo esgotado (rede/timeout)."),
+}
+
+# Tags cujas rotas realmente saem para o banco. As de fora respondem sem cruzar a
+# rede: `bancos` é introspecção do código, `credenciais` só cifra e guarda,
+# `health` é sonda — e `webhooks` é ENTRADA do banco, não chamada a ele.
+_TAGS_QUE_FALAM_COM_O_BANCO = {
+    "cobranca", "carne", "pix", "bolepix", "checkout", "pix-automatico",
+    "conciliacao", "extrato", "config", "jobs",
+}
+
+# O `422` gerado pelo FastAPI cobre só a validação do corpo. A mesma faixa carrega
+# outros dois casos, de corpos diferentes, e omiti-los faz o integrador tratar
+# `422` como "erro meu de schema" quando pode ser o banco ou o catálogo.
+_422_AMPLIADO = (
+    "Três origens, distinguíveis pelo corpo:\n\n"
+    "1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não "
+    "batem com o schema;\n"
+    "2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a "
+    "operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n"
+    "3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz "
+    "`upstream` com a resposta original. Re-tentar igual não resolve."
+)
+
+
+def _openapi_enriquecido() -> dict:
+    """Acrescenta à spec o que o FastAPI não tem como saber sozinho."""
     schema = _openapi_original()
     schema["externalDocs"] = {
         "description": "Documentação do projeto (guias por banco, roadmap, testes)",
         "url": _DOC_REPO,
     }
+    schema.setdefault("components", {}).setdefault("schemas", {}).update(_SCHEMAS_DE_ERRO)
+
+    for operacoes in schema["paths"].values():
+        for operacao in operacoes.values():
+            if not isinstance(operacao, dict):
+                continue
+            respostas = operacao.setdefault("responses", {})
+            tags = set(operacao.get("tags") or ())
+            if tags & _TAGS_QUE_FALAM_COM_O_BANCO:
+                for status, corpo in _RESPOSTAS_DO_BANCO.items():
+                    respostas.setdefault(status, corpo)
+                if "422" in respostas:
+                    respostas["422"]["description"] = _422_AMPLIADO
+            if tags & {"credenciais", "webhooks"}:
+                respostas.setdefault("401", _resposta(
+                    "Token inválido, revogado ou de outro tenant.", _ERRO_SIMPLES))
     return schema
 
 
-app.openapi = _openapi_com_external_docs
+app.openapi = _openapi_enriquecido
 
 app.include_router(bancos.router)
 app.include_router(credenciais.router)
@@ -132,6 +276,7 @@ app.include_router(carne.router)
 app.include_router(jobs.router)
 app.include_router(pix.router)
 app.include_router(bolepix.router)
+app.include_router(checkout.router)
 app.include_router(conciliacao.router)
 app.include_router(extrato.router)
 app.include_router(pix_automatico.router)
@@ -171,6 +316,16 @@ ERRO_UPSTREAM: dict[int, tuple[int, str]] = {
 }
 
 
+def _eh_endpoint_de_token(url: str) -> bool:
+    """Reconhece a URL de autenticação dos providers pelo sufixo do caminho.
+
+    Casar por sufixo e não por host mantém isto válido quando a base muda entre
+    sandbox e produção — que é justamente quando o erro aparece.
+    """
+    caminho = url.split("?", 1)[0].rstrip("/")
+    return caminho.endswith(("/token", "/auth", "/oauth/v2/token", "/v1/auth"))
+
+
 @app.exception_handler(httpx.HTTPStatusError)
 async def _erro_do_banco(request: Request, exc: httpx.HTTPStatusError) -> JSONResponse:
     """Erro HTTP vindo do BANCO (upstream) — nunca 500 genérico.
@@ -184,6 +339,12 @@ async def _erro_do_banco(request: Request, exc: httpx.HTTPStatusError) -> JSONRe
     except ValueError:
         detalhe = (exc.response.text or "")[:500]
     status, mensagem = ERRO_UPSTREAM.get(upstream, (502, "erro na API do banco"))
+    # Erro no endpoint de TOKEN é sempre credencial, qualquer que seja o status.
+    # O Inter devolve 400 para client_credentials inválido, e o mapa acima o
+    # traduzia como "o banco recusou os dados enviados" — mandando quem integra
+    # caçar defeito no payload quando o problema é a credencial.
+    if _eh_endpoint_de_token(str(exc.request.url)):
+        status, mensagem = 424, "credenciais do banco rejeitadas na autenticação"
     resposta = JSONResponse(status_code=status, content={
         "detail": mensagem,
         "upstream": {"status": upstream, "url": str(exc.request.url), "body": detalhe},
@@ -262,7 +423,7 @@ _SWAGGER_HTML = """<!DOCTYPE html>
     <h1>Cobranca-API</h1>
     <span class="surface">Gateway REST &middot; multi-banco</span>
     <span class="pill">100% Python &middot; FastAPI + pyCobran&ccedil;a</span>
-    <small>v__VERSION__ &middot; C6 &middot; Sicoob &middot; Pix BACEN &middot; pyCobrança</small>
+    <small>v__VERSION__ &middot; C6 &middot; Sicoob &middot; Inter &middot; Pix BACEN</small>
     <div class="links">
       <a href="https://github.com/Maxwbh/cobranca-api" target="_blank" rel="noopener">GitHub</a>
       <a href="/api/docs">Offline / pyCobrança &rarr;</a>

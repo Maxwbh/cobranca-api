@@ -1,80 +1,119 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Cobranca-API — plataforma open source de cobrança bancária: boleto, Pix, CNAB e OFX para 18 bancos brasileiros, 100% Python">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640"
+     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, um container, licença MIT.">
   <!--
-    Social preview do GitHub (Settings > General > Social preview): 1280x640.
-    O banner.svg tem 1200x270 e não serve reescalado — o GitHub recorta para
-    2:1 e cortaria o texto. Mesma paleta e mesmos motivos, recompostos.
+    Social preview do GitHub — Settings > General > Social preview.
+    O GitHub aceita PNG/JPG ali, não SVG: este arquivo é a FONTE, e o que se
+    sobe é o social-preview.png gerado por scripts/gerar-icones.py.
 
-    Sem cantos arredondados de propósito: o preview é recortado como retângulo
-    cheio pelo GitHub, Slack e Twitter/X, e o raio viraria uma borda estranha.
+    Sem cantos arredondados de propósito: GitHub, Slack e Twitter/X recortam
+    como retângulo cheio, e o raio viraria uma borda estranha.
+
+    Três coisas mudaram em relação à versão anterior:
+
+    1. Saiu o losango. Era um quadrado arredondado rotacionado a 45° com miolo
+       preenchido, em ciano — o comentário no arquivo antigo o chamava de
+       "losango Pix". A marca Pix é registrada pelo BACEN; a semelhança era
+       exposição desnecessária. No lugar entrou a marca do projeto, que já é
+       feita de barras e portanto cobre o mesmo papel gráfico.
+
+    2. O fundo escureceu. O gradiente ia até #1E40AF, e sobre ele os rótulos
+       em #94A3B8 davam contraste 3,40 — reprova AA. Sobre este par
+       (#0F172A -> #152449) o mesmo cinza dá 5,93 e o ciano dá 6,27. De quebra
+       atende ao pedido de reduzir o gradiente e aproxima da estética de
+       ferramenta para desenvolvedor.
+
+    3. O subtítulo voltou a dizer Pix. A versão "Boletos, CNAB 240/400, OFX e
+       APIs bancárias" era mais técnica mas jogava fora funcionalidade de
+       primeira linha e termo de busca em português.
+
+    Fonte: pilha com métrica de Arial (Liberation Sans no Linux, Arial no
+    Windows, Helvetica no macOS). São metricamente compatíveis, então o arquivo
+    rende praticamente igual em qualquer máquina sem converter texto em curva.
   -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0F172A"/>
-      <stop offset="0.55" stop-color="#1E40AF"/>
-      <stop offset="1" stop-color="#3B5A82"/>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"    stop-color="#0F172A"/>
+      <stop offset="1"    stop-color="#152449"/>
     </linearGradient>
-    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    <linearGradient id="somem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="0.75" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1"    stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
-  <rect width="1280" height="640" fill="url(#bg)"/>
-  <rect width="1280" height="640" fill="url(#fade)"/>
+  <rect width="1280" height="640" fill="url(#fundo)"/>
 
-  <!-- código de barras (boleto), à direita e sangrando para baixo -->
-  <g opacity="0.4">
-    <rect x="968"  y="404" width="6"  height="236" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="980"  y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.55"/>
-    <rect x="989"  y="404" width="10" height="236" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1005" y="404" width="4"  height="236" fill="#06B6D4"/>
-    <rect x="1015" y="404" width="7"  height="236" fill="#FFFFFF" opacity="0.75"/>
-    <rect x="1028" y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.5"/>
-    <rect x="1037" y="404" width="12" height="236" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1055" y="404" width="5"  height="236" fill="#06B6D4"/>
-    <rect x="1066" y="404" width="3"  height="236" fill="#FFFFFF" opacity="0.6"/>
-    <rect x="1075" y="404" width="8"  height="236" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="1089" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.5"/>
-    <rect x="1099" y="404" width="10" height="236" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1115" y="404" width="3"  height="236" fill="#06B6D4"/>
-    <rect x="1124" y="404" width="6"  height="236" fill="#FFFFFF" opacity="0.7"/>
-    <rect x="1136" y="404" width="12" height="236" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1154" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.55"/>
-    <rect x="1164" y="404" width="8"  height="236" fill="#FFFFFF" opacity="0.8"/>
-    <rect x="1178" y="404" width="3"  height="236" fill="#06B6D4"/>
-    <rect x="1187" y="404" width="7"  height="236" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="1200" y="404" width="10" height="236" fill="#FFFFFF" opacity="0.75"/>
-    <rect x="1216" y="404" width="4"  height="236" fill="#FFFFFF" opacity="0.5"/>
-    <rect x="1226" y="404" width="9"  height="236" fill="#FFFFFF" opacity="0.9"/>
+  <!-- Barras de boleto sangrando pelo topo direito: mesmo motivo da marca, em
+       textura. Larguras irregulares de propósito — código de barras real não
+       tem ritmo constante. -->
+  <g fill="url(#somem)">
+    <rect x="878"  y="0" width="7"  height="188"/>
+    <rect x="893"  y="0" width="3"  height="152"/>
+    <rect x="904"  y="0" width="11" height="214"/>
+    <rect x="923"  y="0" width="4"  height="132"/>
+    <rect x="935"  y="0" width="8"  height="196"/>
+    <rect x="951"  y="0" width="3"  height="118"/>
+    <rect x="962"  y="0" width="12" height="228"/>
+    <rect x="982"  y="0" width="4"  height="146"/>
+    <rect x="994"  y="0" width="7"  height="180"/>
+    <rect x="1009" y="0" width="3"  height="124"/>
+    <rect x="1020" y="0" width="10" height="206"/>
+    <rect x="1038" y="0" width="4"  height="138"/>
+    <rect x="1050" y="0" width="8"  height="172"/>
+    <rect x="1066" y="0" width="3"  height="112"/>
+    <rect x="1077" y="0" width="12" height="220"/>
+    <rect x="1097" y="0" width="4"  height="150"/>
+    <rect x="1109" y="0" width="7"  height="186"/>
+    <rect x="1124" y="0" width="3"  height="126"/>
+    <rect x="1135" y="0" width="11" height="208"/>
+    <rect x="1154" y="0" width="4"  height="140"/>
+    <rect x="1166" y="0" width="8"  height="176"/>
+    <rect x="1182" y="0" width="3"  height="116"/>
+    <rect x="1193" y="0" width="10" height="200"/>
+    <rect x="1211" y="0" width="4"  height="134"/>
+    <rect x="1223" y="0" width="9"  height="192"/>
   </g>
 
-  <!-- losango Pix -->
-  <g transform="translate(1090,168) rotate(45)" opacity="0.9">
-    <rect x="-44" y="-44" width="88" height="88" rx="16" fill="none" stroke="#06B6D4" stroke-width="9"/>
-    <rect x="-15" y="-15" width="30" height="30" rx="6" fill="#06B6D4"/>
+  <!-- A marca, no lugar onde estava o losango. Geometria idêntica a
+       marca-escura.svg, escalada de 64 para 260 (fator 4,0625). -->
+  <g transform="translate(980,160) scale(4.0625)">
+    <g fill="#F8FAFC">
+      <rect x="6"  y="14" width="8" height="36" rx="1.5"/>
+      <rect x="18" y="14" width="6" height="36" rx="1.5"/>
+      <rect x="28" y="14" width="4" height="36" rx="1.5"/>
+    </g>
+    <path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#06B6D4"
+          stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
-  <text x="96" y="212" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="96" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">Cobranca-API</text>
+  <g font-family="'Liberation Sans', Arial, Helvetica, sans-serif">
+    <!-- Wordmark: "Cobranca" branco, "-API" ciano. O peso visual vai para a
+         parte que diz o que o projeto é — infraestrutura, não produto. -->
+    <text x="88" y="218" font-size="94" font-weight="700" letter-spacing="-1">
+      <tspan fill="#FFFFFF">Cobranca</tspan><tspan fill="#06B6D4">-API</tspan>
+    </text>
 
-  <rect x="99" y="248" width="250" height="8" rx="4" fill="#06B6D4"/>
+    <rect x="90" y="256" width="248" height="9" rx="4.5" fill="#06B6D4"/>
 
-  <text x="96" y="330" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="600" fill="#E2E8F0">Cobrança bancária brasileira</text>
-  <text x="96" y="382" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="34" font-weight="400" fill="#CBD5E1">Boleto · Pix · Pix Automático · CNAB · OFX</text>
+    <text x="88" y="350" font-size="34" font-weight="500" fill="#CBD5E1">Boletos, Pix, CNAB 240/400 e OFX — via API REST</text>
 
-  <!-- números: o que diferencia, em vez de adjetivo -->
-  <g font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif">
-    <text x="96"  y="486" font-size="52" font-weight="700" fill="#FFFFFF">18</text>
-    <text x="96"  y="520" font-size="20" font-weight="400" fill="#94A3B8">bancos</text>
+    <!-- Números em vez de adjetivos: é o que diferencia e o que se lê rápido
+         quando o card aparece reduzido num unfurl de Slack. -->
+    <g>
+      <text x="88"  y="480" font-size="58" font-weight="700" fill="#FFFFFF">19</text>
+      <text x="88"  y="518" font-size="23" font-weight="400" fill="#94A3B8">bancos</text>
 
-    <text x="250" y="486" font-size="52" font-weight="700" fill="#FFFFFF">100%</text>
-    <text x="250" y="520" font-size="20" font-weight="400" fill="#94A3B8">Python</text>
+      <text x="252" y="480" font-size="58" font-weight="700" fill="#FFFFFF">100%</text>
+      <text x="252" y="518" font-size="23" font-weight="400" fill="#94A3B8">Python</text>
 
-    <text x="446" y="486" font-size="52" font-weight="700" fill="#FFFFFF">1</text>
-    <text x="446" y="520" font-size="20" font-weight="400" fill="#94A3B8">container</text>
+      <text x="464" y="480" font-size="58" font-weight="700" fill="#FFFFFF">1</text>
+      <text x="464" y="518" font-size="23" font-weight="400" fill="#94A3B8">container</text>
 
-    <text x="606" y="486" font-size="52" font-weight="700" fill="#06B6D4">MIT</text>
-    <text x="606" y="520" font-size="20" font-weight="400" fill="#94A3B8">open source</text>
+      <text x="632" y="480" font-size="58" font-weight="700" fill="#06B6D4">MIT</text>
+      <text x="632" y="518" font-size="23" font-weight="400" fill="#94A3B8">open source</text>
+    </g>
+
+    <text x="88" y="576" font-size="24" font-weight="400" fill="#94A3B8">Consuma de qualquer linguagem: Python, Java, Node, PHP, C#, Go, Delphi ou PL/SQL</text>
   </g>
-
-  <text x="96" y="586" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="22" font-weight="400" fill="#94A3B8">REST via HTTP — consuma de Python, Java, Node, PHP, C#, Go, Delphi ou PL/SQL</text>
 </svg>

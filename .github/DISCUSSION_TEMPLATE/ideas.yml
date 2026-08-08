@@ -1,0 +1,55 @@
+title: "[Ideia] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideia de funcionalidade, de banco novo ou de mudança no contrato da API.
+
+        Antes de escrever, vale olhar a [régua de escopo](https://github.com/Maxwbh/cobranca-api/blob/main/docs/development/roadmap-providers.md):
+        o produto é **cobrança** (entrada de dinheiro). Pagamento, transferência e
+        saldo estão fora de escopo em qualquer provider — não por falta de tempo,
+        mas por decisão.
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Que problema isto resolve?
+      description: >-
+        O problema, não a solução. Descrever o que hoje não dá para fazer ajuda
+        mais do que descrever o endpoint que você imaginou.
+      placeholder: >-
+        Preciso emitir para o banco X e hoje só consigo pelo caminho offline,
+        o que me deixa sem baixa automática.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Como você imagina que funcionaria
+      description: "Se já tiver forma de endpoint ou de payload em mente, cole aqui."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo
+      options:
+        - "Banco novo"
+        - "Funcionalidade nova numa rota existente"
+        - "Rota nova"
+        - "Mudança no contrato (quebra compatibilidade)"
+        - "Documentação ou exemplo"
+        - "Outro"
+    validations:
+      required: true
+
+  - type: textarea
+    id: contorno
+    attributes:
+      label: Como você resolve isso hoje
+      description: >-
+        Contorno existente, mesmo que ruim. Ajuda a medir o tamanho real da dor.
+    validations:
+      required: false

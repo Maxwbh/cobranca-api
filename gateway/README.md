@@ -1,7 +1,7 @@
 # Cobranca-API — Gateway (Python/FastAPI)
 
 Gateway de cobrança multi-banco e **porta única da plataforma**, **100% Python**:
-serve as rotas REST online (C6/Sicoob) na raiz e a superfície offline em `/api/*`,
+serve as rotas REST online (C6, Sicoob, Inter) na raiz e a superfície offline em `/api/*`,
 gerada **nativamente** pela engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)
 dentro do próprio processo (sem sidecar, sem proxy HTTP).
 
@@ -20,7 +20,7 @@ docker compose up --build   # (na raiz do repo)
 
 | | Produto | Repo / dir | Papel | Versão |
 |---|---|---|---|---|
-| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
+| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob/Inter, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
 | Outro | **pyCobrança** (engine) | biblioteca Python (pip) | boleto/CNAB/OFX/PIX-QR — chamada in-process por `app/core/pycob.py` | `pycobranca.__version__` |
 
 - A engine offline é a biblioteca [pyCobrança](https://github.com/Maxwbh/pyCobranca)
@@ -32,7 +32,7 @@ docker compose up --build   # (na raiz do repo)
   aparece em `GET /api/metadata`.
 
 ## Por que a engine é uma biblioteca (e não um serviço)
-- No caminho **registrado** (C6/Sicoob) o **banco devolve** linha digitável/PDF/QR →
+- No caminho **registrado** (C6, Sicoob, Inter) o **banco devolve** linha digitável/PDF/QR →
   o serviço só orquestra OAuth+mTLS+JSON. **Não usa a engine.**
 - No caminho **offline/CNAB/carnê** (18 bancos) → `core/pycob.py` chama a engine
   **pyCobrança** no próprio processo (sem HTTP, sem sidecar).
@@ -164,6 +164,12 @@ documento localmente, sem precisar de credencial de banco. Quando homologar,
 ligue por banco: `C6_REGISTERED_READY=true` / `SICOOB_REGISTERED_READY=true`.
 O roteamento fica em `registry.build_provider`.
 
+> **O Inter está fora desse mecanismo, de propósito.** A engine offline não tem
+> o layout do 077: cair nela emitiria um boleto **registrado no banco errado** —
+> falha silenciosa, e cara. Sem credencial, `provider=inter` responde `424`.
+> `registry._OFFLINE_BANK` não tem entrada para ele, e isso é a decisão, não um
+> esquecimento.
+
 ## Configuração (env)
 | Var | Para quê |
 |---|---|
@@ -176,10 +182,71 @@ O roteamento fica em `registry.build_provider`.
 | `VAULT__<tenant>__<provider>__*` | **fallback** de credenciais por tenant — o padrão é o consumidor enviar `credentials` no request (corpo nos POSTs; header `X-Bank-Credentials` em GET/DELETE), sem gravar nada no servidor |
 | `C6_BASE_URL` / `C6_AUTH_URL` | endpoints do C6 (default: sandbox `baas-api-sandbox.c6bank.info` + `/v1/auth`) |
 | `C6_BILLING_SCHEME` | carteira C6: `21` sandbox (default) / `15` produção |
-| `WEBHOOK_TOKEN__<BANCO>` | token do webhook de **entrada** (ex.: `WEBHOOK_TOKEN__C6`) — 401 se divergir |
+| `WEBHOOK_TOKEN__<BANCO>` | token do webhook de **entrada** (ex.: `WEBHOOK_TOKEN__C6`) — 401 se divergir. **Obrigatório**: sem ele a rota recusa |
+| `WEBHOOK_ALLOW_UNAUTHENTICATED` | `1` aceita webhook sem token (comportamento anterior a 2.3.0) — **inseguro**, ver abaixo |
+| `WEBHOOK_CONFIRM` | `0` desliga a reconsulta ao banco antes de propagar `liquidado` (default: ligada) |
+| `WEBHOOK_DEDUP` | `0` desliga o dedup de reentrega do banco (default: ligado) |
+| `OUTBOX_DRAIN_INTERVAL` | segundos entre drenagens da fila de push (default `30`; `0` desliga a thread **e a limpeza**) |
+| `WEBHOOK_INBOX_RETENCAO_DIAS` | idade máxima das marcas de dedup (default `7`) |
+| `OUTBOX_RETENCAO_DIAS` | idade máxima das linhas já `entregue`/`desistiu` (default `30`) |
+| `IDEMPOTENCY_RETENCAO_DIAS` | idade máxima das chaves de idempotência (default `30`) |
+| `OUTBOX_DB_PATH` | SQLite do outbox/dedup (default: o mesmo `CREDENTIAL_DB_PATH`) |
+| `IDEMPOTENCY_DB_PATH` | SQLite das chaves de idempotência (default: o mesmo `CREDENTIAL_DB_PATH`) |
 | `SUPABASE_DB_URL` / `DATABASE_URL` | Postgres/Supabase p/ o store de tokens de credencial (senão SQLite) |
 | `CREDENTIAL_DB_SCHEMA` | schema Postgres do store — **próprio, fora do `public`** (default `boleto_api`; no Supabase, não expor no PostgREST) |
 | `CREDENTIAL_DB_PATH` | caminho do SQLite do store de tokens (default `credentials.db`) |
+
+### Webhook de entrada — por que ele agora recusa por padrão
+
+A rota `/webhooks/{banco}` aceitava qualquer POST quando `WEBHOOK_TOKEN__<BANCO>`
+não estava configurado. Quem descobrisse a URL postava `{"status":"PAID"}`, o
+evento saía normalizado como `liquidado` e o push ia adiante **assinado com a
+nossa chave** — e a assinatura autentica *este serviço*, não o banco, então o
+consumidor não tinha como recusar. Daí três camadas, nesta ordem:
+
+1. **Token de rota, obrigatório.** Cadastre a URL no banco com `?token=<segredo>`
+   e exporte `WEBHOOK_TOKEN__<BANCO>`. Sem isso, `401`.
+2. **Dedup de reentrega.** O banco re-posta até receber 2xx; a mesma notificação
+   entra uma vez só. As repetidas respondem 200 com `event: "duplicado"` —
+   reentrega é comportamento correto do banco, não erro.
+3. **Confirmação na fonte.** Antes de propagar `liquidado`, o gateway
+   **reconsulta o banco**. O campo `confirmado` do evento diz o que aconteceu:
+   `true` o banco confere, `false` ele discordou (e o `status` entregue é o
+   **dele**), `null` não deu para perguntar. Só a rota **com tenant**
+   (`/webhooks/{banco}/{tenant_id}`) confirma — o cofre é por tenant.
+
+`WEBHOOK_ALLOW_UNAUTHENTICATED=1` volta ao comportamento antigo. Existe para
+migração, e é longo de digitar de propósito.
+
+### Push ao consumidor — o evento não se perde mais
+
+A primeira tentativa é inline. Se ela falhar, o evento vai para o **outbox** e
+uma thread re-tenta com backoff (5s → 15s → 1min → 5min → 15min, depois
+`desistiu`). Antes, consumidor fora do ar por 30s custava o evento inteiro.
+Quando o push não sai de primeira, a resposta do webhook traz
+`pendente_de_entrega: true`.
+
+### Retenção
+
+As tabelas de estado de entrega não crescem sem fim: a mesma thread do drenador
+varre por idade de hora em hora. Padrões e por quê:
+
+| Tabela | Default | Critério |
+|---|---|---|
+| `webhook_inbox` | 7 dias | só precisa cobrir a **janela de reentrega do banco**, que é de horas |
+| `webhook_outbox` | 30 dias | as linhas `entregue`/`desistiu` são forenses; **`pendente` nunca é apagado por idade** |
+| `idempotencia` | 30 dias | uma chave só vale enquanto o link que ela criou vale — o do C6 expira em 7 dias |
+
+Passada a retenção, uma `Idempotency-Key` volta a criar um checkout novo, que é
+o certo: o link antigo já não existe para ser devolvido.
+
+`OUTBOX_DRAIN_INTERVAL=0` desliga a thread — e com ela a limpeza. Nesse modo,
+agende `app.core.outbox.limpar()` por fora:
+
+```bash
+python -c "from app.core.outbox import limpar; print(limpar())"
+# {'inbox': 812, 'outbox': 40, 'idempotencia': 7}
+```
 
 ## Rodar (dev)
 ```bash
@@ -198,12 +265,14 @@ uvicorn app.main:app --reload
 - Implementar **Vault** real (KMS/Vault/DB cifrado) — `EnvVault` é só dev.
 - Trocar `subscriptions` por **store real** (DB) — `EnvSubscriptions` é só dev.
 - **Worker de conciliação** (polling Sicoob) — não incluído neste esqueleto.
-- **Retry/fila** no push de eventos (saída) — hoje é best-effort.
 
 > ✅ Já feito: `/api/render/*` in-process; carnê 3-vias; push assinado por
 > tenant (multi-sistema); **C6 REST** (boleto registrado, Pix cob/cobv,
 > conciliação C6 Pay) com contrato real; token de rota no webhook de entrada
-> (`WEBHOOK_TOKEN__<BANCO>`).
+> (`WEBHOOK_TOKEN__<BANCO>`), agora **obrigatório**; **outbox com retry** no
+> push de eventos; dedup de reentrega; confirmação do `liquidado` na fonte;
+> `Idempotency-Key` no `POST /checkout`; **retenção por idade** das tabelas de
+> entrega.
 
 > Recomendação: extrair este diretório para um **repo próprio** (`cobranca-api`) quando sair
 > do esqueleto. Vive aqui temporariamente para versionar junto da decisão.

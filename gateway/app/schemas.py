@@ -17,12 +17,13 @@ class Provider(str, Enum):
 
     `pycobranca` = caminho **offline/CNAB**, processado in-process pela engine
     [pyCobrança](https://github.com/Maxwbh/pyCobranca) (100% Python).
-    `c6` / `sicoob` = API REST do banco.
+    `c6` / `sicoob` / `inter` = API REST do banco.
     """
 
     pycobranca = "pycobranca"
     c6 = "c6"
     sicoob = "sicoob"
+    inter = "inter"
 
 
 def eh_offline(provider: Provider) -> bool:
@@ -172,9 +173,16 @@ class PixCobrancaOut(BaseModel):
 
     txid: str | None = None
     status: Status
+    valor: Decimal | None = Field(
+        default=None, description="Valor original da cobrança, como o banco devolveu"
+    )
     pix_copia_cola: str | None = Field(default=None, description="Payload EMV (copia-e-cola)")
     location: str | None = Field(default=None, description="URL do payload (loc.location)")
-    expira_em: datetime | None = None
+    expira_em: datetime | None = Field(
+        default=None,
+        description="Instante em que a cobrança deixa de ser pagável. Na cob imediata é "
+                    "criação + expiração; na cobv é o vencimento + a validade após ele.",
+    )
     raw: dict[str, Any] | None = None
 
 
@@ -206,6 +214,111 @@ class BolepixIn(BaseModel):
     credentials: dict[str, Any] | None = None
 
 
+# --- Checkout (link de pagamento com cartão) ------------------------------------
+#
+# MODO LINK, e só ele. O pagador digita o cartão no domínio do banco; o PAN não
+# passa por aqui e o escopo PCI-DSS fica com o banco. Isso é decisão de produto,
+# e ela **só é real se o campo não existir** — documentar não segura. Daí o
+# `extra="forbid"`
+# abaixo: `save_card`, `capture` e companhia são recusados com 422 em vez de
+# repassados ao banco. Checkout transparente (`/authorize`,
+# `/generate/public-key`) não é implementado.
+
+
+class TipoCartao(str, Enum):
+    credito = "credito"
+    debito = "debito"
+
+
+class JurosPor(str, Enum):
+    """Quem paga o juro do parcelamento. Default `loja` = BY_SELLER (decisão 1)."""
+
+    loja = "loja"
+    emissor = "emissor"
+
+
+class Autenticacao(str, Enum):
+    obrigatoria = "obrigatoria"
+    opcional = "opcional"
+    nao_exigida = "nao_exigida"
+
+
+class CheckoutCobranca(BaseModel):
+    """Corpo do link de pagamento. Tudo aqui é do CONSUMIDOR da API: varia de
+    cliente para cliente e viaja na requisição — esta API não guarda regra
+    comercial de ninguém.
+
+    Isso vale em particular para **política de parcelamento**: teto de parcelas e
+    valor mínimo de parcela são da loja, e a aplicação que consome resolve os
+    dois ANTES de chamar. Replicá-los aqui criaria uma segunda fonte de verdade
+    que envelhece — e recusaria como inválido um parcelamento que o banco
+    aceita."""
+
+    model_config = {"extra": "forbid"}
+
+    valor: Decimal = Field(description="Valor total do checkout", examples=["150.00"])
+    tipo: TipoCartao = Field(default=TipoCartao.credito, description="credito | debito")
+    parcelas: int = Field(
+        default=1, ge=1,
+        description="Máximo de parcelas oferecido ao pagador (ele escolhe abaixo disso, "
+                    "salvo `parcelas_fixas`). Repassado ao banco COMO VEIO: não há teto "
+                    "aqui, e **valor mínimo de parcela não existe nesta API** — é regra "
+                    "comercial de quem chama, que calcula o número antes de enviar "
+                    "(ex.: `min(3, valor // 100)`). Se o banco recusar o número enviado, "
+                    "a resposta é `422` com o motivo dele em `upstream`, e o ajuste é "
+                    "reenviar com outra configuração.",
+    )
+    juros_por: JurosPor | None = Field(
+        default=JurosPor.loja,
+        description="Quem paga o juro do parcelamento: loja (BY_SELLER) ou emissor (BY_ISSUER)",
+    )
+    parcelas_fixas: bool | None = Field(
+        default=None, description="Se o pagador NÃO pode escolher a quantidade de parcelas"
+    )
+    autenticacao: Autenticacao | None = Field(
+        default=None, description="Autenticação pelo emissor — apetite de risco do chamador"
+    )
+    recorrente: bool | None = Field(default=None, description="Sinaliza cobrança recorrente")
+    pix: bool = Field(default=False, description="Oferece Pix no mesmo link (QR gerado pelo banco)")
+    descricao: str | None = None
+    expira_em: datetime | None = Field(default=None, description="Default do banco: 7 dias")
+    redirect_url: str | None = Field(default=None, description="Para onde o pagador volta após pagar")
+    external_reference_id: str | None = Field(default=None, description="Seu identificador")
+    pagador: Pagador | None = Field(
+        default=None,
+        description="Se enviado com endereço, exige street|logradouro, number|numero (numérico), "
+                    "city|cidade, state|uf e zip_code|cep — o C6 recusa endereço incompleto",
+    )
+
+    @field_validator("juros_por")
+    @classmethod
+    def _juros_obrigatorio_quando_parcela(cls, v: JurosPor | None, info: Any) -> JurosPor | None:
+        # O C6 exige interest_type quando installments > 1. O default já cobre;
+        # anular explicitamente com parcelamento é o único jeito de chegar aqui,
+        # e é 422 nosso em vez de 400 do banco.
+        if v is None and (info.data.get("parcelas") or 1) > 1:
+            raise ValueError("parcelas > 1 exige juros_por (loja ou emissor)")
+        return v
+
+
+class CheckoutIn(BaseModel):
+    tenant_id: str
+    provider: Provider = Provider.c6
+    account_config: dict[str, Any] = Field(default_factory=dict)
+    checkout: CheckoutCobranca
+    credentials: dict[str, Any] | None = None
+
+
+class CheckoutOut(BaseModel):
+    """Resposta normalizada do link de pagamento."""
+
+    id: str | None = Field(default=None, description="Id do checkout no banco")
+    url: str | None = Field(default=None, description="URL do link — para onde o pagador vai")
+    status: Status
+    expira_em: datetime | None = None
+    raw: dict[str, Any] | None = Field(default=None, description="Resposta crua do banco (debug)")
+
+
 # --- Pix lote de cobv -----------------------------------------------------------
 
 
@@ -215,6 +328,26 @@ class LoteCobvIn(BaseModel):
     account_config: dict[str, Any] = Field(default_factory=dict)
     descricao: str
     cobrancas: list[PixCobranca] = Field(description="Cada item exige txid e data_vencimento")
+    credentials: dict[str, Any] | None = None
+
+
+class LoteCobvRevisaoIn(BaseModel):
+    """Revisão de lote de cobv (PATCH BACEN `/lotecobv/{id}`).
+
+    Sem `descricao`, ao contrário do `LoteCobvIn`: o PATCH do BACEN carrega
+    apenas `cobsv`. Reaproveitar o schema da criação obrigaria a mandar um campo
+    que o banco ignora — e um campo que o chamador acha que está alterando, mas
+    não está, é pior que campo ausente. Daí o `extra="forbid"`: mandar
+    `descricao` aqui é `422`, não silêncio."""
+
+    model_config = {"extra": "forbid"}
+
+    tenant_id: str
+    provider: Provider = Provider.c6
+    account_config: dict[str, Any] = Field(default_factory=dict)
+    cobrancas: list[PixCobranca] = Field(
+        description="As cobranças a revisar — mesma forma da criação. Cada item exige "
+                    "txid, data_vencimento e devedor")
     credentials: dict[str, Any] | None = None
 
 
@@ -327,6 +460,18 @@ class WebhookEvent(BaseModel):
     status: Status | None = None
     paid_at: datetime | None = Field(default=None, description="Data/hora do pagamento, se liquidado")
     valor: Decimal | None = Field(default=None, description="Valor pago, se aplicável")
+    confirmado: bool | None = Field(
+        default=None,
+        description="O status foi reconsultado no banco? `true` confere; `false` o banco "
+                    "discordou e o `status` aqui é o DELE; `null` não foi possível "
+                    "perguntar (evento sem tenant, sem credencial no cofre, ou consulta "
+                    "desligada). Só status que move dinheiro é reconsultado.",
+    )
+    pendente_de_entrega: bool | None = Field(
+        default=None,
+        description="`true` quando o push ao consumidor não saiu de primeira e o evento "
+                    "ficou no outbox para re-tentativa com backoff.",
+    )
     raw: dict[str, Any] | None = None
 
 

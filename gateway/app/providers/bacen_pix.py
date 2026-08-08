@@ -6,6 +6,7 @@
 # única vez; cada provider define PIX_BASE e fornece _client().
 from __future__ import annotations
 
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from app.schemas import Pagador, PixCobranca, PixCobrancaOut, Status
@@ -109,10 +110,49 @@ def _pix_out(data: dict[str, Any]) -> PixCobrancaOut:
     return PixCobrancaOut(
         txid=data.get("txid"),
         status=_map_pix_status(data.get("status")) or Status.registrado,
+        valor=(data.get("valor") or {}).get("original"),
         pix_copia_cola=data.get("pixCopiaECola") or data.get("brcode"),  # Sicoob usa brcode
         location=loc.get("location") or data.get("location"),
+        expira_em=_expira_em(data.get("calendario") or {}),
         raw=data,
     )
+
+
+def _expira_em(calendario: dict[str, Any]) -> datetime | None:
+    """Até quando o Pix pode ser pago.
+
+    O BACEN não devolve o instante: manda `criacao` + `expiracao` em segundos na
+    cob, e `dataDeVencimento` + `validadeAposVencimento` em dias na cobv. Sem
+    somar, `expira_em` saía sempre nulo e quem consome tinha de ir ao `raw`
+    fazer a conta — cada consumidor reimplementando duas regras do BACEN.
+
+    Devolve None se a conta não couber num `datetime`. Isto NÃO é defensividade
+    decorativa: o sandbox do Sicoob mandou `validadeAposVencimento` de
+    1.025.541.278 dias e o `timedelta` estourou, derrubando a rota inteira com
+    500. Data vinda do banco é entrada não confiável como qualquer outra, e o
+    prazo é um campo acessório — não vale trocar a resposta por um erro.
+    """
+    venc = calendario.get("dataDeVencimento")
+    if venc:  # cobv: vencimento + dias de validade após ele
+        try:
+            base = date.fromisoformat(str(venc)[:10])
+        except ValueError:
+            return None
+        dias = calendario.get("validadeAposVencimento")
+        dias = int(dias) if isinstance(dias, (int, str)) and str(dias).isdigit() else 0
+        try:
+            return datetime.combine(base + timedelta(days=dias), time.max, tzinfo=timezone.utc)
+        except (OverflowError, ValueError, OSError):
+            return None
+
+    criacao, segundos = calendario.get("criacao"), calendario.get("expiracao")
+    if not criacao or not isinstance(segundos, (int, float)):
+        return None
+    try:
+        inicio = datetime.fromisoformat(str(criacao).replace("Z", "+00:00"))
+        return inicio + timedelta(seconds=int(segundos))
+    except (OverflowError, ValueError, OSError):
+        return None
 
 
 def _map_pix_status(s: str | None) -> Status | None:

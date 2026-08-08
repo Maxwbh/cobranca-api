@@ -1,34 +1,45 @@
 <p align="center">
-  <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária" width="100%" />
+  <picture>
+    <source media="(max-width: 600px)" srcset="./docs/assets/banner-mobile.svg" />
+    <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária: online nas APIs de 3 bancos (C6, Sicoob e Inter — boleto registrado, Pix, Pix Automático, cartão, Bolepix, conciliação) e offline na engine embutida (boleto PDF, CNAB 240/400, carnê, OFX) para 18 bancos" width="100%" />
+  </picture>
 </p>
 
 <h1 align="center">Plataforma Open Source de Cobrança Bancária para o Brasil</h1>
 
-<h3 align="center">API REST + PyCobrança + PIX + CNAB + OFX</h3>
-
 <p align="center">
-  Uma plataforma única para <strong>emissão de boletos</strong>, <strong>remessas CNAB</strong>,
-  <strong>processamento de retorno</strong>, <strong>Pix</strong>, <strong>Pix Automático</strong>
-  e <strong>integração com as APIs dos bancos brasileiros</strong>.
-  <br />
-  Consuma de <strong>qualquer linguagem</strong> via HTTP — Python, Java, Node, PHP, C#, Go,
-  Delphi, Oracle APEX e PL/SQL.
+  <a href="https://cobranca-api-sq67.onrender.com/docs"><strong>Swagger Online →</strong></a> &nbsp;·&nbsp;
+  <a href="https://cobranca-api-sq67.onrender.com/api/docs"><strong>Swagger Offline →</strong></a> &nbsp;·&nbsp;
+  <a href="https://github.com/Maxwbh/pyCobranca"><strong>Engine PyCobrança →</strong></a>
+</p>
+
+<!-- Badges VIVOS, não decorativos: CI, versão, licença e stars saem da API do
+     GitHub e mudam sozinhos. Badge estático `shields.io/badge/...` afirma o que
+     ninguém verifica — um CI quebrado atrás de um selo verde fixo é pior do que
+     nenhum selo. Os dois últimos continuam informativos (19 bancos — 3 online
+     + 18 offline —, OpenAPI) porque são contrato, não métrica. -->
+<p align="center">
+  <a href="https://github.com/Maxwbh/cobranca-api/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Maxwbh/cobranca-api/ci.yml?branch=main&style=for-the-badge&label=build&labelColor=0F172A" alt="Status do build" /></a>
+  <a href="https://github.com/Maxwbh/cobranca-api/tags"><img src="https://img.shields.io/github/v/tag/Maxwbh/cobranca-api?style=for-the-badge&label=versão&color=1E40AF&labelColor=0F172A" alt="Última versão" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/Maxwbh/cobranca-api?style=for-the-badge&color=10B981&labelColor=0F172A" alt="Licença MIT" /></a>
+  <a href="https://github.com/Maxwbh/cobranca-api/stargazers"><img src="https://img.shields.io/github/stars/Maxwbh/cobranca-api?style=for-the-badge&color=F59E0B&labelColor=0F172A" alt="Stars" /></a>
+  <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 3 online (C6, Sicoob, Inter) e 18 offline" />
+  <img src="https://img.shields.io/badge/OpenAPI-3.0_·_3.1-6BA539?style=for-the-badge&labelColor=0F172A" alt="OpenAPI 3.0 e 3.1" />
 </p>
 
 <p align="center">
-  <a href="https://boleto-cnab-api.onrender.com/docs"><strong>Swagger do Gateway →</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://boleto-cnab-api.onrender.com/api/docs"><strong>Swagger Offline →</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/Maxwbh/pyCobranca"><strong>Engine PyCobrança →</strong></a>
-  <br /><br />
+  Consuma de <strong>qualquer linguagem</strong> via HTTP — Python, Java, Node, PHP, C#, Go,
+  Delphi, Oracle APEX e PL/SQL.
+  <br />
   <a href="#quick-start">Quick Start</a>
   ·
   <a href="#arquitetura">Arquitetura</a>
   ·
   <a href="#casos-de-uso">Casos de uso</a>
   ·
-  <a href="./docs/README.md">Documentação</a>
+  <a href="https://maxwbh.github.io/cobranca-api/">Documentação</a>
+  ·
+  <a href="https://github.com/Maxwbh/cobranca-api/discussions/new?category=q-a">Tirar dúvida</a>
   ·
   <a href="https://github.com/Maxwbh/cobranca-api/issues">Reportar Bug</a>
   <br /><br />
@@ -39,30 +50,86 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/18-bancos-1E40AF?style=flat-square&labelColor=0F172A" alt="18 bancos" />
-  <img src="https://img.shields.io/badge/244-testes-3B5A82?style=flat-square&labelColor=0F172A" alt="244 testes" />
-  <img src="https://img.shields.io/badge/100%25-Python-06B6D4?style=flat-square&labelColor=0F172A" alt="100% Python" />
-  <img src="https://img.shields.io/badge/REST-API-3B5A82?style=flat-square&labelColor=0F172A" alt="REST API" />
-  <img src="https://img.shields.io/badge/Docker-ready-3B5A82?style=flat-square&labelColor=0F172A" alt="Docker" />
-  <img src="https://img.shields.io/badge/OpenAPI-3.0_·_3.1-3B5A82?style=flat-square&labelColor=0F172A" alt="OpenAPI" />
-  <br />
-  <img src="https://img.shields.io/badge/CNAB-240_·_400-1E40AF?style=flat-square&labelColor=0F172A" alt="CNAB" />
-  <img src="https://img.shields.io/badge/Pix_·_Pix_Automático-BACEN-06B6D4?style=flat-square&labelColor=0F172A" alt="Pix" />
-  <img src="https://img.shields.io/badge/Bolepix-QR_híbrido-06B6D4?style=flat-square&labelColor=0F172A" alt="Bolepix" />
-  <img src="https://img.shields.io/badge/OFX-conciliação-3B5A82?style=flat-square&labelColor=0F172A" alt="OFX" />
-  <img src="https://img.shields.io/badge/Carnê-3_vias_A4-3B5A82?style=flat-square&labelColor=0F172A" alt="Carnê" />
-  <img src="https://img.shields.io/badge/licença-MIT-1E40AF?style=flat-square&labelColor=0F172A" alt="MIT" />
-</p>
-
-<p align="center">
   <a href="https://render.com/deploy"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" /></a>
 </p>
 
-> **O que esta plataforma entrega:** gateway para as **APIs dos bancos** (boleto
-> registrado, Pix, Pix Automático, conciliação) · **engine offline** de boleto,
-> CNAB 240/400 e carnê para **18 bancos** · **parsing de OFX** · **lote
-> assíncrono** com artefatos assinados · tudo por **REST**, em **um único
-> container 100% Python**.
+<p align="center">
+  <img src="./docs/assets/demo-terminal.svg" width="780"
+       alt="Terminal: POST /cobranca com um payload de boleto devolve id, status registrado, linha digitável, código de barras e o PDF em base64 — pelo caminho offline, sem credencial de banco." />
+</p>
+
+<p align="center"><sub>
+  Resposta <strong>real</strong>, capturada da API — caminho offline (Sicoob),
+  sem credencial e sem convênio. O mesmo <code>POST /cobranca</code> com
+  <code>provider=c6</code> registra no banco.
+</sub></p>
+
+### Dois mundos, um contrato
+
+|  | 🌐 **ONLINE** — nas APIs dos bancos | 📦 **OFFLINE** — na engine embutida |
+|---|---|---|
+| **O que faz** | Boleto **registrado**, Pix e Pix Automático (BACEN), **link de pagamento com cartão**, Bolepix, extrato e conciliação | Boleto em **PDF**, CNAB **240/400** (remessa e retorno), **carnê 3-vias**, parsing de **OFX** |
+| **Como** | OAuth2 + mTLS contra o banco | pyCobrança **no mesmo processo** — sem rede, sem sidecar |
+| **Precisa de** | Convênio e credenciais do banco | **Nada** — roda sem internet |
+| **Bancos** | C6 (336) · Sicoob (756) · Inter (077) | **18 bancos** |
+| **Serve para** | Cobrar e conciliar de verdade, com o banco | Gerar, validar e processar arquivo — inclusive sem convênio |
+
+**Não são dois produtos.** É o mesmo `POST /cobranca`: com `provider=c6` vai ao
+banco, sem `provider` cai na engine. Trocar de mundo é trocar um campo — e é o
+que permite começar offline hoje e ligar o banco quando o convênio sair.
+
+Tudo por **REST**, em **um único container 100% Python**, com **lote assíncrono**
+e artefatos assinados.
+
+---
+
+<a name="quick-start"></a>
+
+## Quick Start
+
+Imagem pronta no GHCR — sem clonar, sem buildar, sem Python instalado:
+
+```bash
+docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest
+
+# Swagger UI
+open http://localhost:8000/docs       # gateway REST (C6, Sicoob, Inter, Pix)
+open http://localhost:8000/api/docs   # offline (boleto/CNAB/OFX)
+```
+
+Cada release publica `ghcr.io/maxwbh/cobranca-api:<versão>` (amd64 + arm64);
+para produção, fixe a versão em vez de `latest`. Quem quer mexer no código
+clona e builda:
+
+```bash
+git clone https://github.com/Maxwbh/cobranca-api.git && cd cobranca-api
+docker compose up --build
+```
+
+### Gerar boleto (1 chamada = PDF + dados)
+
+```bash
+curl "http://localhost:8000/api/boleto?bank=banco_brasil&type=pdf&include_data=true&data=$(python3 -c "
+import json; print(json.dumps({
+    'agencia': '3073', 'conta_corrente': '12345678', 'convenio': '1234567',
+    'carteira': '18', 'nosso_numero': '123', 'cedente': 'Empresa LTDA',
+    'documento_cedente': '11222333000181', 'sacado': 'Joao da Silva',
+    'sacado_documento': '52998224725', 'valor': 1500.0,
+    'data_vencimento': '2027-12-30'
+}))"
+)" | python3 -c "
+import sys, json, base64
+data = json.load(sys.stdin)
+print(f'Nosso Numero: {data[\"nosso_numero\"]}')
+print(f'Formatado:    {data[\"nosso_numero_formatado\"]}')
+print(f'Cod. Barras:  {data[\"codigo_barras\"]}')
+with open('boleto.pdf', 'wb') as f:
+    f.write(base64.b64decode(data['content_base64']))
+print('PDF salvo: boleto.pdf')
+"
+```
+
+---
 
 ---
 
@@ -106,7 +173,7 @@ open source **100% Python** — como **engine oficial de cobrança**, responsáv
 |---|:---:|:---:|
 | **REST API** (qualquer linguagem) | ✅ | — |
 | **Docker** / deploy pronto | ✅ | — |
-| **Gateway bancário** (C6, Sicoob: boleto registrado, Pix, conciliação) | ✅ | — |
+| **Gateway bancário** (C6, Sicoob, Inter: boleto registrado, Pix, conciliação) | ✅ | — |
 | **Lote assíncrono** (jobs, artefatos, webhook) | ✅ | — |
 | **Cofre de credenciais** multi-tenant | ✅ | — |
 | Uso **direto em Python** (import) | ✅ | ✅ |
@@ -121,7 +188,7 @@ linguagem, ou precisa falar com a **API do banco** → **Cobranca-API**.
 
 <p align="center">
   <img src="./docs/assets/arquitetura.svg" width="100%"
-       alt="Arquitetura: aplicações em qualquer linguagem chamam a Cobranca-API via REST; a API usa a engine PyCobrança (offline, in-process) e as APIs dos bancos (online), produzindo boleto PDF, CNAB 240/400, carnê, OFX, cobrança registrada e Pix." />
+       alt="Arquitetura: aplicações em qualquer linguagem chamam a Cobranca-API via REST; a API usa a engine PyCobrança (offline, in-process) e as APIs dos bancos (online), produzindo boleto PDF, CNAB 240/400, carnê, OFX, cobrança registrada, Pix e link de pagamento com cartão." />
 </p>
 
 **Dois caminhos, um contrato:** o **offline** roda a engine PyCobrança dentro do
@@ -193,9 +260,30 @@ Exemplos **reais gerados pela API** (engine pyCobrança, Python puro), um por ba
 </p>
 
 > 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
-> [demo ao vivo](https://boleto-cnab-api.onrender.com/api/docs) — instância de
+> [demo ao vivo](https://cobranca-api-sq67.onrender.com/api/docs) — instância de
 > demonstração no plano gratuito do Render. A URL vem do nome do serviço e **não é
 > fixa**: na sua instalação, use a que o Render mostrar (veja [DEPLOY.md](./DEPLOY.md)).
+
+## Cobranca-API × gateway de pagamento SaaS
+
+A alternativa usual — Asaas, Efí, Iugu, Pagar.me — resolve outro problema, com
+outro custo. A diferença de fundo é **de quem é o contrato com o banco**:
+
+| | **Cobranca-API** (self-hosted) | **Gateway SaaS** |
+|---|---|---|
+| Custo por boleto/transação | **Nenhum do software.** Você paga só a tarifa do **seu** convênio com o banco | Tarifa do serviço por transação ou mensalidade, além da bancária |
+| Contrato bancário | O **seu convênio direto** — o dinheiro liquida na sua conta | Intermediado pelo fornecedor, nas condições dele |
+| Onde os dados moram | Na **sua** infra — CPF, valores e extratos não saem dela | Na infra do fornecedor |
+| Lock-in | Código MIT; trocar de banco é trocar **um campo** no payload | Migrar de API proprietária reescrevendo a integração |
+| CNAB 240/400, carnê, OFX | **Nativos** — é o chão de fábrica do produto | Raramente — abstrair o CNAB é justamente a proposta deles |
+| Antifraude, split, marketplace | **Fora de escopo** — o produto é cobrança | Costuma ter, e é onde eles brilham |
+| Homologação com o banco | **Sua** — com [roteiros prontos](./docs/homologacao/) neste repositório | Já feita pelo fornecedor |
+| Operação | Seu container, seu deploy, seu monitoramento | Zero ops |
+
+**Regra honesta:** se você quer split de pagamento, antifraude e ninguém
+operando infraestrutura, um SaaS serve melhor. Se você **já tem** (ou quer ter)
+convênio com o banco, emite volume, e não quer pagar por boleto nem colocar os
+dados dos seus clientes na infra de terceiro — este projeto existe para isso.
 
 ## Por que usar?
 
@@ -210,12 +298,14 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | "Preciso de boleto com QR Code PIX" | Campo `emv` no payload + `pix=true` na remessa |
 | "Não quero dependências de sistema" | Engine **100% Python** (pyCobrança) — PDF sem GhostScript |
 | "Preciso saber quais bancos/formatos são suportados" | `GET /api/bancos` retorna tudo dinamicamente |
+| "Preciso receber por cartão, sem guardar dados de cartão" | `POST /checkout` devolve um link; o PAN é digitado na página do banco |
 
 ### Diferenciais
 
 - **100% Python** — Engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) **in-process**: um runtime, um container, sem sidecar
 - **18 bancos offline** — boleto + CNAB (15 bancos com remessa, 26 combinações banco×layout, 7 com segmento PIX)
-- **Boleto registrado via API** — C6 e Sicoob: Pix, Bolepix, Pix Automático, extrato e conciliação
+- **Boleto registrado via API** — C6, Sicoob e Inter: Pix, Bolepix, Pix Automático, extrato e conciliação. Nem todo banco faz tudo, e `GET /bancos` responde a matriz exata por introspecção do código
+- **Link de pagamento com cartão** — `POST /checkout` no C6: crédito ou débito, à vista ou parcelado, com Pix no mesmo link. O cartão é digitado na página do banco; PAN nunca passa por aqui
 - **Lote assíncrono** — `POST /jobs/boletos` e `/jobs/cnab/remessas`: 202 + `job_id`, falha por item isolada, artefatos com `sha256` e webhook de conclusão
 - **Credenciais zero-knowledge** — token `bapi_`; o servidor não decifra sem ele
 - **Carnê 3-vias** — N parcelas em PDF A4
@@ -224,45 +314,6 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 
 ---
 
-<a name="quick-start"></a>
-
-## Quick Start
-
-```bash
-git clone https://github.com/Maxwbh/cobranca-api.git && cd cobranca-api
-
-# Docker (serviço único 100% Python)
-docker compose up --build
-
-# Swagger UI
-open http://localhost:8000/docs       # gateway REST (C6/Sicoob, Pix)
-open http://localhost:8000/api/docs   # offline (boleto/CNAB/OFX)
-```
-
-### Gerar boleto (1 chamada = PDF + dados)
-
-```bash
-curl "http://localhost:8000/api/boleto?bank=banco_brasil&type=pdf&include_data=true&data=$(python3 -c "
-import json; print(json.dumps({
-    'agencia': '3073', 'conta_corrente': '12345678', 'convenio': '1234567',
-    'carteira': '18', 'nosso_numero': '123', 'cedente': 'Empresa LTDA',
-    'documento_cedente': '11222333000181', 'sacado': 'Joao da Silva',
-    'sacado_documento': '52998224725', 'valor': 1500.0,
-    'data_vencimento': '2027-12-30'
-}))"
-)" | python3 -c "
-import sys, json, base64
-data = json.load(sys.stdin)
-print(f'Nosso Numero: {data[\"nosso_numero\"]}')
-print(f'Formatado:    {data[\"nosso_numero_formatado\"]}')
-print(f'Cod. Barras:  {data[\"codigo_barras\"]}')
-with open('boleto.pdf', 'wb') as f:
-    f.write(base64.b64decode(data['content_base64']))
-print('PDF salvo: boleto.pdf')
-"
-```
-
----
 
 ## Endpoints
 
@@ -285,10 +336,12 @@ print('PDF salvo: boleto.pdf')
 | **`/docs`** | GET | Swagger do gateway |
 | `/bancos` | GET | Catálogo com capacidades reais e esquema de credenciais por banco |
 | `/credenciais` | POST | Credenciais do banco → token `bapi_` (zero-knowledge) |
-| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6/Sicoob) ou offline, conforme `provider` |
+| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6, Sicoob, Inter) ou offline, conforme `provider` |
 | `/carne` | POST | Carnê 3-vias (registra N parcelas e monta o PDF) |
 | `/pix` · `/bolepix` · `/pix-automatico` | — | Pix BACEN, boleto híbrido e débito recorrente |
-| `/extrato` · `/conciliacao/*` | GET | Extrato PJ e recebíveis/transações |
+| `/checkout` | POST/GET/DELETE | **Link de pagamento com cartão** (crédito/débito, parcelado, Pix no mesmo link) — C6 |
+| `/extrato` · `/conciliacao/*` | GET | Extrato PJ e recebíveis/transações (Pix recebido, recebíveis de cartão) |
+| `/config/webhook-banco` · `/config/webhook-pix` | POST/GET/PUT/DELETE | Cadastro da URL de notificação no banco |
 | **`/jobs/boletos`** | POST/GET | Lote assíncrono: 202 + `job_id`, itens, artefatos (`sha256`, zip) |
 | **`/jobs/cnab/remessas`** | POST/GET | Remessa em lote com **sublotes determinísticos** (1 arquivo por banco/carteira) |
 | `/webhooks/{banco}` | POST | Entrada de notificações do banco → push assinado (HMAC) ao consumidor |
@@ -297,13 +350,13 @@ print('PDF salvo: boleto.pdf')
 | `/api/render/remessa` | POST | Corpo JSON → conteúdo CNAB |
 
 <details>
-<summary>Ver todos os 18 endpoints</summary>
+<summary>Ver todos os 19 endpoints offline</summary>
 
 | Endpoint | Método | Descrição |
 |----------|:------:|-----------|
 | `/api/health` | GET | Health check |
 | `/api/info` | GET | Versão e configuração |
-| `/api/metadata` | GET | Metadados da API e gem |
+| `/api/metadata` | GET | Metadados da API e da engine pyCobrança |
 | `/api/bancos` | GET | Capacidades por banco |
 | `/api/boleto/validate` | GET | Validar dados do boleto |
 | `/api/boleto/data` | GET | Dados calculados |
@@ -416,7 +469,8 @@ curl -X POST http://localhost:8000/carne -H 'Content-Type: application/json' -d 
 
 | Opção | Comando |
 |-------|---------|
-| **Docker** | `docker build -t cobranca-api . && docker run -p 8000:8000 cobranca-api` |
+| **Imagem pronta (GHCR)** | `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest` |
+| **Build local** | `docker build -t cobranca-api . && docker run -p 8000:8000 cobranca-api` |
 | **Docker Compose** | `docker compose up --build` |
 | **Render.com** | [![Deploy](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy) |
 
@@ -431,9 +485,9 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 | API | Python 3.12 · FastAPI · Uvicorn |
 | Engine offline | [pyCobrança](https://github.com/Maxwbh/pyCobranca) 1.0.2 (Python puro) |
 | PDF | ReportLab (via pyCobrança) — sem GhostScript |
-| Providers online | C6 Bank · Sicoob (OAuth2 + mTLS) |
+| Providers online | C6 Bank · Sicoob · Banco Inter (OAuth2 + mTLS) |
 | OFX | `ofxparse` |
-| Testes | pytest · 244 testes + regressão Postman (98 requests) |
+| Testes | pytest · 387 testes + regressão Postman (128 requests, cobertura de endpoint verificada no build) |
 | Docs | OpenAPI 3.0/3.1 · Swagger UI |
 | Container | Docker · python:3.12-slim |
 
@@ -443,8 +497,8 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 
 | O que | Onde |
 |-------|------|
-| **Testar a API agora** | [Swagger UI (demo ao vivo)](https://boleto-cnab-api.onrender.com/api/docs) |
-| Importar no Postman | [`/api/openapi.json`](https://boleto-cnab-api.onrender.com/api/openapi.json) |
+| **Testar a API agora** | [Swagger UI (demo ao vivo)](https://cobranca-api-sq67.onrender.com/api/docs) |
+| Importar no Postman | [`/api/openapi.json`](https://cobranca-api-sq67.onrender.com/api/openapi.json) |
 | Campos por banco | [docs/fields/all-banks.md](./docs/fields/all-banks.md) |
 | Nosso número (entrada/saída/conciliação) | [docs/fields/nosso-numero.md](./docs/fields/nosso-numero.md) |
 | PIX híbrido + Remessa PIX | [docs/api/pix.md](./docs/api/pix.md) |
@@ -490,8 +544,8 @@ uvicorn app.main:app --reload --port 8000
 |---|---|
 | **[PyCobrança](https://github.com/Maxwbh/pyCobranca)** | A **engine** desta plataforma — boletos, CNAB, PIX e PDF em Python puro. Use direto se sua app é Python. |
 | **[coleção Postman](./postman/README.md)** | 98 requests com IDs de rastreabilidade — smoke (<5 min) e regressão completa. |
-| **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB e lote de dentro do banco. |
-| **[exemplos APEX](./examples/apex/)** | Páginas de emissão e de lote com progresso, download de PDF e zip. |
+| **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB, lote e **link de cartão** de dentro do banco. |
+| **[exemplos APEX](./examples/apex/)** | Páginas de emissão, de lote com progresso e de **checkout com cartão** — download de PDF, zip e webhook em ORDS. |
 | **[exemplos Python](./examples/python/)** | Scripts executáveis que chamam a API por HTTP (boleto, remessa, lote). |
 
 ---
@@ -507,9 +561,15 @@ Créditos históricos completos no arquivo [LICENSE](./LICENSE).
 ---
 
 <p align="center">
-  Desenvolvido por <strong><a href="https://github.com/maxwbh">Maxwell da Silva Oliveira</a></strong>
+  Desenvolvido por <strong><a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a></strong>
+  — <a href="https://msbrasil.inf.br"><strong>M&S do Brasil LTDA</strong></a>
   <br />
-  <a href="https://github.com/maxwbh">@maxwbh</a> · M&S do Brasil LTDA
+  <a href="https://github.com/Maxwbh">GitHub</a> ·
+  <a href="https://www.linkedin.com/in/maxwbh">LinkedIn</a> ·
+  <a href="mailto:maxwbh@gmail.com">maxwbh@gmail.com</a>
+  <br /><br />
+  Consultoria e desenvolvimento em integração bancária, Oracle APEX e Python —
+  <a href="https://msbrasil.inf.br">msbrasil.inf.br</a>
   <br /><br />
   ⭐ Se este projeto foi útil, considere dar uma estrela!
 </p>

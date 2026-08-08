@@ -91,6 +91,7 @@ Ailos emite o 2º/3º desconto e a multa só quando há multa informada.
 - **BB e Itaú (400)**: a multa vai por **instrução** (código de ocorrência),
   não como percentual posicional — enviar `percentual_multa` não altera o
   arquivo, e isso é esperado.
+- Banestes (021) não tem remessa CNAB — só impressão do boleto.
 - Banestes (021), HSBC (399) e Safra (422) só emitem boleto (sem remessa CNAB).
 
 ## Exemplo

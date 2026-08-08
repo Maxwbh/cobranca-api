@@ -7,7 +7,7 @@ requisição e as decisões que explicam por que está assim.
 
 <p align="center">
   <img src="./assets/arquitetura-camadas.svg" width="100%"
-       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
+       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, Inter, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
 </p>
 
 ---
@@ -58,6 +58,7 @@ fala com HTTP do cliente.** Cada camada só conhece a de baixo.
 | `bancos` | `/bancos` | Catálogo e capacidades **por introspecção** |
 | `pix` | `/pix` | Pix BACEN (cob/cobv, lote, recebidos) |
 | `bolepix` | `/bolepix` | Boleto híbrido com QR Pix (exclusivo C6) |
+| `checkout` | `/checkout` | Link de pagamento com cartão — **modo link**, sem dado de cartão aqui |
 | `pix_automatico` | `/pix-automatico` | Recorrência, autorização, ciclo |
 | `extrato`, `conciliacao` | `/extrato`, `/conciliacao` | Extrato PJ e C6 Pay |
 | `carne` | `/carne` | Carnê 3 vias A4 |
@@ -203,25 +204,26 @@ gateway/app/
 ├── providers/         # um dialeto por banco
 ├── core/              # cofre, jobs, artefatos, engine, eventos
 └── clients/           # OAuth+mTLS e acesso à engine
-gateway/tests/         # 244 testes
+gateway/tests/         # 441 testes
 docs/openapi.yaml      # spec da superfície offline (OAS 3.0)
-postman/               # 98 requests com IDs de rastreabilidade
+postman/               # 129 requests com IDs de rastreabilidade
 ```
 
 ---
 
 ## Números
 
-| | v2.1.0 |
+| | v2.2.0 |
 |---|---|
 | Linguagem | 100% Python |
 | Processos no container | 1 |
-| Módulos Python (`gateway/app`) | 37 |
-| Linhas em `gateway/app` | ~5.200 |
-| Providers REST | 2 (C6, Sicoob) |
+| Módulos Python (`gateway/app`) | 41 |
+| Linhas em `gateway/app` | ~7.520 |
+| Providers REST | 3 (C6, Sicoob, Inter) |
 | Bancos no caminho offline | 18 |
-| Testes do gateway | 244 |
-| Requests na regressão Postman | 98 |
+| Rotas online (`/docs`) | 67 |
+| Testes do gateway | 441 |
+| Requests na regressão Postman | 128 |
 
 ---
 

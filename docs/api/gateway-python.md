@@ -1,19 +1,28 @@
 # Cobranca-API Gateway (Python) — Referência da API
 
-> Gateway de cobrança multi-banco (`gateway/`, FastAPI, v0.6.0).
-> Spec viva: `GET /docs` (Swagger) e `GET /openapi.json` com a app rodando;
-> (não versionamos cópia da spec — a fonte é a app).
+> Gateway de cobrança multi-banco (`gateway/`, FastAPI). A versão corrente é a
+> que `app.version` declara — não a repetimos aqui, porque cópia de número é a
+> primeira coisa a envelhecer.
 >
-> Não confundir com a **API Ruby** (engine pyCobrança, `/api/*` — ver
-> [docs/openapi.yaml](../openapi.yaml)). Papéis em
+> **A fonte é a app, não este arquivo.** Com o serviço no ar, `GET /docs`
+> (Swagger) e `GET /openapi.json` refletem o código em execução; este guia
+> explica o *porquê* e o fluxo, que a spec não conta. Divergiu? a spec está
+> certa.
+>
+> Não confundir com a superfície **offline** (`/api/*`, engine pyCobrança
+> in-process — ver [docs/openapi.yaml](../openapi.yaml)). Papéis em
 > [separacao-3-produtos.md](../development/separacao-3-produtos.md).
 
 ## Conceitos
 
 - **`tenant_id`** — escopo de cada conta/cliente (multi-tenant).
-- **`provider`** — roteamento: `c6`/`sicoob` = API REST do banco;
+- **`provider`** — roteamento: `c6`, `sicoob` e `inter` = API REST do banco;
   **vazio/omitido** ou `pycobranca` = CNAB offline (engine pyCobrança, 100%
   Python). Pix e conciliação exigem provider REST (senão **422**).
+- **Criação responde `201` com `Location`** — `POST /cobranca`, `/carne`,
+  `/pix` e `/checkout`. O `Location` já vem com `tenant_id` e `provider`, então
+  é seguível como está. `PUT /pix/lote/{id}` responde **`202`**: o banco
+  enfileira o lote, não o cria.
 - **Credenciais** (ordem de precedência):
   1. `Authorization: Bearer bapi_...` — token do `/credenciais` (recomendado);
   2. `credentials` no corpo (POSTs) ou header `X-Bank-Credentials`
@@ -30,15 +39,38 @@ curl http://localhost:8000/bancos
 # → {"autenticacao_api": {...},
 #    "bancos": [
 #      {"id": "c6", "codigo_banco": "336", "tipo": "rest",
-#       "capacidades": ["boleto", "boleto_alteracao", "boleto_pdf", "bolepix",
-#                       "pix", "pix_recebidos", "pix_automatico", "extrato",
-#                       "conciliacao_cartao", "webhook_banco", ...]},
+#       "capacidades": ["boleto", "boleto_alteracao", "boleto_baixa", "boleto_pdf",
+#                       "bolepix", "checkout_cartao", "conciliacao_cartao", "extrato",
+#                       "pix", "pix_automatico", "pix_lote", "pix_recebidos",
+#                       "pix_revisao", "webhook_banco", "webhook_pix_por_chave"]},
 #      {"id": "sicoob", "codigo_banco": "756", "tipo": "rest", ...},
+#      {"id": "inter",  "codigo_banco": "077", "tipo": "rest", ...},
 #      {"id": "pycobranca", "tipo": "offline", "bancos_cnab": [18 bancos]}]}
 ```
 
 Antes de chamar qualquer operação, o sistema consumidor pode checar se o banco
-do tenant suporta a capacidade (ex.: `bolepix` é exclusivo do C6).
+do tenant suporta a capacidade. Nem todo banco faz tudo, e as diferenças são
+reais:
+
+| Capacidade | C6 (336) | Sicoob (756) | Inter (077) |
+|---|:--:|:--:|:--:|
+| Boleto — emitir, consultar, PDF, baixar | ✅ | ✅ | ✅ |
+| Boleto — **alterar** (`PUT /cobranca/{id}`) | ✅ | — | — |
+| Pix BACEN — cob/cobv, lote, revisão, recebidos | ✅ | ✅ | ✅ |
+| Pix Automático | ✅ | ✅ | ✅ ¹ |
+| Extrato da conta PJ | ✅ | ✅ | ✅ |
+| Webhook **cadastrado no banco** | ✅ | — | ✅ |
+| Bolepix (boleto com QR EVP) | ✅ | — | — |
+| Checkout de cartão | ✅ | — | — |
+| Conciliação de adquirência (C6 Pay) | ✅ | — | — |
+
+¹ O dialeto é BACEN e o provider o implementa, mas o **produto precisa estar
+habilitado na conta**: na homologação o sandbox do Inter respondeu que a conta
+não tem Pix Automático contratado. Capacidade declarada ≠ produto liberado.
+
+A tabela acima é reprodução; a **fonte é o `GET /bancos`**, que introspecta as
+classes de provider e por isso não envelhece. Pedir o que o banco não tem
+responde **422 dizendo para onde ir**, não 500.
 
 ## 🔐 Autenticação — mecanismo único da API, esquema próprio por banco
 
@@ -59,6 +91,18 @@ livre e o `GET /bancos` documenta o esquema vigente:
 |---|---|
 | **C6** | `client_id`, `client_secret`, `pfx_base64`, `pfx_password` (mTLS obrigatório) |
 | **Sicoob** | `client_id` + `access_token` (sandbox) · `client_id`, `client_secret`, `pfx_base64`, `pfx_password`, `scopes?` (produção) |
+| **Inter** | `client_id`, `client_secret`, `cert_pem` + `key_pem`, `conta_corrente?`, `scopes?` |
+
+> **O Inter entrega `.crt` + `.key`, não PKCS12.** Os dois campos aceitam PEM cru
+> ou base64 do mesmo material — quem baixou do portal cola o arquivo e segue.
+> `pfx_base64`/`pfx_password` continuam valendo como alternativa, para quem já
+> converteu. Exigir a conversão seria obrigar a rodar `openssl` antes da primeira
+> chamada, por nada.
+>
+> `conta_corrente` só é necessário quando a aplicação enxerga **mais de uma**
+> conta — vira o header `x-conta-corrente`. Mandá-lo vazio é pior que omitir:
+> foi exatamente isso que fez o Sicoob recusar toda consulta com
+> `numeroCliente=`.
 
 > Banco novo com outro esquema? O consumidor não muda nada: continua enviando o
 > dict de credenciais daquele banco no `POST /credenciais` e usando o `bapi_`.
@@ -89,6 +133,17 @@ banco — traduzir a faixa não custa o diagnóstico.
 | `429` | **`429`** | respeitar o `Retry-After` (repassado quando o banco envia) |
 | `5xx` e demais | **`502`** | falha do banco — re-tentar com backoff |
 | rede/timeout | **`504`** | banco indisponível |
+
+> **Uma exceção à tabela:** erro no endpoint de **token** é sempre `424`,
+> qualquer que seja o status devolvido. O Inter responde `400` a
+> `client_credentials` inválido, e traduzir aquilo como "o banco recusou os
+> dados enviados" manda quem integra caçar defeito no payload quando o problema
+> é a credencial.
+
+Todos esses códigos estão **declarados no OpenAPI** das rotas que falam com o
+banco — não é preciso descobri-los em produção. Rotas que não saem do processo
+(`/bancos`, `/health`) não os declaram, justamente para não ensinar o
+integrador a tratar erro que nunca chega.
 
 ---
 
@@ -131,7 +186,13 @@ curl -X DELETE http://localhost:8000/credenciais \
 
 ### `POST /cobranca`
 Registra a cobrança no provider. Com `provider=c6` (e `C6_REGISTERED_READY=true`)
-usa a API REST do banco; senão renderiza offline no engine Ruby.
+usa a API REST do banco; senão renderiza offline na engine pyCobrança, no mesmo
+processo.
+
+> **`provider=inter` não tem esse fallback, de propósito.** A engine offline não
+> tem o layout do 077: cair nela emitiria um boleto **registrado no banco
+> errado** — falha silenciosa e cara. Sem credencial do Inter a rota responde
+> `424`.
 
 ```bash
 curl -X POST http://localhost:8000/cobranca \
@@ -154,36 +215,56 @@ curl -X POST http://localhost:8000/cobranca \
       }
     }
   }'
-# 200 → {"id": "01J3...", "status": "registrado",
-#        "linha_digitavel": "33690.00009 ...", "codigo_barras": "3369...",
-#        "pix_copia_cola": null, "pdf_base64": null, "raw": {...}}
+# 201 Created
+# Location: /cobranca/01J3...?tenant_id=empresa_123&provider=c6
+# → {"id": "01J3...", "status": "registrado",
+#    "linha_digitavel": "33690.00009 ...", "codigo_barras": "3369...",
+#    "pix_copia_cola": null, "pdf_base64": null, "raw": {...}}
 ```
+
+> **`registrado` não é `liquidado`.** O status normalizado tem seis valores —
+> `registrado | pendente | liquidado | baixado | expirado | erro` — e vale igual
+> nos três bancos. Duas traduções foram decisão de produto, não tradução literal:
+> no Inter, `MARCADO_RECEBIDO` (baixa manual do beneficiário) vira **`liquidado`**,
+> porque a pergunta de quem consome é "posso liberar?"; e `PROTESTO` vira
+> **`registrado`**, porque o título segue em aberto — criar um sétimo status
+> obrigaria todo consumidor a tratar um caso que só um banco tem. O valor cru do
+> banco fica sempre em `raw`.
 
 ### `GET /cobranca/{id}?tenant_id=&provider=`
 Consulta o status normalizado (`registrado|pendente|liquidado|baixado|expirado|erro`).
 
 ### `GET /cobranca/{id}/pdf?tenant_id=&provider=`
-PDF do boleto registrado (C6 devolve `pdf_base64`). Provider offline → 422.
+PDF do boleto registrado, em `pdf_base64`. Provider offline → 422.
 
 ### `PUT /cobranca/{id}?tenant_id=&provider=`
 Altera boleto emitido — corpo com os campos C6 (`amount`, `due_date`,
-`discount`, `interest`, `fine`). Registro em processamento na CIP → **409**
-(re-tente em instantes).
+`discount`, `interest`, `fine`). **Só o C6 oferece alteração**; Sicoob e Inter
+respondem `422` apontando o caminho (baixar e reemitir). Registro em
+processamento na CIP → **409** (re-tente em instantes).
 
 ### `DELETE /cobranca/{id}?tenant_id=&provider=`
-Baixa/cancela (C6: `PUT /bank_slips/{id}/cancel`, 204 no banco).
+Baixa/cancela. O verbo muda por banco e o gateway absorve: C6 `PUT
+/bank_slips/{id}/cancel`, Inter `POST /cobrancas/{id}/cancelar` com
+`motivoCancelamento` obrigatório.
 
 > Nas rotas GET/DELETE, credenciais via `Authorization: Bearer bapi_...` ou
 > header `X-Bank-Credentials: <base64(JSON)>`.
+>
+> **Sicoob e Inter identificam a conta, não só o boleto.** Passe
+> `numero_cliente`/`codigo_modalidade` (Sicoob) na query quando a credencial não
+> os traz; sem isso o banco recusa a leitura. O C6 não expõe esse problema
+> porque identifica pelo id — foi por isso que ele passou despercebido até a
+> homologação do Sicoob.
 
 ---
 
 ## 📚 Carnê
 
 ### `POST /carne`
-Registra N parcelas no provider e monta o carnê 3-vias A4 (PDF) no engine.
+Registra N parcelas no provider e monta o carnê 3-vias A4 (PDF) na engine.
 Corpo: `{tenant_id, provider, account_config, bank, parcelas: [Cobranca...],
-credentials?}` → `{carne_pdf_base64, cobrancas: [...]}`.
+credentials?}` → **`201`** com `{carne_pdf_base64, cobrancas: [...]}`.
 
 ---
 
@@ -200,9 +281,17 @@ curl -X POST http://localhost:8000/pix \
     "account_config": {"chave_pix": "financeiro@empresa.com"},
     "pix": {"valor": "97.50", "expiracao_segundos": 3600, "descricao": "Pedido 42"}
   }'
-# 200 → {"txid": "9d36b84f...", "status": "registrado",
-#        "pix_copia_cola": "00020126...", "location": "pix.example.com/qr/..."}
+# 201 Created
+# Location: /pix/9d36b84f...?tenant_id=empresa_123&provider=c6
+# → {"txid": "9d36b84f...", "status": "registrado", "valor": "97.50",
+#    "expira_em": "2026-08-04T15:00:00Z",
+#    "pix_copia_cola": "00020126...", "location": "pix.example.com/qr/..."}
 ```
+
+> `expira_em` é **derivado** do `calendario` do banco: `criacao + expiracao`
+> (cob) ou `dataDeVencimento + validadeAposVencimento` (cobv). Prazo absurdo
+> vindo do banco devolve `null` em vez de derrubar a rota — o mock do Sicoob
+> mandou 1.025.541.278 dias e virava `500`.
 
 ### `POST /pix` — cobv (com vencimento)
 Inclua `data_vencimento`, `txid` (26–35 alfanuméricos) e `devedor` **com
@@ -230,7 +319,17 @@ Lista cobranças do período (RFC3339: `2026-07-15T00:00:00Z`).
 
 ### Lote de cobv
 `PUT /pix/lote/{id}` (corpo: `{descricao, cobrancas:[{txid, valor,
-data_vencimento, devedor…}]}`) · `GET /pix/lote/{id}` · `GET /pix/lotes?inicio=&fim=`.
+data_vencimento, devedor…}]}`) · **`PATCH /pix/lote/{id}`** · `GET /pix/lote/{id}`
+· `GET /pix/lotes?inicio=&fim=`.
+
+O `PUT` responde **`202`**, não `201`: o banco devolve *"lote solicitado para
+criação"* — ele enfileira, e o resultado se lê no `GET`. Prometer `201` seria
+dizer que o recurso já existe.
+
+O `PATCH` **revisa** as cobranças do lote: só as que vão no corpo mudam, as
+demais ficam como estão. Mesma forma de item do `PUT`, **sem `descricao`** — o
+PATCH do BACEN carrega apenas `cobsv`, e mandar `descricao` aqui é `422` em vez
+de silêncio. Vale para qualquer provider de dialeto BACEN (C6, Sicoob, Inter).
 
 ---
 
@@ -266,6 +365,129 @@ Consulta, PDF (base64) e cancelamento (**409** enquanto a CIP processa).
 
 ---
 
+## 💳 Checkout — link de pagamento com cartão (C6)
+
+Cria um link hospedado pelo banco. O pagador abre a `url`, digita o cartão **no
+domínio do C6** e volta pela `redirect_url`. Crédito ou débito, parcelado, e
+Pix no mesmo link se quiser.
+
+**Nenhum dado de cartão passa por esta API.** `save_card` e checkout
+transparente **não existem no schema** — corpo com esses campos responde `422`
+e não chega ao banco. É decisão de produto, e o PAN ficar no domínio do banco
+mantém o escopo PCI-DSS lá.
+
+### `POST /checkout`
+
+```json
+{
+  "tenant_id": "empresa1", "provider": "c6",
+  "checkout": {
+    "valor": "150.00",
+    "tipo": "credito",
+    "parcelas": 6,
+    "juros_por": "loja",
+    "pix": true,
+    "descricao": "Pedido 42",
+    "redirect_url": "https://sua-loja.com.br/retorno"
+  }
+}
+```
+
+| Campo | Default | Observação |
+|---|---|---|
+| `tipo` | `credito` | `credito` \| `debito` |
+| `parcelas` | `1` | **teto** oferecido ao pagador — ele escolhe abaixo, salvo `parcelas_fixas`. Repassado ao banco como veio; ver "política de parcelamento" abaixo |
+| `juros_por` | `loja` | quem paga o juro: `loja` (BY_SELLER) ou `emissor`. Com `parcelas > 1` o campo é obrigatório — anulá-lo responde `422` daqui, não `400` do banco |
+| `pix` | `false` | oferece Pix no mesmo link; o QR é gerado pelo banco |
+| `expira_em` | 7 dias (banco) | ISO 8601 |
+| `pagador` | — | se enviado, o endereço exige `street`, `number` (**numérico**), `city`, `state`, `zip_code` |
+
+Responde **201** com `{id, url, status, expira_em}`. A `url` é o que se manda
+ao cliente.
+
+**Mande `Idempotency-Key` se houver botão humano na frente disto.** Sem a chave,
+duplo clique cria **dois links para a mesma venda** — e nada impede o pagador de
+pagar os dois. Com a chave, o reenvio devolve o mesmo link sem tocar no banco:
+
+```bash
+curl -X POST .../checkout -H 'Idempotency-Key: venda-42' -d @pedido.json
+```
+
+A chave vale por tenant. Reusá-la com um `checkout` diferente responde `422` —
+uma chave identifica **uma** requisição, e devolver o link errado seria pior que
+recusar. Sem o header, o comportamento é o de sempre.
+
+#### Política de parcelamento — de quem é cada parte
+
+| Regra | Quem resolve |
+|---|---|
+| **Valor mínimo de parcela** (ex.: R$ 100) | **A aplicação que consome.** Não existe campo para isso, e não vai existir |
+| **Teto de parcelas da loja** (ex.: até 3x) | **A aplicação que consome**, mandando o número já calculado em `parcelas` |
+| Teto de parcelas do banco | O **banco**, que recusa o que não aceita |
+| Quem paga o juro | Você, em `juros_por` — repassado como `interest_type` |
+
+A API **não valida** `parcelas` além de `>= 1`: o valor vai ao banco como veio.
+Isso é decisão, não omissão — replicar aqui o teto do banco criaria uma segunda
+fonte de verdade que envelhece, e no dia em que o banco ampliar o limite a nossa
+cópia recusaria um parcelamento válido.
+
+Com valor mínimo de parcela, o cálculo é de quem chama, antes do POST:
+
+```sql
+-- 3x, com parcela mínima de R$ 100 — a política é da loja, não da API
+p_parcelas => GREATEST(1, LEAST(3, FLOOR(l_valor / 100)))
+```
+
+| Venda | `parcelas` enviado | O pagador vê |
+|---|---|---|
+| R$ 300,00 | 3 | 3 × R$ 100,00 |
+| R$ 250,00 | 2 | 2 × R$ 125,00 |
+| R$ 90,00 | 1 | à vista |
+
+Mandar `parcelas: 3` fixo numa venda de R$ 90 ofereceria 3 × R$ 30 ao pagador —
+**violando a política da própria loja, e o banco não vai barrar isso por você.**
+
+Se o número enviado passar do que o banco aceita, a resposta é **`422`** com o
+motivo original dele em `upstream` — o caminho é reenviar com outra
+configuração, não há estado a desfazer (o link não chegou a ser criado).
+
+Nada disto vale para `juros_por`: esse é obrigatório quando `parcelas > 1`, e
+anulá-lo é `422` **daqui**, sem chamar o banco.
+
+### `GET /checkout/{id}` · `DELETE /checkout/{id}`
+
+Consulta e cancelamento. Status normalizado igual ao resto da API:
+
+| C6 | Aqui |
+|---|---|
+| `CREATED`, `IN PROGRESS`, `AUTHORIZED…`, `CONFIRMATION REQUESTED`, `CANCELLATION REQUESTED` | `pendente` |
+| `PAID` | `liquidado` |
+| `CANCELLED` | `baixado` |
+| `EXPIRED` | `expirado` |
+| `DECLINED`, `ERROR` | `erro` |
+
+> `DECLINED` é `erro`, não `baixado`: cartão recusado não encerrou a cobrança —
+> o link se esgotou, a dívida não. Quem decide que segue em aberto é o
+> consumidor da API, que é quem conhece contrato e parcela.
+
+**Notificação:** o checkout não tem callback próprio. Cadastre a URL com
+`service: CHECKOUT` em `POST /config/webhook-banco` — o evento chega em
+`/webhooks/c6/<tenant>` e é repassado assinado, como o do boleto, com
+`event: "checkout.atualizado"` e o mesmo status normalizado da tabela acima.
+Use a rota **com tenant**: é a única em que o `liquidado` é reconsultado no
+banco antes de seguir para você.
+
+**Provider que não oferece link hospedado responde `422`** dizendo para onde ir.
+Hoje só o C6 oferece.
+
+**Oracle:** página pronta em
+[`examples/apex/apex_checkout.sql`](../../examples/apex/apex_checkout.sql)
+(criar link, acompanhar status, handler ORDS do webhook) e
+`cobranca_api.criar_checkout` no
+[pacote PL/SQL](../../examples/oracle/cobranca_api_pkg.sql).
+
+---
+
 ## 🏦 Extrato e configuração
 
 ### `GET /extrato?tenant_id=&start_date=&end_date=`
@@ -295,13 +517,27 @@ curl "http://localhost:8000/conciliacao/recebiveis?tenant_id=empresa_123&start_d
 ## 🔔 Webhooks (entrada) e push de eventos (saída)
 
 ### `POST /webhooks/{banco}` · `POST /webhooks/{banco}/{tenant_id}`
-URL que você cadastra **no banco**. Com `WEBHOOK_TOKEN__<BANCO>` configurado,
-exige `?token=...` (ou header `x-webhook-token`) — divergiu, **401**.
+URL que você cadastra **no banco**. Exige `WEBHOOK_TOKEN__<BANCO>` configurado e
+`?token=...` (ou header `x-webhook-token`) — sem token configurado, ou token
+divergente, **401**. Os bancos não assinam o payload; o token de rota é a prova
+de origem, e sem ela qualquer um forjaria um `liquidado`.
 
 O evento é normalizado (`WebhookEvent`) e **empurrado por POST assinado**
 (`X-Signature: sha256=<hmac_sha256(secret, body)>`) ao consumidor dono do
 tenant (`SUB__<tenant>__URL/SECRET`) ou ao destino global
-(`EVENT_WEBHOOK_URL/SECRET`).
+(`EVENT_WEBHOOK_URL/SECRET`). Se o push não sair de primeira, o evento fica em
+fila e é re-tentado com backoff — a resposta traz `pendente_de_entrega: true`.
+
+Três campos do `WebhookEvent` que valem ler antes de integrar:
+
+| Campo | O que diz |
+|---|---|
+| `event` | `"duplicado"` quando o banco reentregou algo que já passou — ignore |
+| `confirmado` | `true` o banco confirmou o `liquidado`; `false` ele discordou e o `status` aqui é o **dele**; `null` não foi possível perguntar |
+| `pendente_de_entrega` | `true` quando o push falhou e vai ser re-tentado |
+
+A confirmação só acontece na rota **com tenant** — o cofre de credenciais é por
+tenant, e sem credencial não há como perguntar ao banco.
 
 ### `GET /health`
 `{"status": "ok"}`.
@@ -386,7 +622,42 @@ curl -s "$GW/extrato?tenant_id=empresa_123&provider=sicoob&start_date=2026-07-01
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Pix Automático (débito recorrente) — idêntico nos dois bancos
+### Banco Inter (077) — sandbox com certificado PEM
+
+```bash
+# 1. Credenciais: o Inter entrega .crt + .key, não .pfx — cole os arquivos
+TOKEN=$(curl -s -X POST $GW/credenciais -H 'Content-Type: application/json' -d "$(jq -n \
+  --rawfile crt Inter_API_Certificado.crt --rawfile key Inter_API_Chave.key '{
+  tenant_id: "empresa_123", provider: "inter",
+  credentials: {client_id: "<uuid da aplicação>", client_secret: "<secret>",
+                cert_pem: $crt, key_pem: $key}}')" | jq -r .token)
+
+# 2. Boleto com QR Pix no MESMO documento (default: formasRecebimento BOLETO_PIX)
+curl -s -X POST $GW/cobranca -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{
+  "tenant_id": "empresa_123", "provider": "inter",
+  "cobranca": {"valor": "150.00", "vencimento": "2026-12-31", "seu_numero": "PED-1",
+    "pagador": {"nome": "João da Silva", "documento": "12345678909",
+      "endereco": {"logradouro": "Rua Presidente Kennedy", "numero": "126A",
+                   "bairro": "Centro", "cidade": "Sete Lagoas",
+                   "uf": "MG", "cep": "35700000"}}}}'
+# 201 → id (codigoSolicitacao), linha_digitavel, codigo_barras e pix_copia_cola
+
+# 3. Baixar: no Inter o motivo é obrigatório, e o gateway o preenche
+curl -s -X DELETE "$GW/cobranca/<codigoSolicitacao>?tenant_id=empresa_123&provider=inter" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4. Extrato Banking v2 — mesma rota dos outros bancos
+curl -s "$GW/extrato?tenant_id=empresa_123&provider=inter&start_date=2026-07-01&end_date=2026-07-31" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+> **Boleto puro é opt-in.** O default do gateway é `BOLETO_PIX` (o híbrido).
+> Pedindo `account_config: {"formas_recebimento": "BOLETO"}` o Inter devolve
+> `pix: null` — verificado no sandbox. Defaultar em `BOLETO` perderia em
+> silêncio justamente o QR que motiva escolher o banco.
+
+### Pix Automático (débito recorrente) — mesmo dialeto em todos os bancos
 
 ```bash
 # 1. Cria a recorrência (contrato de cobrança mensal)

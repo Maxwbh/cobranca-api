@@ -1,0 +1,91 @@
+title: "[Dúvida] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de perguntar, vale conferir a [documentação](https://maxwbh.github.io/cobranca-api/)
+        e o [guia de erros](https://maxwbh.github.io/cobranca-api/api/troubleshooting.html) —
+        boa parte das dúvidas de integração está descrita ali com o código HTTP.
+
+        > ⚠️ **Esta é uma discussão pública.** Não cole `client_secret`, token,
+        > certificado `.pfx`, chave privada nem `Authorization`. Um segredo colado
+        > aqui está comprometido mesmo depois de editado — o histórico de edição
+        > fica visível, e a página pode já ter sido indexada.
+
+  - type: dropdown
+    id: caminho
+    attributes:
+      label: Qual caminho você está usando?
+      description: >-
+        A API tem dois mundos com o mesmo contrato, e o diagnóstico muda
+        completamente entre eles.
+      options:
+        - "Online — chamando a API do banco (precisa de credencial e convênio)"
+        - "Offline — engine embutida, sem rede (boleto PDF, CNAB, carnê, OFX)"
+        - "Não sei dizer"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: banco
+    attributes:
+      label: Banco
+      options:
+        - "C6 Bank (336)"
+        - "Sicoob (756)"
+        - "Banco Inter (077)"
+        - "Outro banco, pelo caminho offline"
+        - "Não se aplica"
+    validations:
+      required: true
+
+  - type: input
+    id: versao
+    attributes:
+      label: Versão da API
+      description: "Sai em `GET /api/metadata`, campo `version`."
+      placeholder: "2.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que você esperava, e o que aconteceu
+      description: >-
+        Endpoint chamado, o que deveria acontecer e o que aconteceu de fato.
+      placeholder: |
+        Chamei POST /cobranca com provider=c6 esperando 201 com linha digitável.
+        Voltou 424.
+    validations:
+      required: true
+
+  - type: textarea
+    id: requisicao
+    attributes:
+      label: Requisição
+      description: >-
+        Corpo enviado, **sem o bloco `credentials`** e sem cabeçalho de
+        autorização. Se o valor for parte do problema, troque por `<omitido>`.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: resposta
+    attributes:
+      label: Resposta
+      description: >-
+        Corpo devolvido e o código HTTP. O `detail` da nossa resposta de erro já
+        costuma dizer o que o banco reclamou.
+      render: json
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: sem-segredo
+    attributes:
+      label: Confirmação
+      options:
+        - label: "Reli o que colei e não há credencial, token, certificado ou chave privada."
+          required: true

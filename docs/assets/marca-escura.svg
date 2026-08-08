@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Cobranca-API">
+  <!--
+    Marca da Cobranca-API — versão para FUNDO ESCURO.
+    Geometria idêntica a marca.svg; mudam só as cores.
+
+    No README, sirva as duas por tema em vez de escolher uma:
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/marca-escura.svg">
+        <img src="docs/assets/marca.svg" alt="Cobranca-API" width="64">
+      </picture>
+    Imagem em README não acompanha o tema do GitHub sozinha — sem isso, uma das
+    duas versões some no fundo.
+
+    Vão constante de 4 entre TODOS os elementos, inclusive entre a última barra
+    e o chevron. Barras: 6-14, 18-24, 28-32. Chevron a partir de 36.
+  -->
+  <g fill="#F8FAFC">
+    <rect x="6"  y="14" width="8" height="36" rx="1.5"/>
+    <rect x="18" y="14" width="6" height="36" rx="1.5"/>
+    <rect x="28" y="14" width="4" height="36" rx="1.5"/>
+  </g>
+  <!-- Ciano da identidade (#06B6D4): sobre navy dá 7,35 de contraste, então
+       aqui não há motivo para fechar o tom como marca.svg faz sobre branco. -->
+  <path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#06B6D4"
+        stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

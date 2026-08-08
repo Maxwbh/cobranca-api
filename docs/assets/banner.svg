@@ -1,56 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="270" viewBox="0 0 1200 270" role="img" aria-label="Cobranca-API — plataforma open source de cobrança bancária: boleto, Pix, CNAB e OFX para 18 bancos brasileiros, 100% Python">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 336" width="1200" height="336"
+     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, licença MIT.">
+  <!-- GERADO por scripts/gerar-banners.py — nao edite a mao. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0F172A"/>
-      <stop offset="0.55" stop-color="#1E40AF"/>
-      <stop offset="1" stop-color="#3B5A82"/>
-    </linearGradient>
-    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0" stop-color="#0F172A"/><stop offset="1" stop-color="#152449"/>
     </linearGradient>
   </defs>
-
-  <!-- fundo -->
-  <rect width="1200" height="270" rx="14" fill="url(#bg)"/>
-  <rect width="1200" height="270" rx="14" fill="url(#fade)"/>
-
-  <!-- motivo: código de barras (boleto) à direita -->
-  <g opacity="0.55">
-    <rect x="905" y="58" width="6"  height="154" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="917" y="58" width="3"  height="154" fill="#FFFFFF" opacity="0.55"/>
-    <rect x="926" y="58" width="10" height="154" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="942" y="58" width="4"  height="154" fill="#06B6D4"/>
-    <rect x="952" y="58" width="7"  height="154" fill="#FFFFFF" opacity="0.75"/>
-    <rect x="965" y="58" width="3"  height="154" fill="#FFFFFF" opacity="0.5"/>
-    <rect x="974" y="58" width="12" height="154" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="992" y="58" width="5"  height="154" fill="#06B6D4"/>
-    <rect x="1003" y="58" width="3" height="154" fill="#FFFFFF" opacity="0.6"/>
-    <rect x="1012" y="58" width="8" height="154" fill="#FFFFFF" opacity="0.85"/>
-    <rect x="1026" y="58" width="4" height="154" fill="#FFFFFF" opacity="0.5"/>
-    <rect x="1036" y="58" width="10" height="154" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1052" y="58" width="3" height="154" fill="#06B6D4"/>
-    <rect x="1061" y="58" width="6" height="154" fill="#FFFFFF" opacity="0.7"/>
-    <rect x="1073" y="58" width="12" height="154" fill="#FFFFFF" opacity="0.9"/>
-    <rect x="1091" y="58" width="4" height="154" fill="#FFFFFF" opacity="0.55"/>
-    <rect x="1101" y="58" width="8" height="154" fill="#FFFFFF" opacity="0.8"/>
-    <rect x="1115" y="58" width="3" height="154" fill="#06B6D4"/>
-    <rect x="1124" y="58" width="7" height="154" fill="#FFFFFF" opacity="0.85"/>
+  <rect width="1200" height="336" rx="14" fill="url(#bg)"/>
+  <rect width="1200" height="4" rx="2" fill="#06B6D4"/>
+  <g transform="translate(72 44) scale(0.96875)">
+    <g fill="#F8FAFC">
+      <rect x="6" y="14" width="8" height="36" rx="1.5"/>
+      <rect x="18" y="14" width="6" height="36" rx="1.5"/>
+      <rect x="28" y="14" width="4" height="36" rx="1.5"/>
+    </g>
+    <path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#06B6D4"
+          stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-
-  <!-- motivo: losango Pix abstrato (ciano) -->
-  <g transform="translate(836,135) rotate(45)" opacity="0.9">
-    <rect x="-26" y="-26" width="52" height="52" rx="10" fill="none" stroke="#06B6D4" stroke-width="6"/>
-    <rect x="-9" y="-9" width="18" height="18" rx="4" fill="#06B6D4"/>
+  <g transform="translate(150 100)">
+    <g fill="#F8FAFC" transform="scale(0.025390625 -0.025390625)">
+        <path transform="translate(0 0)" d="M795 212Q1062 212 1166 480L1423 383Q1340 179 1179.5 79.5Q1019 -20 795 -20Q455 -20 269.5 172.5Q84 365 84 711Q84 1058 263.0 1244.0Q442 1430 782 1430Q1030 1430 1186.0 1330.5Q1342 1231 1405 1038L1145 967Q1112 1073 1015.5 1135.5Q919 1198 788 1198Q588 1198 484.5 1074.0Q381 950 381 711Q381 468 487.5 340.0Q594 212 795 212Z"/>
+        <path transform="translate(1479 0)" d="M1171 542Q1171 279 1025.0 129.5Q879 -20 621 -20Q368 -20 224.0 130.0Q80 280 80 542Q80 803 224.0 952.5Q368 1102 627 1102Q892 1102 1031.5 957.5Q1171 813 1171 542ZM877 542Q877 735 814.0 822.0Q751 909 631 909Q375 909 375 542Q375 361 437.5 266.5Q500 172 618 172Q877 172 877 542Z"/>
+        <path transform="translate(2730 0)" d="M1167 545Q1167 277 1059.5 128.5Q952 -20 752 -20Q637 -20 553.0 30.0Q469 80 424 174H422Q422 139 417.5 78.0Q413 17 408 0H135Q143 93 143 247V1484H424V1070L420 894H424Q519 1102 770 1102Q962 1102 1064.5 956.5Q1167 811 1167 545ZM874 545Q874 729 820.0 818.0Q766 907 653 907Q539 907 479.5 811.5Q420 716 420 536Q420 364 478.5 268.0Q537 172 651 172Q874 172 874 545Z"/>
+        <path transform="translate(3981 0)" d="M143 0V828Q143 917 140.5 976.5Q138 1036 135 1082H403Q406 1064 411.0 972.5Q416 881 416 851H420Q461 965 493.0 1011.5Q525 1058 569.0 1080.5Q613 1103 679 1103Q733 1103 766 1088V853Q698 868 646 868Q541 868 482.5 783.0Q424 698 424 531V0Z"/>
+        <path transform="translate(4778 0)" d="M393 -20Q236 -20 148.0 65.5Q60 151 60 306Q60 474 169.5 562.0Q279 650 487 652L720 656V711Q720 817 683.0 868.5Q646 920 562 920Q484 920 447.5 884.5Q411 849 402 767L109 781Q136 939 253.5 1020.5Q371 1102 574 1102Q779 1102 890.0 1001.0Q1001 900 1001 714V320Q1001 229 1021.5 194.5Q1042 160 1090 160Q1122 160 1152 166V14Q1127 8 1107.0 3.0Q1087 -2 1067.0 -5.0Q1047 -8 1024.5 -10.0Q1002 -12 972 -12Q866 -12 815.5 40.0Q765 92 755 193H749Q631 -20 393 -20ZM720 501 576 499Q478 495 437.0 477.5Q396 460 374.5 424.0Q353 388 353 328Q353 251 388.5 213.5Q424 176 483 176Q549 176 603.5 212.0Q658 248 689.0 311.5Q720 375 720 446Z"/>
+        <path transform="translate(5917 0)" d="M844 0V607Q844 892 651 892Q549 892 486.5 804.5Q424 717 424 580V0H143V840Q143 927 140.5 982.5Q138 1038 135 1082H403Q406 1063 411.0 980.5Q416 898 416 867H420Q477 991 563.0 1047.0Q649 1103 768 1103Q940 1103 1032.0 997.0Q1124 891 1124 687V0Z"/>
+        <path transform="translate(7168 0)" d="M594 -20Q348 -20 214.0 126.5Q80 273 80 535Q80 803 215.0 952.5Q350 1102 598 1102Q789 1102 914.0 1006.0Q1039 910 1071 741L788 727Q776 810 728.0 859.5Q680 909 592 909Q375 909 375 546Q375 172 596 172Q676 172 730.0 222.5Q784 273 797 373L1079 360Q1064 249 999.5 162.0Q935 75 830.0 27.5Q725 -20 594 -20Z"/>
+        <path transform="translate(8307 0)" d="M393 -20Q236 -20 148.0 65.5Q60 151 60 306Q60 474 169.5 562.0Q279 650 487 652L720 656V711Q720 817 683.0 868.5Q646 920 562 920Q484 920 447.5 884.5Q411 849 402 767L109 781Q136 939 253.5 1020.5Q371 1102 574 1102Q779 1102 890.0 1001.0Q1001 900 1001 714V320Q1001 229 1021.5 194.5Q1042 160 1090 160Q1122 160 1152 166V14Q1127 8 1107.0 3.0Q1087 -2 1067.0 -5.0Q1047 -8 1024.5 -10.0Q1002 -12 972 -12Q866 -12 815.5 40.0Q765 92 755 193H749Q631 -20 393 -20ZM720 501 576 499Q478 495 437.0 477.5Q396 460 374.5 424.0Q353 388 353 328Q353 251 388.5 213.5Q424 176 483 176Q549 176 603.5 212.0Q658 248 689.0 311.5Q720 375 720 446Z"/>
+    </g>
+    <g fill="#06B6D4" transform="translate(239.83984375 0) scale(0.025390625 -0.025390625)">
+        <path transform="translate(0 0)" d="M80 409V653H600V409Z"/>
+        <path transform="translate(682 0)" d="M1133 0 1008 360H471L346 0H51L565 1409H913L1425 0ZM739 1192 733 1170Q723 1134 709.0 1088.0Q695 1042 537 582H942L803 987L760 1123Z"/>
+        <path transform="translate(2161 0)" d="M1296 963Q1296 827 1234.0 720.0Q1172 613 1056.5 554.5Q941 496 782 496H432V0H137V1409H770Q1023 1409 1159.5 1292.5Q1296 1176 1296 963ZM999 958Q999 1180 737 1180H432V723H745Q867 723 933.0 783.5Q999 844 999 958Z"/>
+        <path transform="translate(3527 0)" d="M137 0V1409H432V0Z"/>
+    </g>
   </g>
-
-  <!-- título -->
-  <text x="64" y="122" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="58" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">Cobranca-API</text>
-
-  <!-- linha de acento -->
-  <rect x="66" y="142" width="150" height="5" rx="2.5" fill="#06B6D4"/>
-
-  <!-- tagline -->
-  <text x="64" y="182" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="23" font-weight="400" fill="#E2E8F0">Boleto · Pix · Pix Automático · CNAB · OFX</text>
-  <text x="64" y="214" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="18" font-weight="400" fill="#94A3B8">18 bancos · REST 100% Python (FastAPI + PyCobrança) · qualquer linguagem · MIT</text>
+  <g font-family="'Liberation Sans', Arial, Helvetica, sans-serif">
+    <text x="72" y="154" font-size="22" font-weight="500" fill="#CBD5E1">Boletos, Pix, CNAB 240/400 e OFX — via API REST</text>
+    <g transform="translate(72 182)"><rect width="106" height="34" rx="17.0" fill="#06B6D4"/><text x="53.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">19 bancos</text></g>
+    <g transform="translate(190 182)"><rect width="139" height="34" rx="17.0" fill="#06B6D4"/><text x="69.5" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">REST + Python</text></g>
+    <g transform="translate(341 182)"><rect width="156" height="34" rx="17.0" fill="#06B6D4"/><text x="78.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">MIT Open Source</text></g>
+    <text x="72" y="284" font-size="13" font-weight="500" fill="#94A3B8" letter-spacing="0.4">Oracle APEX · PL/SQL · Python · Java · Node · C# · PHP · Go · Delphi</text>
+    <g transform="translate(730 44)">
+      <rect width="398" height="248" rx="12" fill="#0B1220" fill-opacity="0.55" stroke="#334155" stroke-width="1"/>
+      <rect width="398" height="44" rx="12" fill="#0B1220" fill-opacity="0.7"/>
+      <rect y="32" width="398" height="12" fill="#0B1220" fill-opacity="0.7"/>
+      <line y1="44" x2="398" y2="44" stroke="#334155" stroke-width="1"/>
+      <g transform="translate(16 12)"><rect width="52" height="20" rx="5" fill="#34D399" fill-opacity="0.16"/><text x="26" y="14" font-size="11" font-weight="700" fill="#34D399" text-anchor="middle" font-family="ui-monospace, monospace">POST</text></g>
+      <text x="76" y="26" font-size="13" fill="#CBD5E1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">/cobranca</text>
+      <g transform="translate(18 64)">
+        <rect width="30" height="30" rx="7" fill="#06B6D4" fill-opacity="0.14"/>
+        <g transform="translate(5 5) scale(0.8333333333333334)" fill="none" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z M14 3v4h4 M9 13h6 M9 17h4"/></g>
+        <text x="42" y="13" font-size="14" font-weight="600" fill="#F8FAFC">Boletos PDF e carnês</text>
+        <text x="42" y="28" font-size="11" fill="#94A3B8">Layouts A4 de 18 bancos e carnê 3 vias</text>
+        <rect x="306" y="1" width="56" height="17" rx="8.5" fill="#94A3B8" fill-opacity="0.14" stroke="#94A3B8" stroke-opacity="0.4" stroke-width="1"/>
+        <text x="334.0" y="13" font-size="9" font-weight="700" letter-spacing="0.8" fill="#94A3B8" text-anchor="middle">OFFLINE</text>
+      </g>
+      <g transform="translate(18 114)">
+        <rect width="30" height="30" rx="7" fill="#38BDF8" fill-opacity="0.14"/>
+        <g transform="translate(5 5) scale(0.8333333333333334)" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 5 13.5h5.5L9.5 22 19 10.5h-5.5z"/></g>
+        <text x="42" y="13" font-size="14" font-weight="600" fill="#F8FAFC">Pix e Bolepix híbrido</text>
+        <text x="42" y="28" font-size="11" fill="#94A3B8">QR dinâmico e Pix Automático BACEN</text>
+        <rect x="314" y="1" width="48" height="17" rx="8.5" fill="#06B6D4" fill-opacity="0.14" stroke="#06B6D4" stroke-opacity="0.4" stroke-width="1"/>
+        <text x="338.0" y="13" font-size="9" font-weight="700" letter-spacing="0.8" fill="#06B6D4" text-anchor="middle">ONLINE</text>
+      </g>
+      <g transform="translate(18 164)">
+        <rect width="30" height="30" rx="7" fill="#34D399" fill-opacity="0.14"/>
+        <g transform="translate(5 5) scale(0.8333333333333334)" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-13.7-5.2L3 9 M3 4v5h5 M4 13a8 8 0 0 0 13.7 5.2L21 15 M21 20v-5h-5"/></g>
+        <text x="42" y="13" font-size="14" font-weight="600" fill="#F8FAFC">CNAB 240/400 e OFX</text>
+        <text x="42" y="28" font-size="11" fill="#94A3B8">Remessa, retorno e conciliação</text>
+        <rect x="306" y="1" width="56" height="17" rx="8.5" fill="#94A3B8" fill-opacity="0.14" stroke="#94A3B8" stroke-opacity="0.4" stroke-width="1"/>
+        <text x="334.0" y="13" font-size="9" font-weight="700" letter-spacing="0.8" fill="#94A3B8" text-anchor="middle">OFFLINE</text>
+      </g>
+      <g transform="translate(18 214)">
+        <rect width="30" height="30" rx="7" fill="#A78BFA" fill-opacity="0.14"/>
+        <g transform="translate(5 5) scale(0.8333333333333334)" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5h18a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z M2 10.5h20 M6 14.5h4"/></g>
+        <text x="42" y="13" font-size="14" font-weight="600" fill="#F8FAFC">Link de pagamento</text>
+        <text x="42" y="28" font-size="11" fill="#94A3B8">Checkout com crédito e débito</text>
+        <rect x="314" y="1" width="48" height="17" rx="8.5" fill="#06B6D4" fill-opacity="0.14" stroke="#06B6D4" stroke-opacity="0.4" stroke-width="1"/>
+        <text x="338.0" y="13" font-size="9" font-weight="700" letter-spacing="0.8" fill="#06B6D4" text-anchor="middle">ONLINE</text>
+      </g>
+    </g>
+  </g>
 </svg>

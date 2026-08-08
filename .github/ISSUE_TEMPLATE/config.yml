@@ -1,8 +1,13 @@
 blank_issues_enabled: true
 contact_links:
+  # Aponta para o site, não para a árvore de .md: a página renderizada tem
+  # busca, navegação e é indexada — a listagem de arquivos do GitHub não.
   - name: 📖 Documentação
-    url: https://github.com/Maxwbh/cobranca-api/tree/main/docs
+    url: https://maxwbh.github.io/cobranca-api/
     about: Consulte a documentação completa antes de abrir uma issue
+  - name: ❓ Dúvida de integração
+    url: https://github.com/Maxwbh/cobranca-api/discussions/new?category=q-a
+    about: Erro do banco, credencial, certificado ou contrato da API — pergunte aqui, não abra issue
   - name: 🔒 Reportar Vulnerabilidade de Segurança
     url: https://github.com/Maxwbh/cobranca-api/security/policy
     about: Por favor, reporte vulnerabilidades de segurança de forma privada

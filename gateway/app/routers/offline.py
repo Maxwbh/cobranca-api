@@ -475,7 +475,7 @@ _SWAGGER_OFFLINE = """<!DOCTYPE html>
   <div class="cob-topbar">
     <svg class="cob-mark" width="26" height="26" viewBox="0 0 52 52" aria-hidden="true"><g transform="translate(26,26) rotate(45)"><rect x="-20" y="-20" width="40" height="40" rx="8" fill="none" stroke="#06B6D4" stroke-width="5"/><rect x="-7" y="-7" width="14" height="14" rx="3" fill="#06B6D4"/></g></svg>
     <h1>Cobranca-API</h1>
-    <span class="surface">Offline &middot; pyCobranca</span>
+    <span class="surface">Offline &middot; pyCobrança</span>
     <span class="pill">100% Python</span>
     <small>v__VERSION__ &middot; pycobranca __PYCOB__</small>
     <div class="links">

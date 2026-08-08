@@ -68,7 +68,7 @@ vim CHANGELOG.md
 
 # 5. Commit
 git add VERSION CHANGELOG.md gateway/app/main.py docs/openapi.yaml
-git commit --author="Maxwell da Silva Oliveira <maxwbh@gmail.com>" -m "[RELEASE] Versão 1.0.1"
+git commit -m "[RELEASE] Versão 1.0.1"   # assine com a SUA identidade (git config)
 
 # 6. Criar tag — só depois do merge em main
 git tag -a v1.0.1 -m "Versão 1.0.1"
@@ -76,6 +76,12 @@ git tag -a v1.0.1 -m "Versão 1.0.1"
 # 7. Push com tags
 git push origin main --tags
 ```
+
+O push da tag `vX.Y.Z` dispara o workflow de release, que faz **duas** coisas:
+publica a GitHub Release com a seção correspondente do CHANGELOG e publica a
+imagem `ghcr.io/maxwbh/cobranca-api:X.Y.Z` (+ `:latest`, amd64 e arm64) no
+GHCR. Não há passo manual — se a Release existe mas a imagem não, foi o job
+`imagem` que falhou; reexecute pelo `workflow_dispatch` informando a tag.
 
 ### Quando usar cada tipo de versão
 
@@ -129,8 +135,10 @@ Para automatizar versionamento em pipelines:
 
 - name: Commit version
   run: |
-    git config user.name "Maxwell da Silva Oliveira"
-    git config user.email "maxwbh@gmail.com"
+    # Identidade do ROBÔ, não a de uma pessoa: commit automático assinado com
+    # o e-mail de alguém faz o `git blame` apontar para quem não estava lá.
+    git config user.name "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
     git add VERSION CHANGELOG.md
     git commit -m "[AUTO] Bump version"
     git push

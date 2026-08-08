@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Cobranca-API">
+  <!--
+    Marca da Cobranca-API — versão para FUNDO CLARO.
+    Para fundo escuro use marca-escura.svg; para 16px use favicon.svg.
+
+    O desenho: três barras de larguras decrescentes (o código de barras do
+    boleto) que aceleram para a direita e desembocam num chevron. A mesma forma
+    lê "documento" e "fluxo" — que é o produto: gerar o boleto e falar com o
+    banco. O chevron também é o `>` de terminal e de colchete, para o público
+    que o projeto quer, que é quem integra.
+
+    Grade de 64 de propósito: 64 = 4 x 16, então as arestas principais caem em
+    pixel inteiro quando a marca é reduzida a 16px. Ainda assim a terceira
+    barra (4 unidades = 1px a 16px) some nesse tamanho — por isso o favicon é
+    um desenho separado, com duas barras, e não este arquivo reescalado.
+  -->
+  <!--
+    Vão constante de 4 entre TODOS os elementos, inclusive entre a última barra
+    e o chevron. Sem isso o traço do chevron encosta na terceira barra e, de
+    32px para baixo, os dois viram um borrão só.
+    Barras: 6-14, 18-24, 28-32. Chevron a partir de 36.
+  -->
+  <g fill="#0F172A">
+    <rect x="6"  y="14" width="8" height="36" rx="1.5"/>
+    <rect x="18" y="14" width="6" height="36" rx="1.5"/>
+    <rect x="28" y="14" width="4" height="36" rx="1.5"/>
+  </g>
+  <!--
+    Ciano mais fechado que o #06B6D4 da paleta: sobre branco o acento da paleta
+    tem contraste 2,43 e lava; este tem 3,68. Sobre fundo escuro o problema não
+    existe e marca-escura.svg volta ao #06B6D4 da identidade.
+  -->
+  <!-- Traço 9 com ponta redonda: a borda visível fica 4,5 além do path, então
+       o path começa em 40,5 para a forma nascer em 36 e terminar em 58. Com
+       isso o conjunto ocupa 6..58 na horizontal e 14..50 na vertical — 6 e 14
+       de margem dos dois lados, óptica centrada na caixa de 64. -->
+  <path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#0891B2"
+        stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

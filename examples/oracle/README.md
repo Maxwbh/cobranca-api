@@ -12,11 +12,12 @@ que já existe no Oracle (`UTL_HTTP` + `APEX_JSON`, ou `APEX_WEB_SERVICE`).
 
 | Arquivo | O quê |
 |---|---|
-| [`cobranca_api_pkg.sql`](./cobranca_api_pkg.sql) | Pacote `COBRANCA_API` — boleto, CNAB, lote e **cobrança online** |
+| [`cobranca_api_pkg.sql`](./cobranca_api_pkg.sql) | Pacote `COBRANCA_API` — boleto, CNAB, lote, **cobrança online** e **checkout de cartão** |
 | [`acl_setup.sql`](./acl_setup.sql) | ACL de rede + wallet (executar como DBA) |
 | [`exemplo_boleto.sql`](./exemplo_boleto.sql) | **Boleto OFFLINE** (sem credencial) — PDF em BLOB |
 | [`exemplo_online_c6.sql`](./exemplo_online_c6.sql) | **Cobrança registrada no C6** — credencial → token `bapi_` → `POST /cobranca` |
 | [`exemplo_online_sicoob.sql`](./exemplo_online_sicoob.sql) | **Cobrança registrada no Sicoob** — as duas vias de autenticação |
+| [`exemplo_checkout.sql`](./exemplo_checkout.sql) | **Link de pagamento com cartão** (+ Pix no mesmo link) — nenhum dado de cartão passa pelo banco de dados |
 | [`exemplo_remessa.sql`](./exemplo_remessa.sql) | **Remessa CNAB** com encargos (multa/juros/desconto) → `UTL_FILE` |
 | [`exemplo_retorno.sql`](./exemplo_retorno.sql) | **Retorno CNAB** → `JSON_TABLE` → baixa dos títulos |
 | [`exemplo_lote.sql`](./exemplo_lote.sql) | **Lote assíncrono**: cria o job e acompanha até concluir |
@@ -109,6 +110,39 @@ A API responde **202** em ~1s e processa em background; depois:
 - `GET /jobs/boletos/{job_id}/artifacts` → manifesto com `sha256` + **zip** com todos os PDFs
 
 Um item inválido **não** cancela o lote.
+
+## Cartão (link de pagamento)
+
+```sql
+l_ck := cobranca_api.criar_checkout(
+          p_tenant          => 'empresa1',
+          p_valor           => 150.00,
+          p_parcelas        => 6,
+          p_com_pix         => TRUE,              -- QR Pix no MESMO link
+          p_referencia      => 'PED-2026-0042',
+          p_idempotency_key => 'venda-PED-2026-0042');
+-- l_ck.url é para onde o pagador vai
+```
+
+Quatro coisas que decidem se isto funciona em produção:
+
+- **`p_idempotency_key` derivada da venda**, nunca de `SYSTIMESTAMP`. Chave nova
+  a cada chamada não protege de nada; a graça é o reenvio devolver o **mesmo**
+  link em vez de criar um segundo para a mesma venda.
+- **A política de parcelamento é sua, não da API.** `p_parcelas` é o teto
+  oferecido ao pagador e vai ao banco como veio — **não existe valor mínimo de
+  parcela nesta API**. Com "até 3x, mínimo R$ 100", quem calcula é você:
+  `GREATEST(1, LEAST(3, FLOOR(l_valor / 100)))`. Mandar `3` fixo numa venda de
+  R$ 90 oferece 3 × R$ 30 ao pagador, e o banco não barra isso por você.
+- **A baixa vem do `liquidado` que o banco devolve**, não do retorno do
+  navegador. O pagador pode fechar a aba antes de voltar, e pode voltar sem ter
+  pago.
+- **`erro` é cartão recusado, não título baixado.** O link se esgotou; a dívida
+  não. Quem decide se a venda segue em aberto é você.
+
+Para dar baixa com a tela fechada, use o webhook em vez do polling — o
+[`../apex/apex_checkout.sql`](../apex/apex_checkout.sql) traz o handler ORDS,
+com a validação de assinatura que não pode faltar.
 
 ## Erros e diagnóstico
 
