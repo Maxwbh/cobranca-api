@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: 'en-US' }}">
+  <head>
+    <meta charset="UTF-8">
+{% seo %}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0F172A">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link rel="preload" href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" as="style" type="text/css" crossorigin>
+    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+    {% include head-custom.html %}
+  </head>
+  <body>
+    <a id="skip-to-content" href="#content">Pular para o conteúdo.</a>
+
+    <!-- Cabeçalho próprio: sobrepõe o do tema Cayman para usar o MESMO banner
+         do README — uma identidade só, do repositório ao site. O h1 continua
+         existindo para leitor de tela e SEO; visualmente quem fala é o banner,
+         que carrega a mesma informação no alt. -->
+    <header class="page-header" role="banner">
+      <h1 class="so-leitor-de-tela">{{ site.title }}</h1>
+      <picture>
+        <source media="(max-width: 600px)" srcset="{{ '/assets/banner-mobile.svg' | relative_url }}">
+        <img class="banner-cabecalho" src="{{ '/assets/banner.svg' | relative_url }}"
+             alt="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, licença MIT.">
+      </picture>
+      <div class="acoes-cabecalho">
+        <a href="https://cobranca-api-sq67.onrender.com/docs" class="btn btn-primario">Testar a API</a>
+        <a href="{{ '/' | relative_url }}#referencia" class="btn">Documentação</a>
+        <a href="{{ site.github.repository_url }}" class="btn">Código no GitHub</a>
+      </div>
+    </header>
+
+    <main id="content" class="main-content" role="main">
+      {{ content }}
+
+      <footer class="site-footer">
+        <span class="site-footer-owner">
+          <a href="{{ site.github.repository_url }}">cobranca-api</a> — MIT, mantido por
+          <a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a> ·
+          <a href="https://msbrasil.inf.br">M&amp;S do Brasil LTDA</a>.
+        </span>
+      </footer>
+    </main>
+
+    <script>
+      // Botão "copiar" em todo bloco de código. Progressivo: sem JS ou sem
+      // clipboard (http puro), simplesmente não aparece — nada quebra.
+      if (navigator.clipboard) {
+        document.querySelectorAll('.main-content pre').forEach(function (pre) {
+          var b = document.createElement('button');
+          b.className = 'botao-copiar';
+          b.type = 'button';
+          b.textContent = 'copiar';
+          b.addEventListener('click', function () {
+            var codigo = pre.querySelector('code');
+            var texto = (codigo ? codigo.innerText : pre.innerText);
+            navigator.clipboard.writeText(texto).then(function () {
+              b.textContent = 'copiado!';
+              setTimeout(function () { b.textContent = 'copiar'; }, 1600);
+            });
+          });
+          pre.appendChild(b);
+        });
+      }
+    </script>
+  </body>
+</html>
