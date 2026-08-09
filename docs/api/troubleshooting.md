@@ -373,7 +373,7 @@ Se ainda assim houver problemas, reporte um issue com arquivo de exemplo.
 
 ## Suporte
 
-- **Documentação:** [docs/README.md](../README.md)
+- **Documentação:** [documentação do projeto](../)
 - **Campos por banco:** [docs/fields/all-banks.md](../fields/all-banks.md)
 - **OpenAPI Spec:** [docs/openapi.yaml](../openapi.yaml)
 - **Issues:** https://github.com/Maxwbh/cobranca-api/issues

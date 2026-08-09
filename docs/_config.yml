@@ -12,12 +12,12 @@ description: >-
 theme: jekyll-theme-cayman
 lang: pt-BR
 
-# `development/` são notas internas de planejamento (roadmaps, planos de
-# migração, estudos por banco). Ficam versionadas e legíveis no repositório,
-# mas não entram no site: documentação pública que mistura plano interno com
-# referência de uso confunde quem chega para integrar.
+# `development/` ENTRA no site desde 08/2026. Ficava de fora para não misturar
+# plano interno com referência de uso — mas o efeito colateral era pior: todo
+# link para um doc de provider (c6-rest, roadmap…) caía num `.md` cru no
+# GitHub, fora do layout. Agora são páginas do site, com índice próprio em
+# `development/`, e a separação é de navegação, não de publicação.
 exclude:
-  - development/
   - openapi.yaml
 
 # Sem Gemfile: o Pages usa a versão hospedada do Jekyll. Se um dia o site

@@ -262,7 +262,7 @@ Exemplos **reais gerados pela API** (engine pyCobrança, Python puro), um por ba
 > 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
 > [demo ao vivo](https://cobranca-api-sq67.onrender.com/api/docs) — instância de
 > demonstração no plano gratuito do Render. A URL vem do nome do serviço e **não é
-> fixa**: na sua instalação, use a que o Render mostrar (veja [DEPLOY.md](./DEPLOY.md)).
+> fixa**: na sua instalação, use a que o Render mostrar (veja o [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy)).
 
 ## Cobranca-API × gateway de pagamento SaaS
 
@@ -474,7 +474,7 @@ curl -X POST http://localhost:8000/carne -H 'Content-Type: application/json' -d 
 | **Docker Compose** | `docker compose up --build` |
 | **Render.com** | [![Deploy](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy) |
 
-Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
+Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy).
 
 ---
 
@@ -507,7 +507,7 @@ Detalhes e variáveis de ambiente em [DEPLOY.md](./DEPLOY.md).
 | Boleto online × offline (comparativo) | [docs/api/online-vs-offline.md](./docs/api/online-vs-offline.md) |
 | Arquitetura | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Roadmap | [roadmap de providers](./docs/development/roadmap-providers.md) |
-| Deploy | [DEPLOY.md](./DEPLOY.md) |
+| Deploy | [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy) |
 
 ---
 
