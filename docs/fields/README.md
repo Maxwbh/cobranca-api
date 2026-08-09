@@ -351,7 +351,7 @@ boleto_sicoob = {
 
 - [Todos os Bancos](./all-banks.md) - Lista completa e compatibilidade por banco
 - [PIX Híbrido](../api/pix.md) - Guia de boleto com QR Code PIX
-- [Exemplos Python](../../examples/python/README.md) - Scripts executáveis
+- [Exemplos Python](https://github.com/Maxwbh/cobranca-api/tree/main/examples/python) - Scripts executáveis
 - [Troubleshooting](../api/troubleshooting.md) - Solução de problemas
 - [Engine PyCobrança](https://github.com/Maxwbh/pyCobranca) - quem gera o boleto
 

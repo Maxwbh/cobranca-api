@@ -316,6 +316,11 @@ def listar_itens(job_id: str, tenant_id: str, status: str | None = None,
 
 @router.get("/boletos/{job_id}/items/{item_id}", responses=_RESP_404)
 def consultar_item(job_id: str, item_id: str, tenant_id: str) -> Any:
+    """Um item do lote: estado, artefato e — se falhou — o erro daquele boleto.
+
+    É por aqui que se investiga um `partially_completed`: o job segue em frente
+    quando um item falha, e o motivo fica no item, não no job.
+    """
     store = _store()
     if not store.obter(tenant_id, job_id):
         raise HTTPException(status_code=404, detail="job não encontrado para o tenant")
@@ -469,6 +474,12 @@ async def criar_job_remessas(
 
 @router.get("/cnab/remessas/{job_id}", responses=_RESP_404)
 def consultar_job_remessas(job_id: str, tenant_id: str) -> Any:
+    """Estado do job de remessa e a lista de **sublotes** gerados.
+
+    O lote é dividido por banco/layout/convênio/carteira/conta — um arquivo por
+    combinação, porque o banco não aceita remessa misturada. Os arquivos ficam
+    em `/jobs/cnab/remessas/{job_id}/files`.
+    """
     job = _store().obter(tenant_id, job_id)
     if not job or job["tipo"] != "cnab_remessas":
         raise HTTPException(status_code=404, detail="job não encontrado para o tenant")

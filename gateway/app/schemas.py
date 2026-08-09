@@ -428,8 +428,15 @@ class CredencialIn(BaseModel):
     tenant_id: str = Field(description="Tenant dono destas credenciais", examples=["empresa_123"])
     provider: Provider = Field(description="Banco/provider destas credenciais (ex: c6)")
     credentials: dict[str, Any] = Field(
-        description="client_id, client_secret, pfx_base64, pfx_password (cifradas em repouso; "
-                    "chave derivada do token — o servidor não decifra sozinho)"
+        description="Esquema **próprio de cada banco** — o vigente sai em `GET /bancos`. "
+                    "Cifradas em repouso; a chave é derivada do token, então o servidor "
+                    "não decifra sozinho.",
+        examples=[{
+            "client_id": "seu-client-id",
+            "client_secret": "seu-client-secret",
+            "pfx_base64": "<PKCS12 em base64>",
+            "pfx_password": "senha-do-certificado",
+        }],
     )
 
 

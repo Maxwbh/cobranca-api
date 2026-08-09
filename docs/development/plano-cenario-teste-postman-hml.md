@@ -1,8 +1,8 @@
 # Plano — Cenário de Teste HML via Postman (v2)
 
 > **Status:** IMPLEMENTADO. A coleção e os environments existem em
-> [`postman/`](../../postman/) (schema v2.1, IDs de rastreabilidade); a
-> execução com segredos é o [`postman/run-regressao.sh`](../../postman/run-regressao.sh),
+> [`postman/`](https://github.com/Maxwbh/cobranca-api/tree/main/postman) (schema v2.1, IDs de rastreabilidade); a
+> execução com segredos é o [`postman/run-regressao.sh`](https://github.com/Maxwbh/cobranca-api/blob/main/postman/run-regressao.sh),
 > agendada semanalmente pelo workflow `Regressão HML (janela C6)`.
 > **Contexto:** valida o **serviço único** (FastAPI + engine pyCobrança embutida)
 > da v2.0.0. Este documento é o plano que originou esses artefatos.

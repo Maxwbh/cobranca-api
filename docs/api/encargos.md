@@ -134,5 +134,5 @@ POST /api/remessa?bank=banco_brasil&type=cnab240
 ## Ver também
 
 - Engine: [`docs/06-cnab.md` da PyCobrança](https://github.com/Maxwbh/pyCobranca/blob/main/docs/06-cnab.md)
-- [Exemplo Oracle de remessa](../../examples/oracle/exemplo_remessa.sql)
+- [Exemplo Oracle de remessa](https://github.com/Maxwbh/cobranca-api/blob/main/examples/oracle/exemplo_remessa.sql)
 - Spec: `POST /api/remessa` em [`docs/openapi.yaml`](../openapi.yaml)

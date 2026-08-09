@@ -17,6 +17,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.core import pycob
+from app.core.swagger_tema import pagina_swagger
 
 router = APIRouter(tags=["offline"])
 
@@ -427,71 +428,13 @@ def api_openapi_yaml() -> Response:
 
 @router.get("/api/docs", include_in_schema=False)
 def api_docs(request: Request) -> HTMLResponse:
-    html = _SWAGGER_OFFLINE.replace("__VERSION__", request.app.version).replace(
-        "__PYCOB__", pycob.versao())
-    return HTMLResponse(html)
+    return HTMLResponse(pagina_swagger(
+        titulo="Cobranca-API — Offline (Swagger)",
+        superficie="Offline · pyCobrança",
+        pill="18 bancos · sem convênio",
+        detalhe=f"v{request.app.version} · pycobranca {pycob.versao()}",
+        links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
+               ("Gateway REST →", "/docs", True)],
+        spec_url="/api/openapi.json",
+    ))
 
-
-_SWAGGER_OFFLINE = """<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Cobranca-API — Offline (Swagger)</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5/favicon-32x32.png">
-  <style>
-    /* Tema Tech Innovation: #0F172A grafite · #1E40AF azul · #06B6D4 ciano */
-    body { margin: 0; }
-    .cob-topbar { background: linear-gradient(120deg, #0F172A 0%, #1E40AF 70%, #3B5A82 100%);
-                  padding: 14px 28px; color: #fff; border-bottom: 4px solid #06B6D4;
-                  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-    .cob-topbar h1 { margin: 0; font: 700 20px 'Segoe UI', sans-serif; letter-spacing: .3px; }
-    .cob-topbar .surface { color: #06B6D4; font: 600 13px 'Segoe UI', sans-serif;
-                           text-transform: uppercase; letter-spacing: 1px; }
-    .cob-topbar small { color: #cbd5e1; font: 12px 'Segoe UI', sans-serif; }
-    .cob-topbar a { color: #fff; font: 600 13px 'Segoe UI', sans-serif; text-decoration: none;
-                    border: 1px solid #06B6D4; border-radius: 6px; padding: 5px 12px; }
-    .cob-topbar a:hover { background: #06B6D4; color: #0F172A; }
-    .cob-topbar .cob-mark { align-self: center; flex: none; }
-    .cob-topbar .pill { background: rgba(6,182,212,.15); border: 1px solid #06B6D4;
-                        color: #a5f3fc; font: 600 11px 'Segoe UI', sans-serif;
-                        border-radius: 999px; padding: 3px 10px; letter-spacing: .4px; }
-    .cob-topbar .links { margin-left: auto; display: flex; gap: 8px; align-self: center; }
-    .swagger-ui .topbar { display: none; }
-    .swagger-ui .info .title { color: #0F172A; }
-    .swagger-ui .info a { color: #1E40AF; }
-    .swagger-ui .scheme-container { background: #F8FAFC; box-shadow: none; }
-    .swagger-ui .opblock-tag { color: #0F172A; border-bottom: 1px solid #E2E8F0; }
-    @media (max-width: 640px) {
-      .cob-topbar { padding: 10px 14px; gap: 8px; }
-      .cob-topbar h1 { font-size: 17px; }
-      .cob-topbar small, .cob-topbar .pill { display: none; }
-      .cob-topbar .links { margin-left: 0; width: 100%; }
-      .cob-topbar .links a { flex: 1; text-align: center; }
-    }
-  </style>
-</head>
-<body>
-  <div class="cob-topbar">
-    <svg class="cob-mark" width="26" height="26" viewBox="0 0 52 52" aria-hidden="true"><g transform="translate(26,26) rotate(45)"><rect x="-20" y="-20" width="40" height="40" rx="8" fill="none" stroke="#06B6D4" stroke-width="5"/><rect x="-7" y="-7" width="14" height="14" rx="3" fill="#06B6D4"/></g></svg>
-    <h1>Cobranca-API</h1>
-    <span class="surface">Offline &middot; pyCobrança</span>
-    <span class="pill">100% Python</span>
-    <small>v__VERSION__ &middot; pycobranca __PYCOB__</small>
-    <div class="links">
-      <a href="https://github.com/Maxwbh/pyCobranca" target="_blank" rel="noopener">pyCobranca</a>
-      <a href="/docs">Gateway REST &rarr;</a>
-    </div>
-  </div>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    window.onload = () => {
-      window.ui = SwaggerUIBundle({
-        url: '/api/openapi.json', dom_id: '#swagger-ui', deepLinking: true,
-        presets: [SwaggerUIBundle.presets.apis], tryItOutEnabled: true, validatorUrl: null,
-      });
-    };
-  </script>
-</body>
-</html>"""

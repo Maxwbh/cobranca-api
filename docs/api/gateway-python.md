@@ -481,10 +481,10 @@ banco antes de seguir para você.
 Hoje só o C6 oferece.
 
 **Oracle:** página pronta em
-[`examples/apex/apex_checkout.sql`](../../examples/apex/apex_checkout.sql)
+[`examples/apex/apex_checkout.sql`](https://github.com/Maxwbh/cobranca-api/blob/main/examples/apex/apex_checkout.sql)
 (criar link, acompanhar status, handler ORDS do webhook) e
 `cobranca_api.criar_checkout` no
-[pacote PL/SQL](../../examples/oracle/cobranca_api_pkg.sql).
+[pacote PL/SQL](https://github.com/Maxwbh/cobranca-api/blob/main/examples/oracle/cobranca_api_pkg.sql).
 
 ---
 
@@ -700,5 +700,5 @@ curl -s -X POST $GW/cobranca -H 'Content-Type: application/json' -d '{
 5. DELETE /credenciais          → rotação/revogação quando precisar
 ```
 
-Configuração completa (envs) no [README do gateway](../../gateway/README.md);
+Configuração completa (envs) no [guia de deploy](../deploy.md);
 detalhes do C6 em [c6-rest.md](../development/c6-rest.md).

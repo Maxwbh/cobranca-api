@@ -173,7 +173,7 @@ Volume alto não cabe numa requisição síncrona. `POST /jobs/boletos` responde
   por combinação, sempre na mesma ordem.
 - **Conclusão** — webhook assinado (HMAC) + métricas por job.
 
-Contrato completo: [development/plano-jobs-lote.md](./development/plano-jobs-lote.md).
+Contrato completo: [development/plano-jobs-lote.md](development/plano-jobs-lote.md).
 
 ---
 
@@ -231,8 +231,8 @@ postman/               # 129 requests com IDs de rastreabilidade
 
 | Assunto | Documento |
 |---|---|
-| Guias por banco | [development/](./development/) |
-| Jobs em lote | [development/plano-jobs-lote.md](./development/plano-jobs-lote.md) |
+| Guias por banco | [development/](https://github.com/Maxwbh/cobranca-api/tree/main/docs/development) |
+| Jobs em lote | [development/plano-jobs-lote.md](development/plano-jobs-lote.md) |
 | Campos do boleto | [fields/README.md](./fields/README.md) |
 | Engine | [PyCobrança](https://github.com/Maxwbh/pyCobranca) |
 

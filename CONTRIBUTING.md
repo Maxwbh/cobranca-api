@@ -487,7 +487,7 @@ Idealmente, novos códigos devem ter:
 | API endpoints        | `docs/api/`                    |
 | Campos por banco     | `docs/fields/`                 |
 | Exemplos de uso      | `examples/python/`             |
-| Guia de deploy       | `DEPLOY.md`                    |
+| Guia de deploy       | `docs/deploy.md` (site)        |
 | Scripts              | `scripts/README.md`            |
 | README principal     | `README.md`                    |
 | Changelog            | `CHANGELOG.md`                 |

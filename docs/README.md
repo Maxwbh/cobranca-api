@@ -3,17 +3,17 @@
 > Plataforma **100% Python** (engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)).
 > A versão corrente sai em `GET /openapi.json` (`info.version`) e em
 > `GET /api/metadata` — que traz também a da engine —, e o histórico está no
-> [CHANGELOG](../CHANGELOG.md). Repeti-la aqui só criaria mais um lugar para
+> [CHANGELOG](https://github.com/Maxwbh/cobranca-api/releases). Repeti-la aqui só criaria mais um lugar para
 > envelhecer.
 
 Documentação técnica da **Cobranca-API** — plataforma REST de cobrança bancária: gateway para as APIs dos bancos, emissão de boletos, CNAB (remessa/retorno), Pix e parsing de extratos OFX.
 
 ## Início Rápido
 
-- [README do projeto](../README.md) — Overview, quick start, exemplos
-- [DEPLOY.md](../DEPLOY.md) — Guia de deploy no Render.com
-- [CHANGELOG.md](../CHANGELOG.md) — Histórico de versões
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — Como contribuir
+- [README do projeto](https://github.com/Maxwbh/cobranca-api) — Overview, quick start, exemplos
+- [Guia de deploy](deploy.md) — imagem no GHCR, Render, variáveis de ambiente
+- [CHANGELOG.md](https://github.com/Maxwbh/cobranca-api/releases) — Histórico de versões
+- [CONTRIBUTING.md](https://github.com/Maxwbh/cobranca-api/blob/main/CONTRIBUTING.md) — Como contribuir
 
 ## Referência da API
 
@@ -42,7 +42,7 @@ Documentação técnica da **Cobranca-API** — plataforma REST de cobrança ban
 Uma URL, **duas superfícies**. A da raiz fala com a API do banco; a de `/api/*`
 gera o documento localmente, sem banco e sem credencial.
 
-### Online — gateway REST (raiz) · Swagger em [`/docs`](/docs)
+### Online — gateway REST (raiz) · Swagger em [`/docs`](https://cobranca-api-sq67.onrender.com/docs)
 
 | Serviço | Rotas | O que faz | Providers |
 |---|---|---|---|
@@ -69,7 +69,7 @@ gera o documento localmente, sem banco e sem credencial.
 > digita o cartão na página do banco, e `save_card` e checkout transparente não
 > existem no schema — corpo com esses campos responde `422` e não chega ao banco.
 
-### Offline — engine pyCobrança in-process (`/api/*`) · Swagger em [`/api/docs`](/api/docs)
+### Offline — engine pyCobrança in-process (`/api/*`) · Swagger em [`/api/docs`](https://cobranca-api-sq67.onrender.com/api/docs)
 
 Boleto, CNAB e OFX **sem chamar banco**: 18 instituições, sem credencial, sem
 rede. É o caminho para quem registra por arquivo em vez de por API.
@@ -113,11 +113,11 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 > [pyCobrança](https://github.com/Maxwbh/pyCobranca).
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Estrutura modular, services, middleware, fluxos
-- [development/roadmap-providers.md](./development/roadmap-providers.md) — **Roadmap online**: próximos providers REST (bancos e PSP)
-- [development/plano-jobs-lote.md](./development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
+- [development/roadmap-providers.md](development/roadmap-providers.md) — **Roadmap online**: próximos providers REST (bancos e PSP)
+- [development/plano-jobs-lote.md](development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
 - Homologação: [homologacao/](./homologacao/README.md) — roteiro v3.0 do C6 preenchido com evidência real do sandbox, mais as execuções de Sicoob e Inter e o que cada uma prova
-- Integrações REST **implementadas**: [c6-rest.md](./development/c6-rest.md) · [sicoob-rest.md](./development/sicoob-rest.md) · [inter-rest.md](./development/inter-rest.md)
-- Integrações REST **planejadas**: [banco-do-brasil](./development/banco-do-brasil-rest.md) · [btg](./development/btg-rest.md) · [mercado-pago](./development/mercado-pago-rest.md)
+- Integrações REST **implementadas**: [c6-rest.md](development/c6-rest.md) · [sicoob-rest.md](development/sicoob-rest.md) · [inter-rest.md](development/inter-rest.md)
+- Integrações REST **planejadas**: [banco-do-brasil](development/banco-do-brasil-rest.md) · [btg](development/btg-rest.md) · [mercado-pago](development/mercado-pago-rest.md)
 
 ## Guia de Campos por Banco
 
@@ -127,9 +127,9 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 
 ## Exemplos por linguagem
 
-- [examples/oracle/](../examples/oracle/) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB, lote e checkout de cartão
-- [examples/apex/](../examples/apex/) — **Oracle APEX**: emissão, download de PDF, lote com progresso, checkout com cartão
-- [examples/python/](../examples/python/) — Python (scripts executáveis)
+- [examples/oracle/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/oracle) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB, lote e checkout de cartão
+- [examples/apex/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/apex) — **Oracle APEX**: emissão, download de PDF, lote com progresso, checkout com cartão
+- [examples/python/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/python) — Python (scripts executáveis)
 
 ## Recursos Externos
 

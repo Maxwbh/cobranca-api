@@ -158,6 +158,8 @@ ambas por **introspecção do código** (não há como envelhecer).
 | [Leitura de OFX](api/ofx-parsing.md) | Extrato v1/v2 e conciliação com os boletos emitidos |
 | [Troubleshooting](api/troubleshooting.md) | Erros comuns e o que significam |
 | [Arquitetura](ARCHITECTURE.md) | Como as peças se encaixam |
+| [Guia de deploy](deploy.md) | Imagem no GHCR, Render, variáveis de ambiente e troubleshooting |
+| [Notas de engenharia](development/) | Roadmap de providers e o guia de integração de cada banco |
 
 A referência completa e sempre atualizada é o **Swagger servido pela própria
 API** — ele reflete o código em execução, não uma cópia que pode envelhecer.
@@ -184,7 +186,7 @@ docker run -p 8000:8000 -e LOG_LEVEL=info cobranca-api
 ```
 
 Um `Dockerfile`, um processo, sem sidecar. O
-[guia de deploy](https://github.com/Maxwbh/cobranca-api/blob/main/DEPLOY.md)
+[guia de deploy](deploy.md)
 cobre o Render.com e as variáveis de ambiente — inclusive os tetos de lote
 (`LOTE_MAX_ITENS`, `JOB_MAX_ITENS`) e o que muda ao subir de plano.
 

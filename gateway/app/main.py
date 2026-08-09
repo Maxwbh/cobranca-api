@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.vault import CredentialNotFound
+from app.core.swagger_tema import pagina_swagger
 from app.providers.c6 import ProcessamentoPendente
 from app.routers import (
     bancos, bolepix, carne, checkout, cobranca, conciliacao, credenciais,
@@ -241,6 +242,31 @@ _422_AMPLIADO = (
 )
 
 
+# O token `bapi_` não aparece na assinatura das rotas (as credenciais são
+# resolvidas na dependência, e o header é só UM dos três caminhos). Sem declarar
+# aqui, o Swagger não mostra o botão **Authorize** — e quem clica em "Try it out"
+# numa rota de banco não tem onde colar o token.
+_SEGURANCA = "TokenBapi"
+_ESQUEMA_SEGURANCA = {
+    _SEGURANCA: {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "bapi_",
+        "description": (
+            "Token opaco devolvido por `POST /credenciais` — `Authorization: "
+            "Bearer bapi_...`.\n\n"
+            "**É opcional**, e a spec diz isso: as credenciais do banco podem vir "
+            "no corpo (`credentials`), no header `X-Bank-Credentials` ou do cofre "
+            "do servidor (`VAULT__<tenant>__<provider>__*`). Sem nenhuma das três, "
+            "a rota responde `424`."
+        ),
+    }
+}
+# `{}` na lista = "também funciona sem" — declarar só o esquema diria que o token
+# é obrigatório, o que seria mentira nas outras duas formas de credencial.
+_SEGURANCA_OPCIONAL = [{}, {_SEGURANCA: []}]
+
+
 def _openapi_enriquecido() -> dict:
     """Acrescenta à spec o que o FastAPI não tem como saber sozinho."""
     schema = _openapi_original()
@@ -249,6 +275,7 @@ def _openapi_enriquecido() -> dict:
         "url": _DOC_REPO,
     }
     schema.setdefault("components", {}).setdefault("schemas", {}).update(_SCHEMAS_DE_ERRO)
+    schema["components"].setdefault("securitySchemes", {}).update(_ESQUEMA_SEGURANCA)
 
     for operacoes in schema["paths"].values():
         for operacao in operacoes.values():
@@ -261,6 +288,7 @@ def _openapi_enriquecido() -> dict:
                     respostas.setdefault(status, corpo)
                 if "422" in respostas:
                     respostas["422"]["description"] = _422_AMPLIADO
+                operacao.setdefault("security", _SEGURANCA_OPCIONAL)
             if tags & {"credenciais", "webhooks"}:
                 respostas.setdefault("401", _resposta(
                     "Token inválido, revogado ou de outro tenant.", _ERRO_SIMPLES))
@@ -374,83 +402,18 @@ async def _credential_not_found(request: Request, exc: CredentialNotFound) -> JS
     )
 
 
-_SWAGGER_HTML = """<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Cobranca-API — Gateway (Swagger)</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5/favicon-32x32.png">
-  <style>
-    /* Tema Tech Innovation: #0F172A grafite · #1E40AF azul · #06B6D4 ciano */
-    body { margin: 0; }
-    .cob-topbar { background: linear-gradient(120deg, #0F172A 0%, #1E40AF 70%, #3B5A82 100%);
-                  padding: 14px 28px; color: #fff; border-bottom: 4px solid #06B6D4;
-                  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-    .cob-topbar h1 { margin: 0; font: 700 20px 'Segoe UI', sans-serif; letter-spacing: .3px; }
-    .cob-topbar .surface { color: #06B6D4; font: 600 13px 'Segoe UI', sans-serif;
-                           text-transform: uppercase; letter-spacing: 1px; }
-    .cob-topbar small { color: #cbd5e1; font: 12px 'Segoe UI', sans-serif; }
-    .cob-topbar a { color: #fff; font: 600 13px 'Segoe UI', sans-serif;
-                    margin-left: auto; text-decoration: none; border: 1px solid #06B6D4;
-                    border-radius: 6px; padding: 5px 12px; }
-    .cob-topbar a:hover { background: #06B6D4; color: #0F172A; }
-    .swagger-ui .topbar { display: none; }
-    .swagger-ui .info .title { color: #0F172A; }
-    .swagger-ui .info a { color: #1E40AF; }
-    .swagger-ui .btn.authorize, .swagger-ui .btn.authorize svg { color: #1E40AF; fill: #1E40AF; }
-    .swagger-ui .btn.authorize { border-color: #1E40AF; }
-    .swagger-ui .scheme-container { background: #F8FAFC; box-shadow: none; }
-    .swagger-ui .opblock-tag { color: #0F172A; border-bottom: 1px solid #E2E8F0; }
-    .cob-topbar .cob-mark { align-self: center; flex: none; }
-    .cob-topbar .pill { background: rgba(6,182,212,.15); border: 1px solid #06B6D4;
-              color: #a5f3fc; font: 600 11px 'Segoe UI', sans-serif;
-              border-radius: 999px; padding: 3px 10px; letter-spacing: .4px; }
-    .cob-topbar .links { margin-left: auto; display: flex; gap: 8px; align-self: center; }
-    .cob-topbar .links a { margin-left: 0; }
-    @media (max-width: 640px) {
-      .cob-topbar { padding: 10px 14px; gap: 8px; }
-      .cob-topbar h1 { font-size: 17px; }
-      .cob-topbar small, .cob-topbar .pill { display: none; }
-      .cob-topbar .links { margin-left: 0; width: 100%; }
-      .cob-topbar .links a { flex: 1; text-align: center; }
-    }
-  </style>
-</head>
-<body>
-  <div class="cob-topbar">
-    <svg class="cob-mark" width="26" height="26" viewBox="0 0 52 52" aria-hidden="true"><g transform="translate(26,26) rotate(45)"><rect x="-20" y="-20" width="40" height="40" rx="8" fill="none" stroke="#06B6D4" stroke-width="5"/><rect x="-7" y="-7" width="14" height="14" rx="3" fill="#06B6D4"/></g></svg>
-    <h1>Cobranca-API</h1>
-    <span class="surface">Gateway REST &middot; multi-banco</span>
-    <span class="pill">100% Python &middot; FastAPI + pyCobran&ccedil;a</span>
-    <small>v__VERSION__ &middot; C6 &middot; Sicoob &middot; Inter &middot; Pix BACEN</small>
-    <div class="links">
-      <a href="https://github.com/Maxwbh/cobranca-api" target="_blank" rel="noopener">GitHub</a>
-      <a href="/api/docs">Offline / pyCobrança &rarr;</a>
-    </div>
-  </div>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    window.onload = () => {
-      window.ui = SwaggerUIBundle({
-        url: '/openapi.json',
-        dom_id: '#swagger-ui',
-        deepLinking: true,
-        presets: [SwaggerUIBundle.presets.apis],
-        tryItOutEnabled: true,
-        validatorUrl: null,
-      });
-    };
-  </script>
-</body>
-</html>"""
-
-
 @app.get("/docs", include_in_schema=False)
 def swagger_ui() -> HTMLResponse:
     """Swagger UI do gateway com a identidade visual da plataforma."""
-    return HTMLResponse(_SWAGGER_HTML.replace("__VERSION__", app.version))
+    return HTMLResponse(pagina_swagger(
+        titulo="Cobranca-API — Gateway (Swagger)",
+        superficie="Gateway REST · multi-banco",
+        pill="3 bancos ON · 18 OFF",
+        detalhe=f"v{app.version} · C6 · Sicoob · Inter · Pix BACEN",
+        links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
+               ("Offline / pyCobrança →", "/api/docs", True)],
+        spec_url="/openapi.json",
+    ))
 
 
 @app.get("/health", tags=["health"])
