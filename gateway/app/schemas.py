@@ -13,22 +13,90 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Provider(str, Enum):
-    """Provider de cobrança.
+    """**Caminho** da cobrança — e só isso. Qual banco é o campo `banco`.
 
-    `pycobranca` = caminho **offline/CNAB**, processado in-process pela engine
-    [pyCobrança](https://github.com/Maxwbh/pyCobranca) (100% Python).
-    `c6` / `sicoob` / `inter` = API REST do banco.
+    - `on`  — **ON-line**: a API do banco (OAuth2 + mTLS). Exige credencial.
+    - `off` — **OFF-line**: a engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)
+      no próprio processo. Sem rede, sem convênio.
+
+    Os dois eixos eram um campo só, e o preço aparecia na borda: "qual banco"
+    vivia no `provider` quando online e dentro do `account_config` quando
+    offline. Separados, trocar de mundo é trocar `provider` — o `banco` fica.
+
+    Os nomes de banco continuam aceitos como **apelido legado** (`c6` = `on` +
+    `banco=c6`), para não quebrar quem já integrou. Saem na 3.0.0.
     """
 
-    pycobranca = "pycobranca"
+    on = "on"
+    off = "off"
+
+    # --- apelidos legados: nome do BANCO no lugar do caminho ----------------
+    pycobranca = "pycobranca"   # = off
     c6 = "c6"
     sicoob = "sicoob"
     inter = "inter"
+    itau = "itau"
+
+
+class Banco(str, Enum):
+    """Instituição — as 19 tratadas, independente do caminho.
+
+    Os quatro primeiros têm caminho ON (API REST implementada); todos, menos o
+    Inter, têm caminho OFF (layout na engine). `GET /bancos` responde a matriz
+    exata por introspecção, e a combinação impossível (`on` + banco sem API,
+    `off` + Inter) responde `422` dizendo quais existem.
+    """
+
+    c6 = "c6"
+    sicoob = "sicoob"
+    inter = "inter"
+    itau = "itau"
+    banco_brasil = "banco_brasil"
+    bradesco = "bradesco"
+    caixa = "caixa"
+    santander = "santander"
+    sicredi = "sicredi"
+    banrisul = "banrisul"
+    unicred = "unicred"
+    ailos = "ailos"
+    banco_brasilia = "banco_brasilia"
+    banco_nordeste = "banco_nordeste"
+    banestes = "banestes"
+    citibank = "citibank"
+    credisis = "credisis"
+    hsbc = "hsbc"
+    safra = "safra"
+
+
+# Apelido legado (nome do banco no `provider`) → o banco que ele nomeia.
+PROVIDER_LEGADO_BANCO: dict[Provider, Banco] = {
+    Provider.c6: Banco.c6,
+    Provider.sicoob: Banco.sicoob,
+    Provider.inter: Banco.inter,
+    Provider.itau: Banco.itau,
+}
+
+
+def campo_banco(descricao: str | None = None) -> Any:
+    """O eixo `banco` nos corpos de request.
+
+    Existe como fábrica, e não como constante, porque o eixo é o MESMO em toda a
+    API: descrito uma vez, ele não diverge modelo a modelo — que é como o
+    `provider` acabou significando duas coisas diferentes conforme a rota.
+    """
+    return Field(
+        default=None,
+        description=descricao or (
+            "**Instituição**: `c6`, `sicoob`, `inter`, `itau`… Use com "
+            "`provider=on`. Omitido, o `provider` legado (nome do banco) resolve."
+        ),
+        examples=["c6"],
+    )
 
 
 def eh_offline(provider: Provider) -> bool:
-    """True quando o provider roteia para a engine offline (pyCobrança)."""
-    return provider is Provider.pycobranca
+    """True quando o caminho é a engine offline (pyCobrança)."""
+    return provider in (Provider.off, Provider.pycobranca)
 
 
 class Status(str, Enum):
@@ -76,12 +144,22 @@ class Cobranca(BaseModel):
 class CobrancaIn(BaseModel):
     tenant_id: str = Field(description="Identificador do tenant (resolve credenciais no cofre)", examples=["empresa_123"])
     provider: Provider = Field(
-        default=Provider.pycobranca,
+        default=Provider.off,
         description=(
-            "Roteamento: `c6`/`sicoob` = API REST do banco; "
-            "`pycobranca` (ou vazio/omitido) = caminho offline/CNAB pela engine "
-            "pyCobrança."
+            "**Caminho**: `on` = API do banco · `off` = engine pyCobrança "
+            "(default). Nome de banco aqui é apelido legado (`c6` = `on` + "
+            "`banco=c6`) e sai na 3.0.0."
         ),
+    )
+    banco: Banco | None = Field(
+        default=None,
+        description=(
+            "**Instituição**: `c6`, `sicoob`, `inter`, `itau`, `banco_brasil`… "
+            "Obrigatório com `provider=on|off`; no caminho `off` ainda é aceito "
+            "em `account_config.bank`. Combinação inexistente responde `422` "
+            "dizendo quais existem."
+        ),
+        examples=["c6"],
     )
     account_config: dict[str, Any] = Field(
         default_factory=dict,
@@ -104,8 +182,8 @@ class CobrancaIn(BaseModel):
     @field_validator("provider", mode="before")
     @classmethod
     def _provider_vazio_vira_offline(cls, v: Any) -> Any:
-        # Contrato: provider vazio/None/omitido roteia para o caminho offline (CNAB).
-        return Provider.pycobranca if v in (None, "") else v
+        # Contrato: provider vazio/None/omitido roteia para o caminho offline.
+        return Provider.off if v in (None, "") else v
 
 
 class CobrancaOut(BaseModel):
@@ -153,8 +231,11 @@ class PixCobrancaIn(BaseModel):
     tenant_id: str = Field(description="Identificador do tenant", examples=["empresa_123"])
     provider: Provider = Field(
         default=Provider.c6,
-        description="Provider REST com Pix dinâmico (o caminho offline não suporta).",
+        description="**Caminho**: só `on` (API do banco) — Pix dinâmico não existe "
+                    "offline, e `off` responde `422`. Nome de banco aqui é apelido "
+                    "legado (`c6` = `on` + `banco=c6`).",
     )
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(
         default_factory=dict, description="Blob por provider. c6: {chave_pix, ...}"
     )
@@ -209,6 +290,7 @@ class BolepixCobranca(BaseModel):
 class BolepixIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     bolepix: BolepixCobranca
     credentials: dict[str, Any] | None = None
@@ -304,6 +386,7 @@ class CheckoutCobranca(BaseModel):
 class CheckoutIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     checkout: CheckoutCobranca
     credentials: dict[str, Any] | None = None
@@ -325,6 +408,7 @@ class CheckoutOut(BaseModel):
 class LoteCobvIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     descricao: str
     cobrancas: list[PixCobranca] = Field(description="Cada item exige txid e data_vencimento")
@@ -344,6 +428,7 @@ class LoteCobvRevisaoIn(BaseModel):
 
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     cobrancas: list[PixCobranca] = Field(
         description="As cobranças a revisar — mesma forma da criação. Cada item exige "
@@ -374,6 +459,7 @@ class Recorrencia(BaseModel):
 class RecorrenciaIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     recorrencia: Recorrencia
     credentials: dict[str, Any] | None = None
@@ -393,6 +479,7 @@ class CobrancaRecorrente(BaseModel):
 class CobrancaRecorrenteIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     cobranca: CobrancaRecorrente
     credentials: dict[str, Any] | None = None
@@ -403,6 +490,7 @@ class SolicitacaoRecorrenciaIn(BaseModel):
 
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
     dados: dict[str, Any] = Field(description="Payload BACEN da solicrec (idRec, ...)")
     credentials: dict[str, Any] | None = None
@@ -414,6 +502,7 @@ class SolicitacaoRecorrenciaIn(BaseModel):
 class WebhookBancoIn(BaseModel):
     tenant_id: str
     provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
     url: str = Field(description="URL pública que o banco chamará (ex: https://.../webhooks/c6/{tenant})")
     service: str = Field(default="BANK_SLIP", description="BANK_SLIP | CHECKOUT")
     credentials: dict[str, Any] | None = None
@@ -426,7 +515,12 @@ class CredencialIn(BaseModel):
     """Cadastro de credenciais do banco — devolve um token opaco (única vez)."""
 
     tenant_id: str = Field(description="Tenant dono destas credenciais", examples=["empresa_123"])
-    provider: Provider = Field(description="Banco/provider destas credenciais (ex: c6)")
+    provider: Provider = Field(description="Caminho (`on`) ou o nome do banco no formato legado (ex: c6)")
+    banco: Banco | None = campo_banco(
+        "**Instituição** destas credenciais. É por ela que a credencial é "
+        "guardada e procurada — com `provider=on`, é o que separa o C6 do "
+        "Sicoob do mesmo tenant."
+    )
     credentials: dict[str, Any] = Field(
         description="Esquema **próprio de cada banco** — o vigente sai em `GET /bancos`. "
                     "Cifradas em repouso; a chave é derivada do token, então o servidor "
@@ -445,6 +539,7 @@ class CredencialOut(BaseModel):
                                    "Use nas demais rotas via Authorization: Bearer")
     tenant_id: str
     provider: Provider
+    banco: Banco | None = campo_banco("Instituição destas credenciais (eco do request).")
 
 
 # --- Conciliação (C6 Pay statement) ------------------------------------------
@@ -485,6 +580,7 @@ class WebhookEvent(BaseModel):
 class CarneIn(BaseModel):
     tenant_id: str = Field(description="Identificador do tenant", examples=["empresa_123"])
     provider: Provider
+    banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict, description="Blob por provider (ver CobrancaIn)")
     bank: str = Field(description="Slug do banco na engine pyCobrança para renderizar o carnê", examples=["banco_c6"])
     parcelas: list[Cobranca] = Field(description="Parcelas do carnê (registradas individualmente)")

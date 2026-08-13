@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Header, HTTPException
 
 from app.core import credential_store
+from app.registry import chave_credencial
 from app.schemas import CredencialIn, CredencialOut
 
 router = APIRouter(prefix="/credenciais", tags=["credenciais"])
@@ -18,8 +19,14 @@ def cadastrar(body: CredencialIn) -> CredencialOut:
     `Authorization: Bearer bapi_...`.
     """
     store = credential_store.get_store()
-    token = credential_store.enroll(store, body.tenant_id, body.provider.value, body.credentials)
-    return CredencialOut(token=token, tenant_id=body.tenant_id, provider=body.provider)
+    # A credencial é do BANCO, não do caminho: guardar por `provider` colocaria
+    # C6 e Sicoob do mesmo tenant na mesma chave assim que `provider=on` entrou
+    # em uso. Para o apelido legado (`provider=c6`) a chave não muda, então
+    # token emitido antes continua valendo.
+    chave = chave_credencial(body.provider, body.banco)
+    token = credential_store.enroll(store, body.tenant_id, chave, body.credentials)
+    return CredencialOut(token=token, tenant_id=body.tenant_id, provider=body.provider,
+                         banco=body.banco)
 
 
 @router.delete("", status_code=204)

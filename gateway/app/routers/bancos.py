@@ -10,7 +10,10 @@ from app.providers.base import BankProvider
 from app.providers.offline_engine import PyCobrancaProvider
 from app.providers.c6 import C6Provider
 from app.providers.inter import InterProvider
+from app.providers.itau import ItauProvider
 from app.providers.sicoob import SicoobProvider
+from app.registry import _REST_POR_BANCO, _SLUG_ENGINE, registered_ready
+from app.schemas import Banco
 
 router = APIRouter(prefix="/bancos", tags=["bancos"])
 
@@ -78,12 +81,32 @@ _ESQUEMA_INTER = {
     "scopes": "opcional (lista; default do provider)",
 }
 
-# 18 bancos suportados pelo caminho offline (engine pyCobrança / CNAB)
-_BANCOS_CNAB = [
-    "ailos", "banco_brasil", "banco_brasilia", "banco_c6", "banco_nordeste",
-    "banestes", "banrisul", "bradesco", "caixa", "citibank", "credisis", "hsbc",
-    "itau", "safra", "santander", "sicoob", "sicredi", "unicred",
-]
+_ESQUEMA_ITAU = {
+    "client_id": "obrigatório (credencial da aplicação; cobrança sai por gerente/OfficerCash)",
+    "client_secret": "obrigatório (o definitivo, devolvido junto com o certificado)",
+    "cert_pem": "certificado dinâmico assinado pelo Itaú (.crt em PEM ou base64)",
+    "key_pem": "chave privada gerada no CSR (.key em PEM ou base64)",
+    "pfx_base64": "alternativa ao par acima: o mesmo material em PKCS12/base64",
+    "pfx_password": "senha do certificado, quando houver",
+    "scopes": "opcional (lista; default do provider)",
+}
+
+
+# 18 bancos suportados pelo caminho offline (engine pyCobrança / CNAB).
+# Derivado do mapa que o roteador realmente usa: lista escrita à mão aqui já
+# significaria catálogo dizendo uma coisa e `provider=off` fazendo outra.
+_BANCOS_CNAB = sorted(_SLUG_ENGINE.values())
+
+# Os dois eixos, ditos onde o consumidor descobre a API. O `provider` virou o
+# CAMINHO e o `banco` a INSTITUIÇÃO; sem isto no catálogo, a mudança só
+# apareceria lendo o Swagger campo a campo.
+_CAMINHOS = {
+    "on": "API do banco (OAuth2 + mTLS). Exige credencial e homologação.",
+    "off": "engine pyCobrança no próprio processo (CNAB/boleto). Sem rede, sem convênio.",
+    "uso": "provider=on|off + banco=<id>. Ex.: provider=on&banco=c6",
+    "legado": ("nome do banco no `provider` (`provider=c6`) segue aceito como apelido "
+               "de `on`+`banco`; sai na 3.0.0"),
+}
 
 
 def _capacidades(klass: type) -> list[str]:
@@ -96,13 +119,35 @@ def _capacidades(klass: type) -> list[str]:
     return sorted(caps)
 
 
+def _caminho_do_banco(banco: Banco) -> dict:
+    """O que ESTA instalação faz com o banco — não o que o banco sabe fazer.
+
+    `capacidades` responde pela API do banco; não respondia pela instalação. Com
+    `<BANCO>_REGISTERED_READY` desligado, `provider=on` é rebaixado para a
+    engine em silêncio, e quem consultava o catálogo via "boleto" e concluía
+    "registrado no banco". Estes dois campos são a diferença entre as duas
+    frases.
+    """
+    pronto = registered_ready(banco)
+    fallback = _SLUG_ENGINE.get(banco)
+    return {
+        "caminhos": (["on"] if banco in _REST_POR_BANCO else []) + (["off"] if fallback else []),
+        "registrado_pronto": pronto,
+        "fallback_offline": fallback,
+        "caminho_efetivo": "on" if pronto else ("off" if fallback else "on"),
+        "flag": f"{banco.value.upper()}_REGISTERED_READY",
+    }
+
+
 @router.get("", response_model=dict)
 def listar() -> dict:
-    """Bancos/providers disponíveis, capacidades reais e como autenticar."""
+    """Bancos disponíveis, caminho (on/off) de cada um, capacidades reais e como autenticar."""
     return {
+        "caminhos": _CAMINHOS,
         "autenticacao_api": _MECANISMO_API,
         "bancos": [
             {
+                **_caminho_do_banco(Banco.c6),
                 "id": "c6",
                 "nome": "C6 Bank",
                 "codigo_banco": "336",
@@ -113,6 +158,7 @@ def listar() -> dict:
                 "documentacao": "docs/development/c6-rest.md",
             },
             {
+                **_caminho_do_banco(Banco.sicoob),
                 "id": "sicoob",
                 "nome": "Sicoob",
                 "codigo_banco": "756",
@@ -123,6 +169,7 @@ def listar() -> dict:
                 "documentacao": "docs/development/sicoob-rest.md",
             },
             {
+                **_caminho_do_banco(Banco.inter),
                 "id": "inter",
                 "nome": "Banco Inter",
                 "codigo_banco": "077",
@@ -135,6 +182,22 @@ def listar() -> dict:
                                "077, e cair em outro banco emitiria boleto errado"),
             },
             {
+                **_caminho_do_banco(Banco.itau),
+                "id": "itau",
+                "nome": "Itaú Unibanco",
+                "codigo_banco": "341",
+                "tipo": "rest",
+                "capacidades": _capacidades(ItauProvider),
+                "credentials": _ESQUEMA_ITAU,
+                "sandbox": "sem mTLS e fora do OAuth 2.0 — o dialeto do sandbox NÃO é o de produção",
+                "documentacao": "docs/development/itau-rest.md",
+                "observacao": ("ESQUELETO: paths e payload ainda não confirmados (catálogo exige "
+                               "login) e o provider fica desligado até ITAU_REGISTERED_READY — "
+                               "sem a flag, provider=itau emite pela engine, que tem o layout 341. "
+                               "O banco não devolve PDF: quem renderiza é a engine"),
+            },
+            {
+                "caminhos": ["off"],
                 "id": "pycobranca",
                 "nome": "Offline/CNAB (engine pyCobrança — 100% Python)",
                 "codigo_banco": None,

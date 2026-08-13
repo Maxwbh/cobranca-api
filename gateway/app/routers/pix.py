@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._credentials import resolve_request_credentials
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
 from app.schemas import (
+    Banco,
     LoteCobvIn,
     LoteCobvRevisaoIn,
     PixCobrancaIn,
@@ -36,11 +38,11 @@ _AUTH_HEADER = Header(default=None, description="Bearer bapi_... (token do /cred
 
 
 def _provider(tenant_id: str, provider: Provider, account_config: dict, vault: Vault,
-              credentials: dict | None = None):
+              credentials: dict | None = None, banco: Banco | None = None):
     try:
         return build_rest_provider(
-            provider=provider, tenant_id=tenant_id, account_config=account_config,
-            vault=vault, credentials=credentials,
+            provider=provider, banco=banco, tenant_id=tenant_id,
+            account_config=account_config, vault=vault, credentials=credentials,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -57,9 +59,10 @@ def criar(
     """Cria cobrança Pix: cob imediata (default) ou cobv se `data_vencimento`."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=body.credentials,
-        tenant_id=body.tenant_id, provider=body.provider,
+        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco,
     )
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     try:
         out = p.criar_pix(body.pix)
     except ValueError as e:  # chave/txid/devedor ausentes → erro do chamador
@@ -80,60 +83,64 @@ def _location(caminho: str, tenant_id: str, provider, **extra: str) -> str:
     return f"{caminho}?{urlencode(params)}"
 
 
-def _creds(credentials, authorization, tenant_id, provider):
+def _creds(credentials, authorization, tenant_id, provider, banco=None):
     try:
         explicit = credentials_from_header(credentials)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return resolve_request_credentials(
         authorization=authorization, explicit=explicit,
-        tenant_id=tenant_id, provider=provider,
+        tenant_id=tenant_id, provider=provider, banco=banco,
     )
 
 
 @router.get("", response_model=dict)
 def listar(
     tenant_id: str, inicio: str, fim: str,
-    vencimento: bool = False, provider: Provider = Provider.c6,
+    vencimento: bool = False, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Lista cobranças do período (RFC3339). `vencimento=true` lista cobv."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.listar_pix(inicio=inicio, fim=fim, vencimento=vencimento)
 
 
 @router.get("/recebidos", response_model=dict)
 def listar_recebidos(
-    tenant_id: str, inicio: str, fim: str, provider: Provider = Provider.c6,
+    tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Pix RECEBIDOS (money-in) no período — conciliação Pix (P_05 BACEN)."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.listar_pix_recebidos(inicio=inicio, fim=fim)
 
 
 @router.get("/recebidos/{e2eid}", response_model=dict)
 def consultar_recebido(
-    e2eid: str, tenant_id: str, provider: Provider = Provider.c6,
+    e2eid: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Detalhe de um Pix RECEBIDO pelo e2eid (conciliação money-in)."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.consultar_pix_recebido(e2eid)
 
 
 @router.put("/recebidos/{e2eid}/devolucao/{devolucao_id}", response_model=dict, status_code=201)
 def devolver(
-    e2eid: str, devolucao_id: str, body: dict, tenant_id: str, provider: Provider = Provider.c6,
+    e2eid: str, devolucao_id: str, body: dict, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
@@ -142,33 +149,35 @@ def devolver(
     if not body.get("valor"):
         raise HTTPException(status_code=422, detail="corpo deve conter valor")
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.devolver_pix(e2eid, devolucao_id, str(body["valor"]))
 
 
 @router.get("/recebidos/{e2eid}/devolucao/{devolucao_id}", response_model=dict)
 def consultar_devolucao(
-    e2eid: str, devolucao_id: str, tenant_id: str, provider: Provider = Provider.c6,
+    e2eid: str, devolucao_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Consulta uma devolução de Pix recebido."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.consultar_devolucao(e2eid, devolucao_id)
 
 
 @router.get("/lotes", response_model=dict)
 def listar_lotes(
-    tenant_id: str, inicio: str, fim: str, provider: Provider = Provider.c6,
+    tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Lista lotes de cobv do período (RFC3339)."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.listar_lotes_cobv(inicio=inicio, fim=fim)
 
 
@@ -188,9 +197,10 @@ def criar_lote(
     """Cria/atualiza lote de cobranças com vencimento (lotecobv BACEN)."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=body.credentials,
-        tenant_id=body.tenant_id, provider=body.provider,
+        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco,
     )
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     out = p.criar_lote_cobv(lote_id, body.descricao, _cobsv(body))
     response.headers["Location"] = _location(
         f"/pix/lote/{lote_id}", body.tenant_id, body.provider)
@@ -237,47 +247,51 @@ def revisar_lote(
     Vale para qualquer provider de dialeto BACEN — C6, Sicoob e Inter."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=body.credentials,
-        tenant_id=body.tenant_id, provider=body.provider,
+        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco,
     )
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     return p.revisar_lote_cobv(lote_id, _cobsv(body))
 
 
 @router.get("/lote/{lote_id}", response_model=dict)
 def consultar_lote(
-    lote_id: str, tenant_id: str, provider: Provider = Provider.c6,
+    lote_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> dict:
     """Consulta um lote de cobv pelo id."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.consultar_lote_cobv(lote_id)
 
 
 @router.get("/{txid}", response_model=PixCobrancaOut)
 def consultar(
-    txid: str, tenant_id: str, vencimento: bool = False, provider: Provider = Provider.c6,
+    txid: str, tenant_id: str, vencimento: bool = False, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> PixCobrancaOut:
     """`vencimento=true` consulta cobv (/cobv/{txid}); default cob."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.consultar_pix(txid, vencimento=vencimento)
 
 
 @router.patch("/{txid}", response_model=PixCobrancaOut)
 def revisar(
     txid: str, campos: dict, tenant_id: str,
-    vencimento: bool = False, provider: Provider = Provider.c6,
+    vencimento: bool = False, provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> PixCobrancaOut:
     """Revisa a cobrança (PATCH BACEN): valor, solicitacaoPagador, calendario..."""
     p = _provider(tenant_id, provider, {}, vault,
-                  _creds(credentials, authorization, tenant_id, provider))
+                  _creds(credentials, authorization, tenant_id, provider), banco=banco)
     return p.revisar_pix(txid, campos, vencimento=vencimento)

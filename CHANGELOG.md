@@ -14,6 +14,24 @@ changelog quer saber se precisa mexer na integração, não como o defeito surgi
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Não lançado]
+
+### Adicionado
+- Boleto sai com o **logo do banco emissor** no cabeçalho, por padrão, em todos
+  os caminhos (avulso, lote, carnê e fatura). Citibank não tem marca empacotada
+  e segue com a sigla; `logo` em `data` continua sobrepondo.
+- **`banco`** em todas as rotas e corpos: `provider` passa a ser o **caminho**
+  (`on` = API do banco · `off` = engine pyCobrança) e `banco` a instituição
+  (`c6`, `sicoob`, `itau`, `banco_brasil`…). O nome do banco no `provider`
+  (`provider=c6`) segue valendo como apelido e sai na 3.0.0.
+- `GET /bancos` diz o que **esta instalação** faz com cada banco:
+  `registrado_pronto`, `fallback_offline`, `caminho_efetivo` e a flag que liga.
+
+### Alterado
+- Credenciais são guardadas e procuradas pelo **banco**, não pelo `provider`.
+  Token emitido antes continua valendo; ao cadastrar com `provider=on`, informe
+  o `banco`.
+
 ## [2.2.0] - 2026-08-08
 
 ### Adicionado

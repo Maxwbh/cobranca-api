@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.vault import CredentialNotFound
+from app.registry import CaminhoInvalido
 from app.core.swagger_tema import pagina_swagger
 from app.providers.c6 import ProcessamentoPendente
 from app.routers import (
@@ -21,7 +22,9 @@ _DOC_REPO = "https://github.com/Maxwbh/cobranca-api/tree/main/docs/development"
 
 TAGS = [
     {"name": "bancos",
-     "description": "Catálogo de bancos, capacidades reais (introspecção) e esquema de credenciais por banco. "
+     "description": "Catálogo de bancos: caminhos (`on`/`off`) de cada um, capacidades reais (introspecção), "
+                    "o que **esta instalação** faz (`registrado_pronto`, `fallback_offline`) e o esquema de "
+                    "credenciais por banco. "
                     f"Catálogo completo de serviços por banco (incl. não implementados): [docs do repositório]({_DOC_REPO})."},
     {"name": "credenciais",
      "description": "Tokenização zero-knowledge: cadastre as credenciais do banco UMA vez e use o token `bapi_` nas demais chamadas. "
@@ -30,12 +33,19 @@ TAGS = [
                     "(`cert_pem` + `key_pem`, aceitos em PEM cru ou base64). Integrar banco novo não muda "
                     "nada do lado do consumidor: o esquema vigente sai em `GET /bancos`."},
     {"name": "cobranca",
-     "description": "Boleto: emitir, consultar, alterar, PDF e baixar — REST (banco) ou offline via pyCobrança, conforme `provider`. "
+     "description": "Boleto: emitir, consultar, alterar, PDF e baixar. `provider=on` vai à API do banco, "
+                    "`provider=off` emite pela engine pyCobrança; `banco` diz qual instituição. "
                     f"Docs oficiais: [C6 Boleto]({_DOC_C6}/apis/bankslip) · [Sicoob Cobrança v3]({_DOC_SICOOB}) · "
                     f"[Inter Cobrança v3]({_DOC_INTER}).\n\n"
                     "**Alterar (`PUT`) hoje só existe no C6** — no Sicoob e no Inter o caminho é "
-                    "baixar e reemitir, e a rota responde `422` dizendo isso. `GET /bancos` "
-                    "responde a matriz exata, por introspecção."},
+                    "baixar e reemitir, e a rota responde `422` dizendo isso.\n\n"
+                    "**PDF nem sempre vem do banco.** C6 e Inter devolvem em base64; o **Itaú "
+                    "não devolve** — a API dele responde linha digitável e código de barras, e o "
+                    "PDF sai da engine (`POST /api/render/boleto`, `bank=itau`), com **os dados "
+                    "que o banco registrou**. O código de barras é determinístico: renderizar com "
+                    "um nosso número diferente do registrado gera um boleto que não concilia — "
+                    "confira a linha digitável antes de entregar ao pagador.\n\n"
+                    "`GET /bancos` responde a matriz exata, por introspecção."},
     {"name": "carne",
      "description": "Carnê 3-vias A4 (registra N parcelas e monta o PDF na engine pyCobrança)."},
     {"name": "pix",
@@ -92,9 +102,17 @@ app = FastAPI(
         "Serviço único de cobrança **100% Python** — **3 bancos ON** "
         "(**C6** 336 · **Sicoob** 756 · **Inter** 077) **e 18 OFF** pela engine "
         "[pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
+        "**Dois eixos, dois campos:** `provider` é o **caminho** — `on` (API do "
+        "banco) ou `off` (engine pyCobrança) — e `banco` é a **instituição** "
+        "(`c6`, `sicoob`, `itau`, `banco_brasil`…). Trocar de caminho é trocar "
+        "`provider`; o `banco` fica. O nome do banco no `provider` (`provider=c6`) "
+        "segue aceito como **apelido legado** e sai na 3.0.0.\n\n"
         "**Nem todo banco faz tudo** — e isso é dado, não parágrafo: `GET /bancos` "
         "devolve as capacidades por **introspecção das classes de provider**, então "
-        "não há como a lista envelhecer. Pedir ao banco algo que ele não oferece "
+        "não há como a lista envelhecer. Ele diz também o que **esta instalação** "
+        "faz com cada banco (`registrado_pronto`, `fallback_offline`, "
+        "`caminho_efetivo`) — capacidade do banco e caminho da instalação são "
+        "coisas diferentes. Pedir ao banco algo que ele não oferece "
         "responde `422` dizendo **para onde ir**, nunca `500`.\n\n"
         "**Superfície offline (`/api/*`):** boleto/CNAB/OFX de **18 bancos** sem banco online, gerada "
         "**nativamente** pela pyCobrança no próprio processo (sem sidecar) e sem "
@@ -208,7 +226,8 @@ _RESPOSTAS_DO_BANCO: dict[str, dict] = {
         "assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso "
         "é transitório e a mesma chamada funciona em instantes."),
     "424": _resposta(
-        "Credenciais: ausentes no cofre para o par tenant/provider, ou rejeitadas "
+        "Credenciais: ausentes no cofre para o par tenant/**banco** (a credencial é "
+        "da instituição, não do caminho), ou rejeitadas "
         "pelo banco. Todo erro no endpoint de **token** responde `424`, qualquer "
         "que seja o status do banco — o Inter, por exemplo, devolve `400` para "
         "`client_credentials` inválido, e chamar aquilo de payload inválido manda "
@@ -257,7 +276,8 @@ _ESQUEMA_SEGURANCA = {
             "Bearer bapi_...`.\n\n"
             "**É opcional**, e a spec diz isso: as credenciais do banco podem vir "
             "no corpo (`credentials`), no header `X-Bank-Credentials` ou do cofre "
-            "do servidor (`VAULT__<tenant>__<provider>__*`). Sem nenhuma das três, "
+            "do servidor (`VAULT__<tenant>__<banco>__*` — a chave é o banco, não o "
+            "caminho). Sem nenhuma das três, "
             "a rota responde `424`."
         ),
     }
@@ -313,6 +333,17 @@ app.include_router(webhook_banco.pix_router)
 app.include_router(webhooks.router)
 # Catch-all /api/* por último (convenção; rotas tipadas ficam na raiz, sem colisão).
 app.include_router(offline.router)
+
+
+@app.exception_handler(CaminhoInvalido)
+async def _caminho_invalido(request: Request, exc: CaminhoInvalido) -> JSONResponse:
+    """Combinação caminho×banco que não existe → 422 dizendo o que existe.
+
+    Um handler só, e não `try/except` em cada rota: a regra é do roteamento, e
+    espalhá-la garantiria que uma rota nova nascesse sem ela — que é como o erro
+    vira 500 em produção.
+    """
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(ProcessamentoPendente)
@@ -395,10 +426,10 @@ async def _banco_indisponivel(request: Request, exc: httpx.RequestError) -> JSON
 
 @app.exception_handler(CredentialNotFound)
 async def _credential_not_found(request: Request, exc: CredentialNotFound) -> JSONResponse:
-    # Tenant/provider não provisionado no cofre — erro de configuração, não 500.
+    # Tenant/banco não provisionado no cofre — erro de configuração, não 500.
     return JSONResponse(
         status_code=424,
-        content={"detail": "credenciais do tenant/provider ausentes no cofre"},
+        content={"detail": "credenciais do tenant/banco ausentes no cofre"},
     )
 
 

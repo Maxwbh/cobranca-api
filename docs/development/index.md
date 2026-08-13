@@ -34,6 +34,7 @@ integrar começa pela [documentação da API](../).
 | BTG Pactual (208) | [btg-rest.md](btg-rest.md) |
 | Mercado Pago (PSP) | [mercado-pago-rest.md](mercado-pago-rest.md) |
 | Efí (364) | [efi-rest.md](efi-rest.md) |
+| Itaú Unibanco (341) | [itau-rest.md](itau-rest.md) |
 
 Cada página segue o mesmo template: catálogo completo de serviços da
 instituição, autenticação, esquema de credenciais, superfície mapeada para as

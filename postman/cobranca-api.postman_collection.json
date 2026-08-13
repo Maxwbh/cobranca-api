@@ -782,7 +782,26 @@
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "const b = pm.response.json();",
                   "pm.test('autenticacao_api', () => pm.expect(b).to.have.property('autenticacao_api'));",
-                  "pm.test('lista bancos', () => pm.expect(b.bancos).to.be.an('array').that.is.not.empty);"
+                  "pm.test('lista bancos', () => pm.expect(b.bancos).to.be.an('array').that.is.not.empty);",
+                  "// provider = caminho (on/off) e banco = instituição: o catálogo é onde o",
+                  "// consumidor descobre os dois eixos.",
+                  "pm.test('caminhos on/off', () => {",
+                  "  pm.expect(b.caminhos).to.have.property('on');",
+                  "  pm.expect(b.caminhos).to.have.property('off');",
+                  "});",
+                  "// Capacidade é do BANCO; caminho efetivo é desta INSTALAÇÃO. São perguntas",
+                  "// diferentes, e o catálogo passou a responder as duas.",
+                  "const rest = b.bancos.filter((x) => x.tipo === 'rest');",
+                  "pm.test('cada banco REST diz o caminho efetivo', () => {",
+                  "  rest.forEach((x) => {",
+                  "    pm.expect(x, x.id).to.have.property('registrado_pronto');",
+                  "    pm.expect(x, x.id).to.have.property('fallback_offline');",
+                  "    pm.expect(['on', 'off'], x.id).to.include(x.caminho_efetivo);",
+                  "  });",
+                  "});",
+                  "// O Inter não tem layout 077 na engine: o catálogo diz que não há para onde cair.",
+                  "const inter = b.bancos.find((x) => x.id === 'inter');",
+                  "pm.test('Inter sem fallback offline', () => pm.expect(inter.fallback_offline).to.be.null);"
                 ]
               }
             }
@@ -1629,6 +1648,60 @@
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "pm.test('HTML', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('html'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-090 · Cobrança offline pelo modelo novo (provider=off + banco)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "O `provider` diz o CAMINHO (`off` = engine pyCobrança) e o `banco` a INSTITUIÇÃO. Antes o banco só cabia dentro do `account_config`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"{{bank_offline}}\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('registrado', () => pm.expect(b.status).to.eql('registrado'));",
+                  "// Mesmo boleto do BC-018, que pede a MESMA emissão na forma antiga",
+                  "// (provider=pycobranca + account_config.bank). As duas formas convivem",
+                  "// até a 3.0.0 — se divergirem, a migração quebra quem já integrou.",
+                  "pm.test('código de barras do banco pedido', () =>",
+                  "  pm.expect(b.codigo_barras).to.be.a('string').with.lengthOf(44));"
                 ]
               }
             }
@@ -5235,13 +5308,19 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/webhooks/{{webhook_banco}}",
+              "raw": "{{base_url}}/webhooks/{{webhook_banco}}?token={{webhook_token}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "webhooks",
                 "{{webhook_banco}}"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{webhook_token}}"
+                }
               ]
             },
             "description": "Simula o POST que o banco faz. Evento normalizado → push HMAC ao consumidor.",
@@ -5284,7 +5363,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 422]);"
+                  "// A rota é FAIL-CLOSED desde a 2.2.0: sem `WEBHOOK_TOKEN__<BANCO>`",
+                  "// conferindo com o `?token=`, responde 401 — e é isso que se afirma",
+                  "// quando o segredo não está configurado. Tolerar 401 como sucesso",
+                  "// esconderia justamente o dia em que o fail-closed afrouxar.",
+                  "const token = pm.variables.get('webhook_token');",
+                  "if (!token) {",
+                  "  pm.test('sem token → 401 (fail-closed)', () => pm.response.to.have.status(401));",
+                  "} else {",
+                  "  statusEsperado([200, 422]);",
+                  "}"
                 ]
               }
             }
@@ -5301,7 +5389,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/webhooks/{{webhook_banco}}/{{tenant_id}}",
+              "raw": "{{base_url}}/webhooks/{{webhook_banco}}/{{tenant_id}}?token={{webhook_token}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -5309,6 +5397,12 @@
                 "webhooks",
                 "{{webhook_banco}}",
                 "{{tenant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{webhook_token}}"
+                }
               ]
             },
             "description": "",
@@ -5351,7 +5445,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 422]);"
+                  "// A rota é FAIL-CLOSED desde a 2.2.0: sem `WEBHOOK_TOKEN__<BANCO>`",
+                  "// conferindo com o `?token=`, responde 401 — e é isso que se afirma",
+                  "// quando o segredo não está configurado. Tolerar 401 como sucesso",
+                  "// esconderia justamente o dia em que o fail-closed afrouxar.",
+                  "const token = pm.variables.get('webhook_token');",
+                  "if (!token) {",
+                  "  pm.test('sem token → 401 (fail-closed)', () => pm.response.to.have.status(401));",
+                  "} else {",
+                  "  statusEsperado([200, 422]);",
+                  "}"
                 ]
               }
             }
@@ -5586,7 +5689,8 @@
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName);",
                   "  pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -5654,7 +5758,8 @@
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName);",
                   "  pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -5970,7 +6075,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6037,7 +6143,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6117,7 +6224,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6238,7 +6346,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6844,7 +6953,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6911,7 +7021,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -6977,7 +7088,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -7098,7 +7210,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -7164,7 +7277,8 @@
                   "if (_ids.some((v) => !pm.variables.get(v))) {",
                   "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
                   "  _p.push(pm.info.requestName); pm.environment.set('pulados', JSON.stringify(_p));",
-                  "  postman.setNextRequest(null);",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (id encadeado ausente)');",
+                  "  pm.execution.skipRequest();",
                   "}"
                 ]
               }
@@ -7575,6 +7689,153 @@
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
                   "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "NEG-008 · caminho on em banco sem API → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "Não existe API REST do Bradesco aqui. Cair na engine em silêncio devolveria um boleto que o integrador acha registrado no banco.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"on\",\n  \"banco\": \"bradesco\",\n  \"account_config\": {},\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('diz quais bancos têm o caminho on', () =>",
+                  "  pm.expect(pm.response.json().detail).to.include('c6'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "NEG-009 · caminho off no Inter → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "A engine não tem o layout 077. Emitir por outro banco seria registrar a cobrança no lugar errado — falha silenciosa e cara.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"inter\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('não emite por outro banco', () =>",
+                  "  pm.expect(pm.response.json().detail).to.include(\"caminho 'off'\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "NEG-010 · caminho sem banco → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cobranca",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobranca"
+              ]
+            },
+            "description": "`provider=off` sem `banco` e sem `account_config.bank`: a API não escolhe banco por conta própria.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('pede o banco e lista os disponíveis', () =>",
+                  "  pm.expect(pm.response.json().detail).to.include('banco'));"
                 ]
               }
             }

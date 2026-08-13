@@ -212,7 +212,7 @@ def credentials_from_bearer(
 
     - Sem header ou Bearer que não seja `bapi_` -> None (segue o fluxo normal).
     - Token desconhecido/adulterado -> ValueError("token inválido")        (401)
-    - Token de outro tenant/provider -> ValueError("token não corresponde") (403)
+    - Token de outro tenant/banco -> ValueError("token não corresponde")    (403)
     """
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
@@ -224,5 +224,5 @@ def credentials_from_bearer(
         raise ValueError("token inválido")
     tok_tenant, tok_provider, creds = resolved
     if tok_tenant != tenant_id or tok_provider != provider:
-        raise ValueError("token não corresponde ao tenant/provider do request")
+        raise ValueError("token não corresponde ao tenant/banco do request")
     return creds

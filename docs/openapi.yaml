@@ -338,10 +338,13 @@ paths:
           in: query
           required: false
           description: |
-            Template de geração do PDF. Nesta rota (boleto **único**) só existe
-            o layout `moderno`; o parâmetro é aceito por compatibilidade e
-            ignorado. O template `carne` (3 vias por A4) vale em
-            `/api/boleto/multi` e `/api/render/carne`.
+            Modelo visual do PDF. O padrão é `moderno`, que traz **o logo do
+            banco emissor** no cabeçalho — vale para todos os bancos com marca
+            empacotada na engine (o Citibank não tem, e cai na sigla). Envie
+            `logo` em `data` para usar a sua própria imagem.
+
+            `classico` também está disponível nesta rota. O template `carne`
+            (3 vias por A4) vale em `/api/boleto/multi` e `/api/render/carne`.
 
             O tema visual opcional é aplicado a partir dos campos passados em
             `data` (ver schema `BoletoData`: `logo_empresa`, `cor_marca`,
@@ -349,7 +352,7 @@ paths:
             `total_parcelas`).
           schema:
             type: string
-            enum: [moderno]
+            enum: [moderno, classico]
             default: moderno
       responses:
         '200':
@@ -866,9 +869,11 @@ paths:
                   description: Dados do boleto (mesmos campos de /api/boleto)
                 template:
                   type: string
-                  enum: [moderno]
+                  enum: [moderno, classico]
                   default: moderno
-                  description: Aceito por compatibilidade; esta rota gera 1 boleto no layout padrão.
+                  description: >-
+                    Modelo visual. O padrão `moderno` traz o logo do banco emissor
+                    no cabeçalho.
       responses:
         '201':
           description: Boleto renderizado

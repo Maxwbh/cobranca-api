@@ -150,9 +150,22 @@ com a validação de assinatura que não pode faltar.
 |---|---|---|
 | `400` | Dados do boleto inválidos | Ler `validation_errors` (campo a campo) |
 | `401` | Token `bapi_` ausente/revogado | Recadastrar em `POST /credenciais` |
-| `403` | Token não corresponde ao tenant/provider | Usar o token do banco certo |
+| `403` | Token não corresponde ao tenant/banco | Usar o token do banco certo |
 | `409` | CIP processando o registro | Re-tentar em alguns segundos |
 | `413` | Lote acima do limite (200) | Dividir em mais jobs |
 | `424` | Banco rejeitou a credencial (ex.: sandbox C6 fora da janela) | Ver `upstream` no corpo |
 
 `ORA-24247` (ACL) ou `ORA-29024` (certificado) → revise o [`acl_setup.sql`](./acl_setup.sql).
+
+**`201` com `status: erro` numa chamada online** é o caso que mais engana: o
+banco está desligado nesta instalação (`<BANCO>_REGISTERED_READY`), o caminho
+`on` foi rebaixado para a engine e o `account_config` que a API do banco pede
+não basta para ela. Confira antes em `GET /bancos` — `registrado_pronto` e
+`caminho_efetivo` respondem por banco.
+
+## `p_provider`: caminho e banco
+
+A API separa os dois eixos: `provider` é o **caminho** (`on` = API do banco,
+`off` = engine pyCobrança) e `banco` é a **instituição**. Este pacote passa o
+nome do banco em `p_provider` (`'c6'`, `'sicoob'`) — apelido que a API aceita
+como `on` + `banco` e mantém até a **3.0.0**. Nada aqui precisa mudar agora.

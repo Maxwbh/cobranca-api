@@ -10,7 +10,9 @@ from app.core.vault import Vault, get_vault
 from app.providers.bacen_pix import _devedor_simples
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._credentials import resolve_request_credentials
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
 from app.schemas import (
+    Banco,
     CobrancaRecorrenteIn,
     Provider,
     RecorrenciaIn,
@@ -24,22 +26,22 @@ _CREDS_HEADER = Header(default=None, alias="X-Bank-Credentials",
 _AUTH_HEADER = Header(default=None, description="Bearer bapi_... (token do /credenciais)")
 
 
-def _provider(tenant_id, provider, account_config, vault, credentials):
+def _provider(tenant_id, provider, account_config, vault, credentials, banco=None):
     try:
-        return build_rest_provider(provider=provider, tenant_id=tenant_id,
+        return build_rest_provider(provider=provider, banco=banco, tenant_id=tenant_id,
                                    account_config=account_config, vault=vault,
                                    credentials=credentials)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
-def _creds_get(credentials, authorization, tenant_id, provider):
+def _creds_get(credentials, authorization, tenant_id, provider, banco=None):
     try:
         explicit = credentials_from_header(credentials)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                       tenant_id=tenant_id, provider=provider)
+                                       tenant_id=tenant_id, provider=provider, banco=banco)
 
 
 # --- recorrências ------------------------------------------------------------------
@@ -54,8 +56,9 @@ def criar_recorrencia(body: RecorrenciaIn, authorization: str | None = _AUTH_HEA
         raise HTTPException(status_code=422,
                             detail="informe exatamente um: valor_fixo (valorRec) ou valor_minimo")
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
-                                        tenant_id=body.tenant_id, provider=body.provider)
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+                                        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
 
     vinculo = {"contrato": rec.contrato, "devedor": _devedor_simples(rec.devedor)}
     if rec.objeto:
@@ -77,35 +80,35 @@ def criar_recorrencia(body: RecorrenciaIn, authorization: str | None = _AUTH_HEA
 
 
 @router.get("/recorrencias", response_model=dict)
-def listar_recorrencias(tenant_id: str, inicio: str, fim: str, provider: Provider = Provider.c6,
+def listar_recorrencias(tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                         credentials: str | None = _CREDS_HEADER,
                         authorization: str | None = _AUTH_HEADER,
                         vault: Vault = Depends(get_vault)) -> dict:
     """Lista recorrências do período (RFC3339)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).listar_recorrencias(inicio=inicio, fim=fim)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).listar_recorrencias(inicio=inicio, fim=fim)
 
 
 @router.get("/recorrencias/{id_rec}", response_model=dict)
 def consultar_recorrencia(id_rec: str, tenant_id: str, txid: str | None = None,
-                          provider: Provider = Provider.c6,
+                          provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                           credentials: str | None = _CREDS_HEADER,
                           authorization: str | None = _AUTH_HEADER,
                           vault: Vault = Depends(get_vault)) -> dict:
     """Consulta a recorrência (opcionalmente por txid da jornada)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).consultar_recorrencia(id_rec, txid=txid)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).consultar_recorrencia(id_rec, txid=txid)
 
 
 @router.patch("/recorrencias/{id_rec}", response_model=dict)
 def revisar_recorrencia(id_rec: str, campos: dict, tenant_id: str,
-                        provider: Provider = Provider.c6,
+                        provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                         credentials: str | None = _CREDS_HEADER,
                         authorization: str | None = _AUTH_HEADER,
                         vault: Vault = Depends(get_vault)) -> dict:
     """Gestão (Jornada 4): alteração ou cancelamento (ex.: {"status": "CANCELADA"})."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).revisar_recorrencia(id_rec, campos)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).revisar_recorrencia(id_rec, campos)
 
 
 # --- solicitação de confirmação (Jornada 1) ------------------------------------------
@@ -116,63 +119,64 @@ def criar_solicitacao(body: SolicitacaoRecorrenciaIn, authorization: str | None 
                       vault: Vault = Depends(get_vault)) -> dict:
     """solicrec: envia o pedido de autorização ao app do banco do pagador (Jornada 1)."""
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
-                                        tenant_id=body.tenant_id, provider=body.provider)
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+                                        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     return p.criar_solicitacao_recorrencia(body.dados)
 
 
 @router.get("/solicitacoes/{id_solic}", response_model=dict)
-def consultar_solicitacao(id_solic: str, tenant_id: str, provider: Provider = Provider.c6,
+def consultar_solicitacao(id_solic: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                           credentials: str | None = _CREDS_HEADER,
                           authorization: str | None = _AUTH_HEADER,
                           vault: Vault = Depends(get_vault)) -> dict:
     """Consulta a solicitação de autorização."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).consultar_solicitacao_recorrencia(id_solic)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).consultar_solicitacao_recorrencia(id_solic)
 
 
 @router.patch("/solicitacoes/{id_solic}", response_model=dict)
 def revisar_solicitacao(id_solic: str, campos: dict, tenant_id: str,
-                        provider: Provider = Provider.c6,
+                        provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                         credentials: str | None = _CREDS_HEADER,
                         authorization: str | None = _AUTH_HEADER,
                         vault: Vault = Depends(get_vault)) -> dict:
     """Revisa/cancela a solicitação de autorização (PATCH BACEN)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).revisar_solicitacao_recorrencia(id_solic, campos)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).revisar_solicitacao_recorrencia(id_solic, campos)
 
 
 # --- locations (QR de adesão — Jornada 2) --------------------------------------------
 
 
 @router.post("/locations", response_model=dict, status_code=201)
-def criar_location(tenant_id: str, provider: Provider = Provider.c6,
+def criar_location(tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                    credentials: str | None = _CREDS_HEADER,
                    authorization: str | None = _AUTH_HEADER,
                    vault: Vault = Depends(get_vault)) -> dict:
     """Cria a location do QR de adesão da recorrência (Jornada 2)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).criar_location_recorrencia()
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).criar_location_recorrencia()
 
 
 @router.get("/locations/{loc_id}", response_model=dict)
-def consultar_location(loc_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def consultar_location(loc_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                        credentials: str | None = _CREDS_HEADER,
                        authorization: str | None = _AUTH_HEADER,
                        vault: Vault = Depends(get_vault)) -> dict:
     """Consulta a location (payload do QR)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).consultar_location_recorrencia(loc_id)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).consultar_location_recorrencia(loc_id)
 
 
 @router.delete("/locations/{loc_id}/recorrencia", response_model=dict)
-def desvincular_location(loc_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def desvincular_location(loc_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                          credentials: str | None = _CREDS_HEADER,
                          authorization: str | None = _AUTH_HEADER,
                          vault: Vault = Depends(get_vault)) -> dict:
     """Desvincula a recorrência da location (invalida o QR)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).desvincular_location_recorrencia(loc_id)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).desvincular_location_recorrencia(loc_id)
 
 
 # --- cobranças do ciclo (cobr — Jornada 3) --------------------------------------------
@@ -184,8 +188,9 @@ def criar_cobranca(txid: str, body: CobrancaRecorrenteIn,
                    vault: Vault = Depends(get_vault)) -> dict:
     """Agenda a cobrança do ciclo (>= 2 dias antes do vencimento — regra BACEN)."""
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
-                                        tenant_id=body.tenant_id, provider=body.provider)
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+                                        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     c = body.cobranca
     payload = {
         "idRec": c.id_rec,
@@ -200,56 +205,56 @@ def criar_cobranca(txid: str, body: CobrancaRecorrenteIn,
 
 
 @router.get("/cobrancas", response_model=dict)
-def listar_cobrancas(tenant_id: str, inicio: str, fim: str, provider: Provider = Provider.c6,
+def listar_cobrancas(tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                      credentials: str | None = _CREDS_HEADER,
                      authorization: str | None = _AUTH_HEADER,
                      vault: Vault = Depends(get_vault)) -> dict:
     """Lista cobranças do ciclo no período (RFC3339)."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).listar_cobrancas_recorrentes(inicio=inicio, fim=fim)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).listar_cobrancas_recorrentes(inicio=inicio, fim=fim)
 
 
 @router.get("/cobrancas/{txid}", response_model=dict)
-def consultar_cobranca(txid: str, tenant_id: str, provider: Provider = Provider.c6,
+def consultar_cobranca(txid: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                        credentials: str | None = _CREDS_HEADER,
                        authorization: str | None = _AUTH_HEADER,
                        vault: Vault = Depends(get_vault)) -> dict:
     """Consulta uma cobrança do ciclo (cobr) pelo txid."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).consultar_cobranca_recorrente(txid)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).consultar_cobranca_recorrente(txid)
 
 
 @router.patch("/cobrancas/{txid}", response_model=dict)
-def revisar_cobranca(txid: str, campos: dict, tenant_id: str, provider: Provider = Provider.c6,
+def revisar_cobranca(txid: str, campos: dict, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                      credentials: str | None = _CREDS_HEADER,
                      authorization: str | None = _AUTH_HEADER,
                      vault: Vault = Depends(get_vault)) -> dict:
     """Revisa a cobrança do ciclo (PATCH BACEN) — ex.: cancelamento antes da liquidação."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).revisar_cobranca_recorrente(txid, campos)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).revisar_cobranca_recorrente(txid, campos)
 
 
 @router.post("/cobrancas/{txid}/retentativa/{data}", response_model=dict, status_code=201)
-def retentar_cobranca(txid: str, data: str, tenant_id: str, provider: Provider = Provider.c6,
+def retentar_cobranca(txid: str, data: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                       credentials: str | None = _CREDS_HEADER,
                       authorization: str | None = _AUTH_HEADER,
                       vault: Vault = Depends(get_vault)) -> dict:
     """Retentativa de liquidação para a data (YYYY-MM-DD) — pós vencimento não pago."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    return _provider(tenant_id, provider, {}, vault, creds).retentar_cobranca_recorrente(txid, data)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    return _provider(tenant_id, provider, {}, vault, creds, banco=banco).retentar_cobranca_recorrente(txid, data)
 
 
 # --- webhooks do Pix Automático ---------------------------------------------------------
 
 
 @router.put("/config/webhooks", response_model=dict)
-def configurar_webhooks(body: dict, tenant_id: str, provider: Provider = Provider.c6,
+def configurar_webhooks(body: dict, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
                         credentials: str | None = _CREDS_HEADER,
                         authorization: str | None = _AUTH_HEADER,
                         vault: Vault = Depends(get_vault)) -> dict:
     """Configura webhookrec e/ou webhookcobr: {"url_recorrencia": ..., "url_cobranca": ...}."""
-    creds = _creds_get(credentials, authorization, tenant_id, provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+    creds = _creds_get(credentials, authorization, tenant_id, provider, banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     out: dict = {}
     if body.get("url_recorrencia"):
         out["webhookrec"] = p.configurar_webhook_recorrencia(body["url_recorrencia"])
