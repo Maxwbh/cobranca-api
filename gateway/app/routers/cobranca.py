@@ -5,9 +5,11 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 
 from app.core.vault import Vault, get_vault
-from app.registry import build_provider, credentials_from_header
+from app.registry import (_SLUG_ENGINE, build_provider, credentials_from_header,
+                          resolver_caminho)
 from app.routers._credentials import resolve_request_credentials
-from app.schemas import CobrancaIn, CobrancaOut, Provider
+from app.routers._params import BANCO as _BANCO, PROVIDER as _PROVIDER
+from app.schemas import Banco, CobrancaIn, CobrancaOut, Provider
 
 router = APIRouter(prefix="/cobranca", tags=["cobranca"])
 
@@ -50,14 +52,20 @@ def registrar(
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> CobrancaOut:
-    """Registra a cobrança (boleto): `provider=c6|sicoob` = API REST do banco;
-    vazio/omitido = CNAB offline pela engine pyCobrança. Resposta normalizada."""
+    """Registra a cobrança (boleto). Dois eixos: `provider` diz o **caminho** —
+    `on` = API REST do banco, `off` (default) = CNAB offline pela engine
+    pyCobrança — e `banco` diz a **instituição** (`c6`, `sicoob`, `itau`…).
+
+    O nome do banco no `provider` (`provider=c6`) segue aceito como apelido de
+    `on` + `banco`, e sai na 3.0.0. Resposta normalizada, igual nos dois
+    caminhos. Combinação que não existe responde `422` dizendo quais existem.
+    """
     creds = resolve_request_credentials(
         authorization=authorization, explicit=body.credentials,
-        tenant_id=body.tenant_id, provider=body.provider,
+        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco,
     )
     provider = build_provider(
-        provider=body.provider, tenant_id=body.tenant_id,
+        provider=body.provider, banco=body.banco, tenant_id=body.tenant_id,
         account_config=body.account_config, vault=vault, credentials=creds,
     )
     out = provider.registrar(body.cobranca)
@@ -97,7 +105,8 @@ def _conta(numero_cliente: int | None, codigo_modalidade: int | None) -> dict:
 
 @router.get("/{cobranca_id}", response_model=CobrancaOut)
 def consultar(
-    cobranca_id: str, tenant_id: str, provider: Provider,
+    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
     credentials: str | None = _CREDS_HEADER,
@@ -107,38 +116,74 @@ def consultar(
     """Consulta o status normalizado do boleto (registrado|pendente|liquidado|baixado)."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=_header_creds(credentials),
-        tenant_id=tenant_id, provider=provider,
+        tenant_id=tenant_id, provider=provider, banco=banco,
     )
-    p = build_provider(provider=provider, tenant_id=tenant_id, account_config=_conta(numero_cliente, codigo_modalidade),
+    p = build_provider(provider=provider, banco=banco, tenant_id=tenant_id,
+                       account_config=_conta(numero_cliente, codigo_modalidade),
                        vault=vault, credentials=creds)
     return p.consultar(cobranca_id)
 
 
 @router.get("/{cobranca_id}/pdf", response_model=CobrancaOut)
 def pdf(
-    cobranca_id: str, tenant_id: str, provider: Provider,
+    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
 ) -> CobrancaOut:
-    """PDF do boleto registrado (quando o banco fornece; C6 devolve base64)."""
+    """PDF do boleto registrado — **quando o banco fornece**.
+
+    C6, Sicoob e Inter devolvem o PDF em base64. O **Itaú não**: a API dele responde
+    linha digitável e código de barras, e o desenho é renderizar pela engine,
+    que já tem o layout 341. Nesse caso a rota responde `422` dizendo o caminho
+    exato — `POST /api/render/boleto` com `bank` do banco e **os dados que o
+    banco registrou**.
+
+    A ressalva do `422` não é formalidade: o código de barras é determinístico,
+    então renderizar com um nosso número diferente do registrado produz um
+    boleto que ninguém concilia. Confira a linha digitável calculada contra a
+    que o banco devolveu antes de entregar ao pagador.
+    """
     creds = resolve_request_credentials(
         authorization=authorization, explicit=_header_creds(credentials),
-        tenant_id=tenant_id, provider=provider,
+        tenant_id=tenant_id, provider=provider, banco=banco,
     )
-    p = build_provider(provider=provider, tenant_id=tenant_id, account_config=_conta(numero_cliente, codigo_modalidade),
+    p = build_provider(provider=provider, banco=banco, tenant_id=tenant_id,
+                       account_config=_conta(numero_cliente, codigo_modalidade),
                        vault=vault, credentials=creds)
     try:
         return p.pdf(cobranca_id)
     except NotImplementedError as e:
-        raise HTTPException(status_code=422, detail="provider não fornece PDF online") from e
+        # "Não fornece" sozinho manda o integrador procurar defeito onde não há.
+        # Quando o banco TEM layout na engine (Itaú, por exemplo), o PDF existe
+        # — só vem do caminho offline, e a mensagem entrega o slug pronto.
+        #
+        # O slug sai do BANCO resolvido, não do `provider`: com o modelo novo
+        # (`provider=on&banco=itau`) o `provider` não nomeia banco nenhum, e
+        # procurar por ele devolveria a mensagem genérica justo em quem tem
+        # layout.
+        _, alvo = resolver_caminho(provider, banco, {})
+        slug = _SLUG_ENGINE.get(alvo)
+        alternativa = (
+            f"renderize pela engine: POST /api/render/boleto com bank='{slug}' e os "
+            "dados que o banco registrou (confira a linha digitável calculada "
+            "contra a que o banco devolveu antes de entregar ao pagador)"
+            if slug else
+            "não há layout offline para este banco; use o PDF do próprio banco quando houver"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"banco '{alvo.value}' não devolve PDF na API; {alternativa}",
+        ) from e
 
 
 @router.put("/{cobranca_id}", response_model=CobrancaOut)
 def alterar(
-    cobranca_id: str, campos: dict, tenant_id: str, provider: Provider,
+    cobranca_id: str, campos: dict, tenant_id: str, provider: Provider = _PROVIDER,
+    banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
     credentials: str | None = _CREDS_HEADER,
@@ -148,19 +193,21 @@ def alterar(
     """Altera boleto emitido (amount, due_date, discount, interest, fine)."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=_header_creds(credentials),
-        tenant_id=tenant_id, provider=provider,
+        tenant_id=tenant_id, provider=provider, banco=banco,
     )
-    p = build_provider(provider=provider, tenant_id=tenant_id, account_config=_conta(numero_cliente, codigo_modalidade),
+    p = build_provider(provider=provider, banco=banco, tenant_id=tenant_id,
+                       account_config=_conta(numero_cliente, codigo_modalidade),
                        vault=vault, credentials=creds)
     try:
         return p.alterar(cobranca_id, campos)
     except NotImplementedError as e:
-        raise HTTPException(status_code=422, detail="provider não suporta alteração online") from e
+        raise HTTPException(status_code=422, detail="este banco não suporta alteração online; baixe e reemita") from e
 
 
 @router.delete("/{cobranca_id}", response_model=CobrancaOut)
 def baixar(
-    cobranca_id: str, tenant_id: str, provider: Provider,
+    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
     credentials: str | None = _CREDS_HEADER,
@@ -170,8 +217,9 @@ def baixar(
     """Baixa/cancela o boleto (409 enquanto a CIP processa o registro)."""
     creds = resolve_request_credentials(
         authorization=authorization, explicit=_header_creds(credentials),
-        tenant_id=tenant_id, provider=provider,
+        tenant_id=tenant_id, provider=provider, banco=banco,
     )
-    p = build_provider(provider=provider, tenant_id=tenant_id, account_config=_conta(numero_cliente, codigo_modalidade),
+    p = build_provider(provider=provider, banco=banco, tenant_id=tenant_id,
+                       account_config=_conta(numero_cliente, codigo_modalidade),
                        vault=vault, credentials=creds)
     return p.baixar(cobranca_id)

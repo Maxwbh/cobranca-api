@@ -42,7 +42,7 @@ Documentação técnica da **Cobranca-API** — plataforma REST de cobrança ban
 Uma URL, **duas superfícies**. A da raiz fala com a API do banco; a de `/api/*`
 gera o documento localmente, sem banco e sem credencial.
 
-### Online — gateway REST (raiz) · Swagger em [`/docs`](https://cobranca-api-sq67.onrender.com/docs)
+### Online — gateway REST (raiz) · [Swagger publicado](swagger/) · `/docs` no serviço
 
 | Serviço | Rotas | O que faz | Providers |
 |---|---|---|---|
@@ -69,7 +69,7 @@ gera o documento localmente, sem banco e sem credencial.
 > digita o cartão na página do banco, e `save_card` e checkout transparente não
 > existem no schema — corpo com esses campos responde `422` e não chega ao banco.
 
-### Offline — engine pyCobrança in-process (`/api/*`) · Swagger em [`/api/docs`](https://cobranca-api-sq67.onrender.com/api/docs)
+### Offline — engine pyCobrança in-process (`/api/*`) · [Swagger publicado](swagger/offline.html) · `/api/docs` no serviço
 
 Boleto, CNAB e OFX **sem chamar banco**: 18 instituições, sem credencial, sem
 rede. É o caminho para quem registra por arquivo em vez de por API.

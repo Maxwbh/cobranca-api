@@ -4,7 +4,7 @@ import hmac
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Path, Request
 
 from app.core import outbox
 from app.core.forwarder import forward_event
@@ -207,8 +207,16 @@ def _liberar(marca: Any) -> None:
             pass
 
 
+_BANCO_EMISSOR = Path(
+    description="Banco que está notificando — é o slug usado na URL cadastrada nele "
+                "(`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` "
+                "valida a chamada. Não confundir com o parâmetro `banco` das rotas "
+                "de cobrança, que é a instituição do request.",
+)
+
+
 @router.post("/{banco}", response_model=WebhookEvent)
-async def receber(banco: str, request: Request) -> WebhookEvent:
+async def receber(request: Request, banco: str = _BANCO_EMISSOR) -> WebhookEvent:
     """Webhook global (consumidor único / destino default).
 
     Exige `WEBHOOK_TOKEN__<BANCO>` (ou o opt-out explícito). **Sem tenant na
@@ -218,7 +226,7 @@ async def receber(banco: str, request: Request) -> WebhookEvent:
 
 
 @router.post("/{banco}/{tenant_id}", response_model=WebhookEvent)
-async def receber_por_tenant(banco: str, tenant_id: str, request: Request) -> WebhookEvent:
+async def receber_por_tenant(request: Request, tenant_id: str, banco: str = _BANCO_EMISSOR) -> WebhookEvent:
     """Webhook por tenant (multi-sistema). O banco aponta o callback de cada conta
     para esta URL; o tenant vem do path e roteia para o consumidor dono."""
     return await _handle(banco, request, tenant_id=tenant_id)

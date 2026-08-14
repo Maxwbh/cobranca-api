@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._credentials import resolve_request_credentials
-from app.schemas import Provider
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
+from app.schemas import Banco, Provider
 
 router = APIRouter(prefix="/extrato", tags=["extrato"])
 
@@ -20,7 +21,8 @@ def consultar(
     tenant_id: str,
     start_date: str = Query(description="Data inicial (YYYY-MM-DD)"),
     end_date: str = Query(description="Data final (YYYY-MM-DD)"),
-    provider: Provider = Provider.c6,
+    provider: Provider = _PROVIDER_ON,
+    banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
     vault: Vault = Depends(get_vault),
@@ -31,9 +33,9 @@ def consultar(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
     try:
-        p = build_rest_provider(provider=provider, tenant_id=tenant_id,
+        p = build_rest_provider(provider=provider, banco=banco, tenant_id=tenant_id,
                                 account_config={}, vault=vault, credentials=creds)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e

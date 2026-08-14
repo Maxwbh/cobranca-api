@@ -8,6 +8,11 @@
 --
 -- Mandar client_secret VAZIO junto com access_token faz o provider tentar
 -- OAuth sem material e falhar — envie só os campos da via que você usa.
+--
+-- ANTES DE RODAR: `GET /bancos` diz se ESTA instalacao tem o Sicoob ligado
+-- (`registrado_pronto` / `caminho_efetivo`). Com `SICOOB_REGISTERED_READY`
+-- desligado, o online e rebaixado para a engine e o boleto NAO passa pelo
+-- banco — responde 201 como se tivesse passado.
 --------------------------------------------------------------------------------
 SET SERVEROUTPUT ON SIZE UNLIMITED
 

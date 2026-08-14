@@ -13,7 +13,8 @@ from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._capacidades import exige_capacidade
 from app.routers._credentials import resolve_request_credentials
-from app.schemas import BolepixIn, CobrancaOut, Pagador, Provider
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
+from app.schemas import Banco, BolepixIn, CobrancaOut, Pagador, Provider
 
 router = APIRouter(prefix="/bolepix", tags=["bolepix"])
 
@@ -22,9 +23,9 @@ _CREDS_HEADER = Header(default=None, alias="X-Bank-Credentials",
 _AUTH_HEADER = Header(default=None, description="Bearer bapi_... (token do /credenciais)")
 
 
-def _provider(tenant_id, provider, account_config, vault, credentials):
+def _provider(tenant_id, provider, account_config, vault, credentials, banco=None):
     try:
-        return build_rest_provider(provider=provider, tenant_id=tenant_id,
+        return build_rest_provider(provider=provider, banco=banco, tenant_id=tenant_id,
                                    account_config=account_config, vault=vault,
                                    credentials=credentials)
     except ValueError as e:
@@ -82,13 +83,14 @@ def criar(body: BolepixIn, authorization: str | None = _AUTH_HEADER,
     """Emite Bolepix (boleto + QR Pix EVP). Reenvio com o mesmo
     external_reference_id devolve a cobrança existente (idempotente no banco)."""
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
-                                        tenant_id=body.tenant_id, provider=body.provider)
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+                                        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     # Capacidade ANTES do payload: "este banco não faz Bolepix" precede
     # "faltou o CEP" — senão um provider sem suporte responderia sobre o campo.
     emitir = exige_capacidade(p, "criar_bolepix", body.provider,
                               recurso="Bolepix",
-                              alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")
+                              alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use `banco=c6`")
     bp = body.bolepix
     chave = bp.chave_pix or body.account_config.get("chave_pix")
     dados = {
@@ -118,7 +120,7 @@ def criar(body: BolepixIn, authorization: str | None = _AUTH_HEADER,
 
 
 @router.get("/{external_reference_id}", response_model=CobrancaOut)
-def consultar(external_reference_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def consultar(external_reference_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
               credentials: str | None = _CREDS_HEADER,
               authorization: str | None = _AUTH_HEADER,
               vault: Vault = Depends(get_vault)) -> CobrancaOut:
@@ -128,14 +130,14 @@ def consultar(external_reference_id: str, tenant_id: str, provider: Provider = P
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     return exige_capacidade(p, "consultar_bolepix", provider,
-                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")(external_reference_id)
+                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use `banco=c6`")(external_reference_id)
 
 
 @router.get("/{external_reference_id}/pdf", response_model=CobrancaOut)
-def pdf(external_reference_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def pdf(external_reference_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
         credentials: str | None = _CREDS_HEADER,
         authorization: str | None = _AUTH_HEADER,
         vault: Vault = Depends(get_vault)) -> CobrancaOut:
@@ -145,14 +147,14 @@ def pdf(external_reference_id: str, tenant_id: str, provider: Provider = Provide
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     return exige_capacidade(p, "pdf_bolepix", provider,
-                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")(external_reference_id)
+                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use `banco=c6`")(external_reference_id)
 
 
 @router.delete("/{external_reference_id}", response_model=CobrancaOut)
-def cancelar(external_reference_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def cancelar(external_reference_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
              credentials: str | None = _CREDS_HEADER,
              authorization: str | None = _AUTH_HEADER,
              vault: Vault = Depends(get_vault)) -> CobrancaOut:
@@ -162,7 +164,7 @@ def cancelar(external_reference_id: str, tenant_id: str, provider: Provider = Pr
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     return exige_capacidade(p, "cancelar_bolepix", provider,
-                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use provider=c6")(external_reference_id)
+                            recurso="Bolepix", alternativa="Bolepix é exclusivo do C6 (/v2/bank_slips) — use `banco=c6`")(external_reference_id)

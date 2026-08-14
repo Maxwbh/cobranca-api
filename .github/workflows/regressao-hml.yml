@@ -96,6 +96,8 @@ jobs:
           COB_CONTA: ${{ secrets.COB_CONTA }}
           COB_CONVENIO: ${{ secrets.COB_CONVENIO }}
           COB_E2EID: ${{ secrets.COB_E2EID }}
+          # Sem ele BC-066/067 afirmam o 401 (fail-closed); com ele, a entrega.
+          COB_WEBHOOK_TOKEN: ${{ secrets.COB_WEBHOOK_TOKEN }}
         run: |
           if [ "${{ inputs.smoke }}" = "true" ]; then
             ./postman/run-regressao.sh --smoke

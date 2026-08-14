@@ -29,6 +29,7 @@ declare -A MAPA=(
   [COB_CONTA]=conta
   [COB_CONVENIO]=convenio
   [COB_E2EID]=e2eid
+  [COB_WEBHOOK_TOKEN]=webhook_token
   [COB_C6_CLIENT_ID]=c6_client_id
   [COB_C6_CLIENT_SECRET]=c6_client_secret
   [COB_C6_PFX_BASE64]=c6_pfx_base64
@@ -51,6 +52,7 @@ declare -A PORQUE=(
   [COB_AGENCIA]="BC-009 -> destrava cobranca_id (SMK-07, BC-010..013)"
   [COB_CONTA]="BC-009 -> destrava cobranca_id (SMK-07, BC-010..013)"
   [COB_CONVENIO]="BC-009 -> destrava cobranca_id (SMK-07, BC-010..013)"
+  [COB_WEBHOOK_TOKEN]="BC-066/067 exercitam a ENTREGA do webhook; sem ele so se afirma o 401 fail-closed"
 )
 
 ARGS=()

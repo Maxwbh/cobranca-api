@@ -6,7 +6,7 @@ def test_bancos_lista_capacidades_reais(client):
     assert r.status_code == 200
     data = r.json()
     bancos = {b["id"]: b for b in data["bancos"]}
-    assert set(bancos) == {"c6", "sicoob", "inter", "pycobranca"}
+    assert set(bancos) == {"c6", "sicoob", "inter", "itau", "pycobranca"}
 
     # capacidades refletem o código (introspecção)
     assert "pix_automatico" in bancos["c6"]["capacidades"]

@@ -11,7 +11,8 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.core import credential_store
-from app.schemas import Provider
+from app.registry import chave_credencial
+from app.schemas import Banco, Provider
 
 
 def resolve_request_credentials(
@@ -20,13 +21,19 @@ def resolve_request_credentials(
     explicit: dict[str, Any] | None,
     tenant_id: str,
     provider: Provider,
+    banco: Banco | None = None,
 ) -> dict[str, Any] | None:
-    """Bearer bapi_ -> credenciais do token; senão as explícitas do request; senão None."""
+    """Bearer bapi_ -> credenciais do token; senão as explícitas do request; senão None.
+
+    A credencial é procurada pelo BANCO (`chave_credencial`): com `provider=on`,
+    procurar pelo caminho misturaria as credenciais de bancos diferentes do
+    mesmo tenant.
+    """
     if authorization and credential_store.TOKEN_PREFIX in authorization:
         try:
             bearer = credential_store.credentials_from_bearer(
                 credential_store.get_store(), authorization,
-                tenant_id=tenant_id, provider=provider.value,
+                tenant_id=tenant_id, provider=chave_credencial(provider, banco),
             )
         except ValueError as e:
             status = 403 if "não corresponde" in str(e) else 401
