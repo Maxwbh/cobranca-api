@@ -1,4 +1,5 @@
 import os
+import sys
 import urllib.request
 import urllib.error
 import json
@@ -7,13 +8,15 @@ REMESSA_URL = 'http://localhost:8000/api/remessa'
 OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_output'))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+FALHAS = []
+
 # Formato padrão de pagamento esperado pela API (via FieldMapper)
 PAGAMENTO_C6 = {
     "nosso_numero": "12345678",
     "data_vencimento": "2026/12/31",
     "valor": 1500.00,
     "nome_sacado": "Joao da Silva",
-    "documento_sacado": "12345678900",
+    "documento_sacado": "12345678909",
     "endereco_sacado": "Rua Teste, 100",
     "bairro_sacado": "Centro",
     "cep_sacado": "01000000",
@@ -38,7 +41,7 @@ PAGAMENTO_SICOOB = {
 # codigo_beneficiario: código do cedente fornecido pelo C6 (10 dígitos)
 DATA_C6 = {
     "empresa_mae": "Empresa C6 LTDA",
-    "documento_cedente": "33445566000177",
+    "documento_cedente": "33445566000186",
     "agencia": "0001",
     "conta_corrente": "1234567",
     "digito_conta": "0",
@@ -50,7 +53,7 @@ DATA_C6 = {
 # Sicoob — CNAB 240 (único tipo suportado)
 DATA_SICOOB = {
     "empresa_mae": "Cooperativa Teste",
-    "documento_cedente": "98765432000100",
+    "documento_cedente": "98765432000198",
     "agencia": "4327",
     "conta_corrente": "417270",
     "convenio": "229385",
@@ -97,6 +100,7 @@ def generate_remessa(name, bank, cnab_type, data):
             print(f"[OK] Gerada: {filename} ({len(content)} bytes)")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8')
+        FALHAS.append(f"{name} {cnab_type}: HTTP {e.code} — {err_body[:200]}")
         print(f"[ERR] {name} {cnab_type}: HTTP {e.code} — {err_body}")
     finally:
         os.remove(tmp_path)
@@ -104,4 +108,12 @@ def generate_remessa(name, bank, cnab_type, data):
 print(f"Gerando arquivos de remessa em {OUTPUT_DIR}...")
 generate_remessa("c6",    "banco_c6", "cnab400", DATA_C6)
 generate_remessa("sicoob","sicoob",   "cnab240", DATA_SICOOB)
+# Sem isto o script sai 0 mesmo quando nenhuma remessa foi gerada — em CI, um
+# verde que não significa nada.
+if FALHAS:
+    print(f"\nFALHOU: {len(FALHAS)} remessa(s) não geradas.")
+    for f in FALHAS:
+        print(f"  - {f}")
+    sys.exit(1)
+
 print("Concluído!")

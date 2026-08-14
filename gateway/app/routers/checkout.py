@@ -21,8 +21,10 @@ from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._capacidades import exige_capacidade
 from app.routers._credentials import resolve_request_credentials
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
 from app.schemas import (
     Autenticacao,
+    Banco,
     CheckoutIn,
     CheckoutOut,
     JurosPor,
@@ -43,7 +45,7 @@ _IDEMPOTENCIA_HEADER = Header(
 
 # Cartão existe onde a instituição OFERECE link hospedado. Hoje, o C6.
 _ALTERNATIVA = ("link de pagamento existe no banco que oferece a funcionalidade — "
-                "hoje o C6 (/v1/checkouts); use provider=c6")
+                "hoje o C6 (/v1/checkouts); use `banco=c6`")
 
 _TIPO = {TipoCartao.credito: "CREDIT", TipoCartao.debito: "DEBIT"}
 _JUROS = {JurosPor.loja: "BY_SELLER", JurosPor.emissor: "BY_ISSUER"}
@@ -66,9 +68,9 @@ ENDERECO_OBRIGATORIO = {
 }
 
 
-def _provider(tenant_id, provider, account_config, vault, credentials):
+def _provider(tenant_id, provider, account_config, vault, credentials, banco=None):
     try:
-        return build_rest_provider(provider=provider, tenant_id=tenant_id,
+        return build_rest_provider(provider=provider, banco=banco, tenant_id=tenant_id,
                                    account_config=account_config, vault=vault,
                                    credentials=credentials)
     except ValueError as e:
@@ -130,8 +132,9 @@ def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
             return guardada
 
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
-                                        tenant_id=body.tenant_id, provider=body.provider)
-    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds)
+                                        tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
+    p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
+                  banco=body.banco)
     # Capacidade ANTES do payload: "este banco não faz link de pagamento" precede
     # "faltou o CEP" — senão um provider sem suporte responderia sobre o campo.
     criar_link = exige_capacidade(p, "criar_checkout", body.provider,
@@ -197,7 +200,7 @@ def _guardar(tenant_id: str, chave: str, marca: str, resultado: CheckoutOut) -> 
 
 
 @router.get("/{checkout_id}", response_model=CheckoutOut)
-def consultar(checkout_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def consultar(checkout_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
               credentials: str | None = _CREDS_HEADER,
               authorization: str | None = _AUTH_HEADER,
               vault: Vault = Depends(get_vault)) -> CheckoutOut:
@@ -207,15 +210,15 @@ def consultar(checkout_id: str, tenant_id: str, provider: Provider = Provider.c6
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     return exige_capacidade(p, "consultar_checkout", provider,
                             recurso="link de pagamento com cartão",
                             alternativa=_ALTERNATIVA)(checkout_id)
 
 
 @router.delete("/{checkout_id}", response_model=CheckoutOut)
-def cancelar(checkout_id: str, tenant_id: str, provider: Provider = Provider.c6,
+def cancelar(checkout_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
              credentials: str | None = _CREDS_HEADER,
              authorization: str | None = _AUTH_HEADER,
              vault: Vault = Depends(get_vault)) -> CheckoutOut:
@@ -225,8 +228,8 @@ def cancelar(checkout_id: str, tenant_id: str, provider: Provider = Provider.c6,
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     creds = resolve_request_credentials(authorization=authorization, explicit=explicit,
-                                        tenant_id=tenant_id, provider=provider)
-    p = _provider(tenant_id, provider, {}, vault, creds)
+                                        tenant_id=tenant_id, provider=provider, banco=banco)
+    p = _provider(tenant_id, provider, {}, vault, creds, banco=banco)
     return exige_capacidade(p, "cancelar_checkout", provider,
                             recurso="link de pagamento com cartão",
                             alternativa=_ALTERNATIVA)(checkout_id)

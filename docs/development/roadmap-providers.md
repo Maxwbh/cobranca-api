@@ -71,7 +71,7 @@ cai aqui sai antes da discussão de esforço:
 |---|---|---|
 | Bradesco | 237 | Maior base de contas, mas onboarding pesado |
 | Santander | 033 | Big 5; API disponível |
-| Itaú | 341 | Mais rentável, mas onboarding notoriamente difícil (precisa gerente) |
+| Itaú | 341 | Maior base de cobrança do país e **a API não devolve PDF** — a engine já renderiza o 341, então o registro online reaproveita o offline. O gargalo é comercial: credencial de cobrança **não** sai por autosserviço. [itau-rest.md](itau-rest.md) |
 | Nubank / Caixa | 260 / 104 | Base gigante, mas API PJ de boleto registrado limitada/incerta |
 
 ## Diferença Banco × PSP (decisão de produto)

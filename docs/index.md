@@ -160,9 +160,17 @@ ambas por **introspecção do código** (não há como envelhecer).
 | [Arquitetura](ARCHITECTURE.md) | Como as peças se encaixam |
 | [Guia de deploy](deploy.md) | Imagem no GHCR, Render, variáveis de ambiente e troubleshooting |
 | [Notas de engenharia](development/) | Roadmap de providers e o guia de integração de cada banco |
+| [**Swagger — gateway REST**](swagger/) | Todos os endpoints do gateway, publicados aqui |
+| [**Swagger — offline (`/api/*`)**](swagger/offline.html) | Boleto, CNAB e OFX sem convênio |
 
-A referência completa e sempre atualizada é o **Swagger servido pela própria
-API** — ele reflete o código em execução, não uma cópia que pode envelhecer.
+O Swagger publicado é **gerado do código a cada versão** e o CI reprova se ele
+ficar para trás — não é uma cópia que envelhece. Ele mora no site porque a
+instância de demonstração hiberna: documentação que some quando o servidor
+dorme não serve para quem está decidindo integrar.
+
+Para **executar** as chamadas (o `Try it out`), use a
+[demo ao vivo](https://cobranca-api-sq67.onrender.com/docs) ou suba a sua com
+um `docker run` — aí o Swagger é servido pela própria API.
 
 ---
 
@@ -195,7 +203,8 @@ cobre o Render.com e as variáveis de ambiente — inclusive os tetos de lote
   <p>Suba o container e emita o primeiro boleto em menos de 5 minutos —
   sem convênio, sem credencial, sem cadastro.</p>
   <p>
-    <a class="btn btn-primario" href="https://cobranca-api-sq67.onrender.com/docs">Testar no Swagger</a>
+    <a class="btn btn-primario" href="swagger/">Ver o Swagger</a>
+    <a class="btn" href="https://cobranca-api-sq67.onrender.com/docs">Testar na demo</a>
     <a class="btn" href="https://github.com/Maxwbh/cobranca-api">Ver no GitHub</a>
   </p>
 </div>

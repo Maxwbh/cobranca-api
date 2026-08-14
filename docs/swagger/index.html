@@ -1,32 +1,10 @@
-"""Página do Swagger UI com a identidade visual da plataforma.
-
-As duas superfícies (gateway em `/docs`, offline em `/api/docs`) usavam HTML
-quase idêntico duplicado em dois arquivos — e as duas carregavam no topbar o
-losango rotacionado que já saiu do social preview pela semelhança com a marca
-Pix do BACEN. Aqui vive UMA página parametrizada: a marca é a oficial (barras
-+ seta), a paleta é a mesma do site (navy #0F172A/#152449 + ciano #06B6D4) e
-o corpo do Swagger recebe o mesmo tratamento de cartões do restante da
-plataforma.
-"""
-from __future__ import annotations
-
-# A marca em 64x64, geometria idêntica a docs/assets/marca-escura.svg.
-_MARCA = (
-    '<svg class="cob-mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">'
-    '<g fill="#F8FAFC"><rect x="6" y="14" width="8" height="36" rx="1.5"/>'
-    '<rect x="18" y="14" width="6" height="36" rx="1.5"/>'
-    '<rect x="28" y="14" width="4" height="36" rx="1.5"/></g>'
-    '<path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#06B6D4"'
-    ' stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-)
-
-_PAGINA = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>__TITULO__</title>
-  <link rel="stylesheet" href="__ASSETS__/swagger-ui.css">
+  <title>Cobranca-API — Gateway (Swagger)</title>
+  <link rel="stylesheet" href="./vendor/swagger-ui.css">
   <link rel="icon" href="https://maxwbh.github.io/cobranca-api/assets/favicon.svg" type="image/svg+xml">
   <style>
     /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
@@ -162,19 +140,19 @@ _PAGINA = """<!DOCTYPE html>
 </head>
 <body>
   <div class="cob-topbar">
-    __MARCA__
+    <svg class="cob-mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><g fill="#F8FAFC"><rect x="6" y="14" width="8" height="36" rx="1.5"/><rect x="18" y="14" width="6" height="36" rx="1.5"/><rect x="28" y="14" width="4" height="36" rx="1.5"/></g><path d="M40.5 18.5 L53.5 32 L40.5 45.5" fill="none" stroke="#06B6D4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <h1>Cobranca<span>-API</span></h1>
-    <span class="surface">__SUPERFICIE__</span>
-    <span class="pill">__PILL__</span>
-    <small>__DETALHE__</small>
-    <div class="links">__LINKS__</div>
+    <span class="surface">Gateway REST · multi-banco</span>
+    <span class="pill">4 bancos ON · 18 OFF</span>
+    <small>v2.2.0 · C6 · Sicoob · Inter · Itaú · Pix BACEN — para executar: <a href="https://cobranca-api-sq67.onrender.com/docs">demo</a> · <code>docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest</code></small>
+    <div class="links"><a href="https://github.com/Maxwbh/cobranca-api" target="_blank" rel="noopener">GitHub</a><a href="./offline.html" class="primario">Offline / pyCobrança →</a></div>
   </div>
   <div id="swagger-ui"></div>
-  <script src="__ASSETS__/swagger-ui-bundle.js"></script>
+  <script src="./vendor/swagger-ui-bundle.js"></script>
   <script>
     window.onload = () => {
       window.ui = SwaggerUIBundle({
-        url: '__SPEC__',
+        url: './openapi.json',
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [SwaggerUIBundle.presets.apis],
@@ -184,30 +162,4 @@ _PAGINA = """<!DOCTYPE html>
     };
   </script>
 </body>
-</html>"""
-
-
-# De onde vêm o CSS e o JS do swagger-ui. O serviço usa a CDN; a documentação
-# publicada no site aponta para os arquivos versionados ao lado dela — uma
-# página que existe para NÃO sair do ar não deve depender de um terceiro.
-CDN_SWAGGER = "https://unpkg.com/swagger-ui-dist@5"
-
-
-def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
-                   links: list[tuple[str, str, bool]], spec_url: str,
-                   assets: str = CDN_SWAGGER) -> str:
-    """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
-    ancoras = "".join(
-        f'<a href="{href}"{" class=\"primario\"" if primario else ""}'
-        f'{" target=\"_blank\" rel=\"noopener\"" if href.startswith("http") else ""}>{rotulo}</a>'
-        for rotulo, href, primario in links
-    )
-    return (_PAGINA
-            .replace("__TITULO__", titulo)
-            .replace("__MARCA__", _MARCA)
-            .replace("__SUPERFICIE__", superficie)
-            .replace("__PILL__", pill)
-            .replace("__DETALHE__", detalhe)
-            .replace("__LINKS__", ancoras)
-            .replace("__SPEC__", spec_url)
-            .replace("__ASSETS__", assets.rstrip("/")))
+</html>

@@ -105,5 +105,10 @@ jobs:
           EOF
       - name: Postman coverage (endpoint sem BC-xxx quebra o build)
         run: python postman/check_coverage.py
+      # A doc publicada no site é gerada do código. Sem esta guarda ela
+      # envelhece em silêncio — e doc errada é pior que doc ausente, porque
+      # ninguém desconfia dela.
+      - name: Swagger do site em dia com o código
+        run: PYTHONPATH=gateway python scripts/gerar-swagger-estatico.py --conferir
       - name: Test (gateway Python/FastAPI)
         run: cd gateway && PYTHONPATH=. pytest -v

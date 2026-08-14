@@ -128,8 +128,8 @@ RECURSOS = [
     ("cartao",    "#A78BFA", "Link de pagamento",      "ONLINE",  "Checkout com crédito e débito"),
 ]
 
-# 19 = 3 online (C6, Sicoob, Inter) + 18 offline da engine, menos os 2 que
-# estão nos dois caminhos (C6 e Sicoob). O detalhamento fica no ALT e no site.
+# 19 = 4 online (C6, Sicoob, Inter, Itaú) + 18 offline da engine, menos os 3
+# que estão nos dois caminhos (C6, Sicoob e Itaú). Detalhamento no ALT e no site.
 PILLS = ["19 bancos", "REST + Python", "MIT Open Source"]
 
 
@@ -163,7 +163,7 @@ def fundo(w, h):
 
 
 ALT = ("Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. "
-       "3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, licença MIT.")
+       "4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline, 100% Python, licença MIT.")
 
 
 # ---------------------------------------------------------------- desktop

@@ -19,6 +19,7 @@ from pycobranca.contracts import SLUG_POR_CODIGO
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
                                    OFXInvalido, PyCobrancaError, RetornoInvalido)
 from pycobranca.render import render_boleto_pdf, render_carne_pdf, render_fatura_pdf
+from pycobranca.render.marcas import logo_do_banco
 from pycobranca.render.modelos import MODELOS_BOLETO
 from pycobranca import cnab as _cnab
 from pycobranca.cnab import Pagamento, PagamentoPix, Retorno
@@ -156,6 +157,17 @@ def construir_boleto(bank: str, data: dict[str, Any]):
         boleto = klass(**kwargs)
     except (PyCobrancaError, ValueError, TypeError) as e:
         raise DadosInvalidos(_erros(e)) from e
+    # Logo do banco no cabeçalho — padrão, e não opção. A engine empacota os
+    # PNGs por código FEBRABAN, mas a capacidade é opt-in: sem esta linha o
+    # boleto saía com a sigla em texto, e quem recebe compara com o boleto do
+    # internet banking. Vale para TODOS os caminhos porque todos passam por
+    # aqui — boleto avulso, lote, carnê e fatura.
+    #
+    # Só preenche o que veio vazio: logo enviado pelo chamador continua
+    # mandando. Banco sem PNG empacotado devolve None e o layout cai na sigla,
+    # como antes — nunca no logo de outro banco.
+    if getattr(boleto, "logo", None) is None:
+        boleto.logo = logo_do_banco(boleto.codigo)
     return boleto
 
 

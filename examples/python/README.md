@@ -32,18 +32,35 @@ rodar contra outro ambiente, edite a constante do script
 
 | Script | O que faz | Saída |
 |---|---|---|
+| `generate_boleto.py` | **Comece por aqui.** Uma cobrança em `POST /cobranca` + o PDF pela engine, com a conferência da linha digitável | `examples/test_output/boleto.pdf` |
 | `generate_test_boletos.py` | 12 boletos de C6 e Sicoob (padrão e PIX) via `GET /api/boleto`, para conferência visual | PDFs em `examples/test_output/` |
-| `generate_remessa.py` | Arquivo de remessa CNAB via `POST /api/remessa`, com upload de JSON | `.txt` de remessa |
-| `generate_boleto.py` | Smoke de container: constrói a imagem, sobe, chama `POST /api/boleto/multi` e derruba | nenhuma — checa status 2xx |
+| `generate_remessa.py` | Arquivo de remessa CNAB via `POST /api/remessa`, com upload de JSON | `.rem` de remessa |
 
 ```bash
+python examples/python/generate_boleto.py
 python examples/python/generate_test_boletos.py
 python examples/python/generate_remessa.py
 ```
 
-> `generate_boleto.py` roda `docker build`/`docker run`/`docker rm` — precisa de
-> Docker e da porta 8000 livre, e não deve ser apontado para um ambiente que
-> você não queira derrubar.
+Os três **saem com código ≠ 0 quando alguma chamada falha** e imprimem o corpo
+do erro (a API diz qual campo recusou). Para apontar a outro ambiente:
+`API=https://meu-host python examples/python/generate_boleto.py`.
+
+## Os dois eixos: `provider` e `banco`
+
+`provider` diz o **caminho** — `on` (API do banco) ou `off` (engine pyCobrança,
+sem rede e sem convênio) — e `banco` diz a **instituição**:
+
+```jsonc
+{"provider": "off", "banco": "itau"}   // boleto pela engine, layout 341
+{"provider": "on",  "banco": "c6"}     // registrado na API do C6
+{"provider": "c6"}                     // apelido legado do anterior; sai na 3.0.0
+```
+
+`provider=on` exige credencial (`POST /credenciais`) **e** o banco ligado nesta
+instalação. `GET /bancos` responde as duas coisas por banco: `registrado_pronto`
+e `caminho_efetivo`. Com o banco desligado, o `on` é rebaixado para a engine —
+a resposta vem `201` sem ter passado pelo banco.
 
 ## 📚 Dados de teste por banco
 

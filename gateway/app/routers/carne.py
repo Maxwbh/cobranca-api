@@ -24,7 +24,7 @@ def gerar_carne(body: CarneIn, vault: Vault = Depends(get_vault)) -> CarneOut:
     registrado, ele é repassado ao render para o carnê bater com a cobrança.
     """
     provider = build_provider(
-        provider=body.provider, tenant_id=body.tenant_id,
+        provider=body.provider, banco=body.banco, tenant_id=body.tenant_id,
         account_config=body.account_config, vault=vault,
         credentials=body.credentials,
     )

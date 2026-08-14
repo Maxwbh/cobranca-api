@@ -6,6 +6,16 @@
 -- título passa a existir na CIP. O offline só GERA o documento localmente.
 --
 -- Fluxo: credenciais (uma vez) -> token bapi_ -> POST /cobranca
+--
+-- ANTES DE RODAR, confira se a instalacao esta com o C6 LIGADO:
+--
+--   GET /bancos  ->  {"id":"c6", "registrado_pronto":true, "caminho_efetivo":"on"}
+--
+-- Com `C6_REGISTERED_READY` desligado no servidor (o padrao), o caminho online
+-- e REBAIXADO para a engine offline — a chamada responde 201 e o boleto sai
+-- pela engine, sem passar pelo banco. Como o `account_config` deste exemplo tem
+-- so o que a API do C6 pede, a engine devolve `status: erro` com a lista de
+-- campos que faltam, e o motivo real (o gate) nao aparece em lugar nenhum.
 --------------------------------------------------------------------------------
 SET SERVEROUTPUT ON SIZE UNLIMITED
 
@@ -64,7 +74,7 @@ EXCEPTION
     -- Erros que voce VAI encontrar, e o que cada um significa:
     --   424 -> o BANCO recusou a credencial. Nao e falha do servico. No
     --          sandbox do C6 tambem acontece FORA DA JANELA (seg-sex 7h-23h).
-    --   403 -> o token bapi_ nao e deste tenant+provider (ele amarra os dois).
+    --   403 -> o token bapi_ nao e deste tenant+banco (ele amarra os dois).
     --   409 -> registro na CIP ainda em curso: re-tente em alguns segundos.
     DBMS_OUTPUT.put_line('ERRO: ' || SQLERRM);
     RAISE;

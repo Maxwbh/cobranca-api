@@ -137,3 +137,32 @@ fora do git (evidência anexada ao ciclo de HML, com versão da coleção
   contam como sucesso onde o cenário espera.
 - `BC-048/049/050` (Pix recebidos por `e2eid`) precisam de um Pix real no
   sandbox — preencha `{{e2eid}}`; sem ele, respondem 404 (aceito pelo teste).
+- **Request com id encadeado ausente é PULADO, não aborta o run.** O id vem da
+  resposta anterior; quando ela falha (janela do sandbox, credencial ausente), a
+  URL colapsaria em 405 — falha enganosa. O nome do pulado sai no `pulados` do
+  environment e o encerramento (`ZZ`) reclama se algum for do smoke.
+
+## Os dois eixos: `provider` (caminho) e `banco` (instituição)
+
+`provider` diz **por onde** — `on` = API do banco, `off` = engine pyCobrança — e
+`banco` diz **qual instituição**. O nome do banco no `provider` (`provider=c6`)
+segue valendo como apelido; é o que a maior parte da coleção usa, de propósito:
+é a forma que está em produção e no roteiro já enviado ao banco.
+
+| Request | O que fixa |
+|---|---|
+| `BC-004` | o catálogo responde `caminhos`, e cada banco REST diz `registrado_pronto`, `fallback_offline` e `caminho_efetivo` |
+| `BC-090` | mesma emissão do `BC-018`, na forma nova (`provider=off` + `banco`) — se as duas divergirem, a migração quebra quem já integrou |
+| `NEG-008` | `on` em banco sem API REST → `422` com a lista de quem tem |
+| `NEG-009` | `off` no Inter → `422` (a engine não tem o layout 077; cair em outro banco registraria no lugar errado) |
+| `NEG-010` | caminho sem `banco` → `422`: a API não escolhe banco sozinha |
+
+## Webhook de entrada: `webhook_token`
+
+`POST /webhooks/{banco}` é **fail-closed** desde a 2.2.0 — sem `?token=`
+conferindo com `WEBHOOK_TOKEN__<BANCO>` no servidor, responde `401` antes de
+olhar o corpo. `BC-066/067` afirmam os dois lados:
+
+- `webhook_token` **vazio** → exige `401` (é o fail-closed que se quer provar);
+- `webhook_token` **preenchido** (`COB_WEBHOOK_TOKEN`, igual ao do servidor) →
+  exige `200`/`422`, exercitando a entrega de verdade.

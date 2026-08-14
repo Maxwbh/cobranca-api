@@ -11,6 +11,12 @@
 --
 -- A URL do Render vem do NOME do servico e muda se ele for renomeado,
 -- recriado ou apontado para dominio proprio. Defina g_base_url no seu schema.
+--
+-- SOBRE `p_provider`: a API tem DOIS eixos — `provider` diz o CAMINHO (`on` =
+-- API do banco, `off` = engine pyCobranca) e `banco` diz a INSTITUICAO. Este
+-- pacote passa o NOME DO BANCO no `provider` ('c6', 'sicoob'), que a API aceita
+-- como apelido de `on` + `banco` e mantem por compatibilidade ate a 3.0.0.
+-- Enquanto isso, nada aqui precisa mudar.
 --------------------------------------------------------------------------------
 CREATE OR REPLACE PACKAGE cobranca_api AS
 
@@ -68,7 +74,7 @@ CREATE OR REPLACE PACKAGE cobranca_api AS
                                  p_credenciais_json IN CLOB) RETURN VARCHAR2;
 
   -- Cobranca REGISTRADA na API do banco (c6 | sicoob) — POST /cobranca.
-  -- Exige g_token do MESMO tenant+provider (o token e amarrado aos dois).
+  -- Exige g_token do MESMO tenant+banco (o token e amarrado aos dois).
   FUNCTION registrar_cobranca(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
                               p_boleto IN t_boleto,
                               p_account_config_json IN VARCHAR2 DEFAULT '{}')
@@ -350,7 +356,7 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
     l_val  VARCHAR2(40);
   BEGIN
     -- 424 = o BANCO recusou a credencial (nao e erro do servico).
-    -- 403 = o token nao pertence a este tenant+provider: o bapi_ e amarrado
+    -- 403 = o token nao pertence a este tenant+banco: o bapi_ e amarrado
     --       aos dois, entao token do C6 em rota Sicoob e recusado de proposito.
     l_val := TO_CHAR(p_boleto.valor, 'FM9999999990.00',
                      'NLS_NUMERIC_CHARACTERS=''.,''');

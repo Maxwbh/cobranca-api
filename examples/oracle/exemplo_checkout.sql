@@ -77,7 +77,7 @@ EXCEPTION
     --          `detail` da resposta diz qual campo.
     --   424 -> o BANCO recusou a credencial. No sandbox do C6 tambem acontece
     --          FORA DA JANELA (seg-sex 7h-23h).
-    --   403 -> o token bapi_ nao e deste tenant+provider.
+    --   403 -> o token bapi_ nao e deste tenant+banco.
     DBMS_OUTPUT.put_line('ERRO: ' || SQLERRM);
     RAISE;
 END;

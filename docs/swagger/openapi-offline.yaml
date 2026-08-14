@@ -14,7 +14,7 @@ info:
 
     ## Offline (`/api/*`) × Gateway (raiz) — quando usar cada um
 
-    | | **Offline (esta doc)** | **Gateway REST** ([Swagger `/docs`](/docs)) |
+    | | **Offline (esta doc)** | **Gateway REST** ([Swagger `/docs`](./index.html)) |
     |---|---|---|
     | O que faz | GERA o documento (boleto/CNAB) localmente | REGISTRA a cobrança na API online do banco (C6, Sicoob) |
     | Boleto | Não registrado (o banco só conhece no pagamento) | **Registrado** (CIP, em tempo real) + Pix, Bolepix, webhooks |
@@ -23,7 +23,7 @@ info:
 
     > **Autenticação:** esta superfície não tem `securitySchemes` de propósito.
     > O mecanismo `bapi_` pertence ao gateway e está documentado no
-    > [Swagger do gateway](/docs).
+    > [Swagger do gateway](./index.html).
 
     ## Como testar
 

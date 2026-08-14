@@ -16,9 +16,27 @@
 ## Conceitos
 
 - **`tenant_id`** — escopo de cada conta/cliente (multi-tenant).
-- **`provider`** — roteamento: `c6`, `sicoob` e `inter` = API REST do banco;
-  **vazio/omitido** ou `pycobranca` = CNAB offline (engine pyCobrança, 100%
-  Python). Pix e conciliação exigem provider REST (senão **422**).
+- **`provider`** — o **caminho**, e só ele: `on` = API REST do banco (OAuth2 +
+  mTLS, exige credencial); `off` (default; **vazio/omitido** equivale) = CNAB
+  offline pela engine pyCobrança, 100% Python, sem rede e sem convênio. Pix e
+  conciliação só existem `on` (senão **422**).
+- **`banco`** — a **instituição**: `c6`, `sicoob`, `inter`, `itau`,
+  `banco_brasil`… Trocar de mundo é trocar o `provider`; o `banco` fica. No
+  caminho `off` o banco também pode continuar vindo em `account_config.bank`,
+  como sempre veio.
+
+  > Os dois eixos eram um campo só, e o preço aparecia na borda: "qual banco"
+  > vivia no `provider` quando online e dentro do `account_config` quando
+  > offline — não havia como dizer *"esse banco, pelo outro caminho"*.
+  >
+  > **O nome do banco no `provider` continua aceito** (`provider=c6` =
+  > `provider=on&banco=c6`): há integração em produção e roteiro de homologação
+  > já enviado ao banco com esses payloads. O apelido sai na 3.0.0.
+  >
+  > Combinação que não existe falha alto, com a lista de quem tem:
+  > `provider=on&banco=bradesco` → `422` (não há API REST do Bradesco aqui);
+  > `provider=off&banco=inter` → `422` (a engine não tem o layout 077, e cair em
+  > outro banco emitiria boleto registrado no lugar errado).
 - **Criação responde `201` com `Location`** — `POST /cobranca`, `/carne`,
   `/pix` e `/checkout`. O `Location` já vem com `tenant_id` e `provider`, então
   é seguível como está. `PUT /pix/lote/{id}` responde **`202`**: o banco
@@ -27,42 +45,62 @@
   1. `Authorization: Bearer bapi_...` — token do `/credenciais` (recomendado);
   2. `credentials` no corpo (POSTs) ou header `X-Bank-Credentials`
      (JSON base64, GET/DELETE) — stateless, só memória;
-  3. cofre do servidor `VAULT__<tenant>__<provider>__*` (env, fallback).
+  3. cofre do servidor `VAULT__<tenant>__<banco>__*` (env, fallback) — a chave
+     é o **banco** (`VAULT__empresa_123__C6__CLIENT_ID`), não o caminho.
 
 ## 🏦 Descoberta: `GET /bancos`
 
-Lista os bancos/providers, suas **capacidades reais** (introspectadas do código —
-nunca desatualiza) e o contrato único de autenticação:
+Lista os bancos, os **caminhos** de cada um, suas **capacidades reais**
+(introspectadas do código — nunca desatualiza) e o contrato único de
+autenticação:
 
 ```bash
 curl http://localhost:8000/bancos
-# → {"autenticacao_api": {...},
+# → {"caminhos": {"on": "API do banco...", "off": "engine pyCobrança..."},
+#    "autenticacao_api": {...},
 #    "bancos": [
 #      {"id": "c6", "codigo_banco": "336", "tipo": "rest",
+#       "caminhos": ["on", "off"], "registrado_pronto": true,
+#       "fallback_offline": "banco_c6", "caminho_efetivo": "on",
+#       "flag": "C6_REGISTERED_READY",
 #       "capacidades": ["boleto", "boleto_alteracao", "boleto_baixa", "boleto_pdf",
 #                       "bolepix", "checkout_cartao", "conciliacao_cartao", "extrato",
 #                       "pix", "pix_automatico", "pix_lote", "pix_recebidos",
 #                       "pix_revisao", "webhook_banco", "webhook_pix_por_chave"]},
 #      {"id": "sicoob", "codigo_banco": "756", "tipo": "rest", ...},
-#      {"id": "inter",  "codigo_banco": "077", "tipo": "rest", ...},
+#      {"id": "inter",  "codigo_banco": "077", "tipo": "rest",
+#       "caminhos": ["on"], "fallback_offline": null, ...},
 #      {"id": "pycobranca", "tipo": "offline", "bancos_cnab": [18 bancos]}]}
 ```
+
+**`capacidades` fala do banco; os quatro campos novos falam desta instalação.**
+São perguntas diferentes: "o C6 emite boleto registrado?" e "este container vai
+emitir pelo C6?". Enquanto `<BANCO>_REGISTERED_READY` estiver desligado, o
+caminho `on` é **rebaixado para a engine** — `registrado_pronto: false` e
+`caminho_efetivo: "off"` dizem isso antes de o integrador descobrir pelo boleto.
+`fallback_offline: null` (Inter) significa que não há para onde cair.
 
 Antes de chamar qualquer operação, o sistema consumidor pode checar se o banco
 do tenant suporta a capacidade. Nem todo banco faz tudo, e as diferenças são
 reais:
 
-| Capacidade | C6 (336) | Sicoob (756) | Inter (077) |
-|---|:--:|:--:|:--:|
-| Boleto — emitir, consultar, PDF, baixar | ✅ | ✅ | ✅ |
-| Boleto — **alterar** (`PUT /cobranca/{id}`) | ✅ | — | — |
-| Pix BACEN — cob/cobv, lote, revisão, recebidos | ✅ | ✅ | ✅ |
-| Pix Automático | ✅ | ✅ | ✅ ¹ |
-| Extrato da conta PJ | ✅ | ✅ | ✅ |
-| Webhook **cadastrado no banco** | ✅ | — | ✅ |
-| Bolepix (boleto com QR EVP) | ✅ | — | — |
-| Checkout de cartão | ✅ | — | — |
-| Conciliação de adquirência (C6 Pay) | ✅ | — | — |
+| Capacidade | C6 (336) | Sicoob (756) | Inter (077) | Itaú (341) ² |
+|---|:--:|:--:|:--:|:--:|
+| Boleto — emitir, consultar, baixar | ✅ | ✅ | ✅ | ✅ |
+| Boleto — **PDF pela API do banco** | ✅ | ✅ | ✅ | **—** |
+| Boleto — **alterar** (`PUT /cobranca/{id}`) | ✅ | — | — | ✅ |
+| Pix BACEN — cob/cobv, lote, revisão, recebidos | ✅ | ✅ | ✅ | — |
+| Pix Automático | ✅ | ✅ | ✅ ¹ | — |
+| Extrato da conta PJ | ✅ | ✅ | ✅ | — |
+| Webhook **cadastrado no banco** | ✅ | — | ✅ | — |
+| Bolepix (boleto com QR EVP) | ✅ | — | — | — |
+| Checkout de cartão | ✅ | — | — | — |
+| Conciliação de adquirência (C6 Pay) | ✅ | — | — | — |
+
+² **Itaú é esqueleto**, desligado por padrão (`ITAU_REGISTERED_READY`): sem a
+flag, `provider=itau` emite pela engine offline, que tem o layout 341. Pix e
+webhook ficam de fora até o contrato ser confirmado — ver
+[itau-rest.md](../development/itau-rest.md).
 
 ¹ O dialeto é BACEN e o provider o implementa, mas o **produto precisa estar
 habilitado na conta**: na homologação o sandbox do Inter respondeu que a conta
@@ -71,6 +109,20 @@ não tem Pix Automático contratado. Capacidade declarada ≠ produto liberado.
 A tabela acima é reprodução; a **fonte é o `GET /bancos`**, que introspecta as
 classes de provider e por isso não envelhece. Pedir o que o banco não tem
 responde **422 dizendo para onde ir**, não 500.
+
+
+> **PDF nem sempre vem do banco.** C6, Sicoob e Inter devolvem o PDF em base64
+> na própria API. O **Itaú não devolve** — a API dele responde linha digitável e
+> código de barras. Quando o banco não fornece, `GET /cobranca/{id}/pdf` responde
+> `422` **com o caminho pronto**: renderizar pela engine em
+> `POST /api/render/boleto`, com o `bank` do banco e **os dados que o banco
+> registrou**.
+>
+> A ressalva não é formalidade. O código de barras é **determinístico** — função
+> de banco, vencimento, valor, agência/conta/carteira e nosso número —, então
+> renderizar com um nosso número diferente do registrado produz um boleto que o
+> pagador paga e ninguém concilia. **Compare a linha digitável calculada pela
+> engine com a que o banco devolveu antes de entregar.**
 
 ## 🔐 Autenticação — mecanismo único da API, esquema próprio por banco
 
@@ -185,9 +237,15 @@ curl -X DELETE http://localhost:8000/credenciais \
 ## 🧾 Cobrança (boleto)
 
 ### `POST /cobranca`
-Registra a cobrança no provider. Com `provider=c6` (e `C6_REGISTERED_READY=true`)
+Registra a cobrança. Com `provider=on&banco=c6` (e `C6_REGISTERED_READY=true`)
 usa a API REST do banco; senão renderiza offline na engine pyCobrança, no mesmo
-processo.
+processo. `provider=off&banco=<qualquer um dos 18>` vai direto à engine.
+
+```jsonc
+{"provider": "on",  "banco": "c6"}     // API do C6
+{"provider": "off", "banco": "c6"}     // mesmo banco, boleto pela engine
+{"provider": "c6"}                     // apelido legado do primeiro (sai na 3.0.0)
+```
 
 > **`provider=inter` não tem esse fallback, de propósito.** A engine offline não
 > tem o layout do 077: cair nela emitiria um boleto **registrado no banco
