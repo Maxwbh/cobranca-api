@@ -37,9 +37,9 @@ TAGS = [
                     "`provider=off` emite pela engine pyCobrança; `banco` diz qual instituição. "
                     f"Docs oficiais: [C6 Boleto]({_DOC_C6}/apis/bankslip) · [Sicoob Cobrança v3]({_DOC_SICOOB}) · "
                     f"[Inter Cobrança v3]({_DOC_INTER}).\n\n"
-                    "**Alterar (`PUT`) hoje só existe no C6** — no Sicoob e no Inter o caminho é "
-                    "baixar e reemitir, e a rota responde `422` dizendo isso.\n\n"
-                    "**PDF nem sempre vem do banco.** C6 e Inter devolvem em base64; o **Itaú "
+                    "**Alterar (`PUT`) existe no C6 e no Itaú** — no Sicoob e no Inter o caminho "
+                    "é baixar e reemitir, e a rota responde `422` dizendo isso.\n\n"
+                    "**PDF nem sempre vem do banco.** C6, Sicoob e Inter devolvem em base64; o **Itaú "
                     "não devolve** — a API dele responde linha digitável e código de barras, e o "
                     "PDF sai da engine (`POST /api/render/boleto`, `bank=itau`), com **os dados "
                     "que o banco registrou**. O código de barras é determinístico: renderizar com "
@@ -99,9 +99,12 @@ app = FastAPI(
     license_info={"name": "MIT", "url": "https://github.com/Maxwbh/cobranca-api/blob/main/LICENSE"},
     openapi_tags=TAGS,
     description=(
-        "Serviço único de cobrança **100% Python** — **3 bancos ON** "
-        "(**C6** 336 · **Sicoob** 756 · **Inter** 077) **e 18 OFF** pela engine "
-        "[pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
+        "Serviço único de cobrança **100% Python** — **4 bancos ON** "
+        "(**C6** 336 · **Sicoob** 756 · **Inter** 077 · **Itaú** 341) **e 18 OFF** "
+        "pela engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
+        "O Itaú entra com o provider REST implementado e **desligado por padrão** "
+        "(`ITAU_REGISTERED_READY`): sem a flag, ele emite pela engine, que tem o "
+        "layout 341. `GET /bancos` diz o que **esta instalação** faz com cada um.\n\n"
         "**Dois eixos, dois campos:** `provider` é o **caminho** — `on` (API do "
         "banco) ou `off` (engine pyCobrança) — e `banco` é a **instituição** "
         "(`c6`, `sicoob`, `itau`, `banco_brasil`…). Trocar de caminho é trocar "
@@ -439,8 +442,8 @@ def swagger_ui() -> HTMLResponse:
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Gateway (Swagger)",
         superficie="Gateway REST · multi-banco",
-        pill="3 bancos ON · 18 OFF",
-        detalhe=f"v{app.version} · C6 · Sicoob · Inter · Pix BACEN",
+        pill="4 bancos ON · 18 OFF",
+        detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
                ("Offline / pyCobrança →", "/api/docs", True)],
         spec_url="/openapi.json",

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 430" width="680" height="430"
-     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 3 bancos online (C6, Sicoob, Inter) e 18 offline, 100% Python, licença MIT.">
+     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline, 100% Python, licença MIT.">
   <!-- GERADO por scripts/gerar-banners.py — nao edite a mao. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">

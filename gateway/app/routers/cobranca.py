@@ -136,7 +136,7 @@ def pdf(
 ) -> CobrancaOut:
     """PDF do boleto registrado — **quando o banco fornece**.
 
-    C6 e Inter devolvem o PDF em base64. O **Itaú não**: a API dele responde
+    C6, Sicoob e Inter devolvem o PDF em base64. O **Itaú não**: a API dele responde
     linha digitável e código de barras, e o desenho é renderizar pela engine,
     que já tem o layout 341. Nesse caso a rota responde `422` dizendo o caminho
     exato — `POST /api/render/boleto` com `bank` do banco e **os dados que o
@@ -201,7 +201,7 @@ def alterar(
     try:
         return p.alterar(cobranca_id, campos)
     except NotImplementedError as e:
-        raise HTTPException(status_code=422, detail="provider não suporta alteração online") from e
+        raise HTTPException(status_code=422, detail="este banco não suporta alteração online; baixe e reemita") from e
 
 
 @router.delete("/{cobranca_id}", response_model=CobrancaOut)

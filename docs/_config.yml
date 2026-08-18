@@ -7,7 +7,7 @@
 title: Cobranca-API
 description: >-
   Cobrança bancária brasileira em API REST: boleto, CNAB 240/400, Pix,
-  Pix Automático e OFX. 3 bancos online (C6, Sicoob, Inter) e 18 offline,
+  Pix Automático e OFX. 4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline,
   100% Python, um container.
 theme: jekyll-theme-cayman
 lang: pt-BR

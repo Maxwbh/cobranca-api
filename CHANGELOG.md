@@ -17,6 +17,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Swagger publicado no site**, gerado do código e sem depender do serviço no
+  ar: [gateway](https://maxwbh.github.io/cobranca-api/swagger/) e
+  [offline](https://maxwbh.github.io/cobranca-api/swagger/offline.html).
 - Boleto sai com o **logo do banco emissor** no cabeçalho, por padrão, em todos
   os caminhos (avulso, lote, carnê e fatura). Citibank não tem marca empacotada
   e segue com a sigla; `logo` em `data` continua sobrepondo.

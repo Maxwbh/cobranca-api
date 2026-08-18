@@ -1,29 +1,30 @@
 <p align="center">
   <picture>
     <source media="(max-width: 600px)" srcset="./docs/assets/banner-mobile.svg" />
-    <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária: online nas APIs de 3 bancos (C6, Sicoob e Inter — boleto registrado, Pix, Pix Automático, cartão, Bolepix, conciliação) e offline na engine embutida (boleto PDF, CNAB 240/400, carnê, OFX) para 18 bancos" width="100%" />
+    <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária: online nas APIs de 4 bancos (C6, Sicoob, Inter e Itaú — boleto registrado, Pix, Pix Automático, cartão, Bolepix, conciliação) e offline na engine embutida (boleto PDF, CNAB 240/400, carnê, OFX) para 18 bancos" width="100%" />
   </picture>
 </p>
 
 <h1 align="center">Plataforma Open Source de Cobrança Bancária para o Brasil</h1>
 
 <p align="center">
-  <a href="https://cobranca-api-sq67.onrender.com/docs"><strong>Swagger Online →</strong></a> &nbsp;·&nbsp;
-  <a href="https://cobranca-api-sq67.onrender.com/api/docs"><strong>Swagger Offline →</strong></a> &nbsp;·&nbsp;
+  <a href="https://maxwbh.github.io/cobranca-api/swagger/"><strong>Swagger (gateway) →</strong></a> &nbsp;·&nbsp;
+  <a href="https://maxwbh.github.io/cobranca-api/swagger/offline.html"><strong>Swagger (offline) →</strong></a> &nbsp;·&nbsp;
+  <a href="https://cobranca-api-sq67.onrender.com/docs"><strong>Demo ao vivo →</strong></a> &nbsp;·&nbsp;
   <a href="https://github.com/Maxwbh/pyCobranca"><strong>Engine PyCobrança →</strong></a>
 </p>
 
 <!-- Badges VIVOS, não decorativos: CI, versão, licença e stars saem da API do
      GitHub e mudam sozinhos. Badge estático `shields.io/badge/...` afirma o que
      ninguém verifica — um CI quebrado atrás de um selo verde fixo é pior do que
-     nenhum selo. Os dois últimos continuam informativos (19 bancos — 3 online
+     nenhum selo. Os dois últimos continuam informativos (19 bancos — 4 online
      + 18 offline —, OpenAPI) porque são contrato, não métrica. -->
 <p align="center">
   <a href="https://github.com/Maxwbh/cobranca-api/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Maxwbh/cobranca-api/ci.yml?branch=main&style=for-the-badge&label=build&labelColor=0F172A" alt="Status do build" /></a>
   <a href="https://github.com/Maxwbh/cobranca-api/releases/latest"><img src="https://img.shields.io/github/v/release/Maxwbh/cobranca-api?style=for-the-badge&label=vers%C3%A3o&color=1E40AF&labelColor=0F172A" alt="Última versão" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/Maxwbh/cobranca-api?style=for-the-badge&color=10B981&labelColor=0F172A" alt="Licença MIT" /></a>
   <a href="https://github.com/Maxwbh/cobranca-api/stargazers"><img src="https://img.shields.io/github/stars/Maxwbh/cobranca-api?style=for-the-badge&color=F59E0B&labelColor=0F172A" alt="Stars" /></a>
-  <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 3 online (C6, Sicoob, Inter) e 18 offline" />
+  <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 4 online (C6, Sicoob, Inter, Itaú) e 18 offline" />
   <img src="https://img.shields.io/badge/OpenAPI-3.0_·_3.1-6BA539?style=for-the-badge&labelColor=0F172A" alt="OpenAPI 3.0 e 3.1" />
 </p>
 
@@ -304,7 +305,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 
 - **100% Python** — Engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) **in-process**: um runtime, um container, sem sidecar
 - **18 bancos offline** — boleto + CNAB (15 bancos com remessa, 26 combinações banco×layout, 7 com segmento PIX)
-- **Boleto registrado via API** — C6, Sicoob e Inter: Pix, Bolepix, Pix Automático, extrato e conciliação. Nem todo banco faz tudo, e `GET /bancos` responde a matriz exata por introspecção do código
+- **Boleto registrado via API** — C6, Sicoob, Inter e Itaú (341, desligado por padrão até `ITAU_REGISTERED_READY`): Pix, Bolepix, Pix Automático, extrato e conciliação. Nem todo banco faz tudo, e `GET /bancos` responde a matriz exata por introspecção do código
 - **Link de pagamento com cartão** — `POST /checkout` no C6: crédito ou débito, à vista ou parcelado, com Pix no mesmo link. O cartão é digitado na página do banco; PAN nunca passa por aqui
 - **Lote assíncrono** — `POST /jobs/boletos` e `/jobs/cnab/remessas`: 202 + `job_id`, falha por item isolada, artefatos com `sha256` e webhook de conclusão
 - **Credenciais zero-knowledge** — token `bapi_`; o servidor não decifra sem ele
