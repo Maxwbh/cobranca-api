@@ -86,7 +86,57 @@ jobs:
           from openapi_spec_validator.validation import (openapi_v30_spec_validator,
                                                           openapi_v31_spec_validator)
 
-          core = yaml.safe_load(open('docs/openapi.yaml'))
+          bruto = open('docs/openapi.yaml', encoding='utf-8').read()
+
+          # CHAVE DUPLICADA é o defeito mais silencioso possível num YAML
+          # escrito à mão: `safe_load` fica com a ÚLTIMA e não avisa. Uma rota
+          # ou um schema inteiro pode sumir da doc publicada sem que nada
+          # quebre — a spec segue válida, só que menor.
+          class _Dup(yaml.SafeLoader):
+              pass
+
+          _repetidas = []
+
+          def _mapa(loader, node, deep=False):
+              vistas = {}
+              for k, _ in node.value:
+                  chave = loader.construct_object(k, deep=deep)
+                  if chave in vistas:
+                      _repetidas.append(f"{chave!r} (linhas {vistas[chave]} e "
+                                        f"{k.start_mark.line + 1})")
+                  vistas[chave] = k.start_mark.line + 1
+              return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+          _Dup.construct_mapping = _mapa
+          core = yaml.load(bruto, _Dup)
+          if _repetidas:
+              print('CORE: chave duplicada —', '; '.join(_repetidas))
+              sys.exit(1)
+
+          # `on`, `off`, `yes` e `no` SEM ASPAS são booleanos no YAML 1.1
+          # (PyYAML, Ruby) e texto no 1.2 (Go, js-yaml). Vale dobrado aqui: o
+          # vocabulário do produto é `provider=on|off`, e um `enum: [on, off]`
+          # sairia `[true, false]` no /api/openapi.json e `["on", "off"]` para
+          # quem lesse o /api/openapi.yaml com um parser 1.2.
+          import re as _re
+          _ambiguos = [f'linha {n}: {l.strip()}'
+                       for n, l in enumerate(bruto.split('\n'), 1)
+                       if _re.search(r'(?::\s+|^\s*-\s+)(on|off|yes|no)\s*$', l, _re.I)]
+          if _ambiguos:
+              print('CORE: escalar ambíguo entre YAML 1.1 e 1.2 (ponha aspas) —',
+                    '; '.join(_ambiguos))
+              sys.exit(1)
+
+          # A spec offline é servida como JSON em /api/openapi.json e como o
+          # YAML cru em /api/openapi.yaml. Valor que o YAML entende e o JSON
+          # não — data sem aspas é o caso clássico — faria as duas rotas
+          # responderem coisas diferentes para o mesmo campo.
+          import json as _json
+          try:
+              _json.dumps(core)
+          except TypeError as e:
+              print('CORE: valor não expressável em JSON ->', e)
+              sys.exit(1)
           errs = list(openapi_v30_spec_validator.iter_errors(core))
           for e in errs:
               print('CORE:', '/'.join(map(str, e.absolute_path)), '->', e.message[:160])
@@ -110,5 +160,11 @@ jobs:
       # ninguém desconfia dela.
       - name: Swagger do site em dia com o código
         run: PYTHONPATH=gateway python scripts/gerar-swagger-estatico.py --conferir
+      # A referência da API não envelhece com erro — envelhece com OMISSÃO: a
+      # rota nova entra, o Swagger a mostra, e o guia não a menciona. Ninguém
+      # percebe, porque nada fica errado; só fica faltando. Foi assim que ele
+      # chegou a 31 de 67 rotas.
+      - name: Referência da API cobre todas as rotas do gateway
+        run: PYTHONPATH=gateway python scripts/check_referencia_rotas.py
       - name: Test (gateway Python/FastAPI)
         run: cd gateway && PYTHONPATH=. pytest -v

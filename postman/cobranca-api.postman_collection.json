@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Cobranca-API — Cenário de Teste HML",
-    "description": "Coleção v3.6.0 do plano docs/development/plano-cenario-teste-postman-hml.md.\n\n**Rastreabilidade:** cada request tem ID (BC-xxx funcional, NEG-xxx negativo, SMK smoke) ligado à matriz §4 do plano e aos testes T1–T10 do roadmap de migração.\n\n**Smoke (pre-deploy, <5min):** `newman run ... --folder 'SMK · Smoke (pre-deploy, < 5 min)'`\n**Regressão completa:** rodar a coleção inteira (ordem 00→NEG).\n\n**Catálogo de serviços:** as descrições citam IDs `C6-Sxx`/`SIC-Sxx` — o catálogo completo de serviços de cada banco (inclusive não implementados) vive em docs/development/<banco>-rest.md, seção \"Serviços do banco × Cobranca-API\".\n\n**Fixtures:** os uploads usam spec/fixtures/ do repositório — rodar newman a partir da raiz do repo (Postman UI: Working Directory = raiz do repo).",
+    "description": "Coleção v3.6.0 do serviço único (REST online na raiz + offline em /api/*).\n\n**Rastreabilidade:** cada request tem ID (BC-xxx funcional, NEG-xxx negativo, SMK smoke) ligado à matriz de rastreabilidade e aos critérios T1–T10 em postman/README.md.\n\n**Smoke (pre-deploy, <5min):** `newman run ... --folder 'SMK · Smoke (pre-deploy, < 5 min)'`\n**Regressão completa:** rodar a coleção inteira (ordem 00→NEG).\n\n**Catálogo de serviços:** as descrições citam IDs `C6-Sxx`/`SIC-Sxx` — o catálogo completo de serviços de cada banco (inclusive não implementados) vive em docs/development/<banco>-rest.md, seção \"Serviços do banco × Cobranca-API\".\n\n**Fixtures:** os uploads usam postman/fixtures/ do repositório — rodar newman a partir da raiz do repo (Postman UI: Working Directory = raiz do repo).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -6878,7 +6878,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 201, 424], [\"C6\"]);"
+                  "statusEsperado([200, 201, 424], [\"C6\", \"chave_pix\"]);"
                 ]
               }
             },

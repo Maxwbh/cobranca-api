@@ -20,8 +20,8 @@
         "tags": [
           "bancos"
         ],
-        "summary": "Listar",
-        "description": "Bancos disponíveis, caminho (on/off) de cada um, capacidades reais e como autenticar.",
+        "summary": "Catálogo de bancos desta instalação",
+        "description": "Bancos disponíveis, caminho (on/off) de cada um, capacidades reais e como autenticar.\n\nÉ a rota para onde o resto da documentação manda quem precisa da matriz\nexata — e ela respondia com `summary: \"Listar\"` e schema \"objeto qualquer\".\nOs campos que decidem integração estão descritos no schema da resposta.",
         "operationId": "listar_bancos_get",
         "responses": {
           "200": {
@@ -29,8 +29,133 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "properties": {
+                    "caminhos": {
+                      "type": "object",
+                      "description": "O que `on` e `off` significam, e o apelido legado."
+                    },
+                    "autenticacao_api": {
+                      "type": "object",
+                      "description": "Como autenticar — igual para todos os bancos."
+                    },
+                    "bancos": {
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Valor aceito em `banco` (e no `provider` legado).",
+                            "example": "c6"
+                          },
+                          "nome": {
+                            "type": "string",
+                            "example": "C6 Bank"
+                          },
+                          "codigo_banco": {
+                            "type": "string",
+                            "description": "COMPE. `null` no registro da engine, que não é um banco.",
+                            "example": "336",
+                            "nullable": true
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "rest",
+                              "offline"
+                            ]
+                          },
+                          "caminhos": {
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "on",
+                                "off"
+                              ]
+                            },
+                            "type": "array",
+                            "description": "Caminhos que ESTE banco tem. O Inter só tem `on`: não há layout offline dele, e cair na engine emitiria um boleto de outro banco.",
+                            "example": [
+                              "on",
+                              "off"
+                            ]
+                          },
+                          "registrado_pronto": {
+                            "type": "boolean",
+                            "description": "A flag desta instalação está ligada."
+                          },
+                          "caminho_efetivo": {
+                            "type": "string",
+                            "enum": [
+                              "on",
+                              "off"
+                            ],
+                            "description": "**O que acontece de fato** ao pedir `provider=on` agora. Com a flag desligada e havendo fallback, vira `off` — a chamada responde `201` sem ter passado pelo banco."
+                          },
+                          "fallback_offline": {
+                            "type": "string",
+                            "description": "Slug da engine usado quando o `on` é rebaixado.",
+                            "example": "banco_c6",
+                            "nullable": true
+                          },
+                          "flag": {
+                            "type": "string",
+                            "description": "Variável de ambiente que liga o caminho `on`.",
+                            "example": "C6_REGISTERED_READY"
+                          },
+                          "capacidades": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array",
+                            "description": "Introspectadas das classes de provider — método sobrescrito = capacidade real, então a lista não envelhece com o código.",
+                            "example": [
+                              "boleto",
+                              "pix",
+                              "pix_consulta",
+                              "webhook_entrada"
+                            ]
+                          },
+                          "credentials": {
+                            "type": "object",
+                            "description": "Esquema de credenciais DESTE banco, para o `POST /credenciais`. O mecanismo é um só; os campos são de cada instituição."
+                          },
+                          "bancos_cnab": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array",
+                            "description": "Só no registro da engine: os 18 slugs do catálogo offline."
+                          },
+                          "observacao": {
+                            "type": "string",
+                            "description": "Só no registro da engine: quando ela entra sem ninguém pedir."
+                          },
+                          "sandbox": {
+                            "type": "string"
+                          },
+                          "documentacao": {
+                            "type": "string",
+                            "example": "docs/development/c6-rest.md"
+                          }
+                        },
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "nome",
+                          "tipo",
+                          "caminhos",
+                          "capacidades"
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  },
                   "additionalProperties": true,
                   "type": "object",
+                  "required": [
+                    "caminhos",
+                    "autenticacao_api",
+                    "bancos"
+                  ],
                   "title": "Response Listar Bancos Get"
                 }
               }
@@ -142,7 +267,7 @@
         "tags": [
           "cobranca"
         ],
-        "summary": "Registrar",
+        "summary": "Registrar cobrança (boleto)",
         "description": "Registra a cobrança (boleto). Dois eixos: `provider` diz o **caminho** —\n`on` = API REST do banco, `off` (default) = CNAB offline pela engine\npyCobrança — e `banco` diz a **instituição** (`c6`, `sicoob`, `itau`…).\n\nO nome do banco no `provider` (`provider=c6`) segue aceito como apelido de\n`on` + `banco`, e sai na 3.0.0. Resposta normalizada, igual nos dois\ncaminhos. Combinação que não existe responde `422` dizendo quais existem.",
         "operationId": "registrar_cobranca_post",
         "parameters": [
@@ -177,7 +302,7 @@
         },
         "responses": {
           "201": {
-            "description": "Successful Response",
+            "description": "Cobrança registrada. **Cheque `status`**: por compatibilidade, dados recusados pela engine também respondem `201`, com `status: \"erro\"`, `id: null` e sem `Location`. `COBRANCA_ERRO_HTTP=1` faz esse caso responder `422`, que passa a ser o default na 3.0.0.",
             "content": {
               "application/json": {
                 "schema": {
@@ -187,7 +312,7 @@
             },
             "headers": {
               "Location": {
-                "description": "URL de consulta do recurso criado, já com tenant_id e provider",
+                "description": "URL de consulta do recurso criado, já com tenant_id, provider e banco",
                 "schema": {
                   "type": "string"
                 }
@@ -200,6 +325,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -418,6 +563,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -650,6 +815,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -866,6 +1051,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -940,7 +1145,7 @@
         "tags": [
           "cobranca"
         ],
-        "summary": "Pdf",
+        "summary": "PDF do boleto",
         "description": "PDF do boleto registrado — **quando o banco fornece**.\n\nC6, Sicoob e Inter devolvem o PDF em base64. O **Itaú não**: a API dele responde\nlinha digitável e código de barras, e o desenho é renderizar pela engine,\nque já tem o layout 341. Nesse caso a rota responde `422` dizendo o caminho\nexato — `POST /api/render/boleto` com `bank` do banco e **os dados que o\nbanco registrou**.\n\nA ressalva do `422` não é formalidade: o código de barras é determinístico,\nentão renderizar com um nosso número diferente do registrado produz um\nboleto que ninguém concilia. Confira a linha digitável calculada contra a\nque o banco devolveu antes de entregar ao pagador.",
         "operationId": "pdf_cobranca__cobranca_id__pdf_get",
         "parameters": [
@@ -1084,6 +1289,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -1158,18 +1383,38 @@
         "tags": [
           "carne"
         ],
-        "summary": "Gerar Carne",
-        "description": "Registra N parcelas no provider e monta o carnê (3-vias A4) no engine.\n\nBancos registram cobranças individuais; o PDF de carnê é montado\nin-process pela engine pyCobrança. Quando o banco devolve um nosso_numero\nregistrado, ele é repassado ao render para o carnê bater com a cobrança.",
+        "summary": "Gerar carnê",
+        "description": "Registra N parcelas no provider e monta o carnê (3-vias A4) no engine.\n\nBancos registram cobranças individuais; o PDF de carnê é montado\nin-process pela engine pyCobrança. Quando o banco devolve um nosso_numero\nregistrado, ele é repassado ao render para o carnê bater com a cobrança.\n\n**Tudo que dá para recusar é recusado ANTES do registro**: lote acima do\nteto, parcela duplicada, banco sem layout e dado que a engine não desenha.\nDepois do primeiro `registrar` existe boleto no banco, e um erro ali deixa\ntítulos vivos que a resposta não menciona.",
         "operationId": "gerar_carne_carne_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bearer bapi_... (token do /credenciais)",
+              "title": "Authorization"
+            },
+            "description": "Bearer bapi_... (token do /credenciais)"
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CarneIn"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -1182,12 +1427,35 @@
               }
             }
           },
+          "413": {
+            "description": "Lote acima de 200 parcelas"
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -1307,6 +1575,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -1519,6 +1807,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso é transitório e a mesma chamada funciona em instantes.",
             "content": {
@@ -1612,14 +1920,16 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/StatusItem"
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "Filtra por estado do item",
               "title": "Status"
-            }
+            },
+            "description": "Filtra por estado do item"
           },
           {
             "name": "limite",
@@ -1628,9 +1938,12 @@
             "schema": {
               "type": "integer",
               "maximum": 500,
+              "minimum": 1,
+              "description": "Itens por página (1 a 500)",
               "default": 100,
               "title": "Limite"
-            }
+            },
+            "description": "Itens por página (1 a 500)"
           },
           {
             "name": "offset",
@@ -1638,9 +1951,12 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
+              "description": "Itens a pular",
               "default": 0,
               "title": "Offset"
-            }
+            },
+            "description": "Itens a pular"
           }
         ],
         "responses": {
@@ -1663,6 +1979,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -1787,6 +2123,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso é transitório e a mesma chamada funciona em instantes.",
             "content": {
@@ -1888,12 +2244,35 @@
           "404": {
             "description": "Job não encontrado para o tenant."
           },
+          "410": {
+            "description": "Artefatos expirados (retenção vencida)."
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2008,12 +2387,35 @@
           "404": {
             "description": "Job não encontrado para o tenant."
           },
+          "410": {
+            "description": "Artefatos expirados (retenção vencida)."
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2128,12 +2530,35 @@
           "404": {
             "description": "Job não encontrado para o tenant."
           },
+          "410": {
+            "description": "Artefatos expirados (retenção vencida)."
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2243,6 +2668,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2425,6 +2870,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso é transitório e a mesma chamada funciona em instantes.",
             "content": {
@@ -2526,12 +2991,35 @@
           "404": {
             "description": "Job não encontrado para o tenant."
           },
+          "410": {
+            "description": "Artefatos expirados (retenção vencida)."
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2646,12 +3134,35 @@
           "404": {
             "description": "Job não encontrado para o tenant."
           },
+          "410": {
+            "description": "Artefatos expirados (retenção vencida)."
+          },
           "422": {
             "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2778,6 +3289,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2984,6 +3515,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -3178,6 +3729,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -3359,6 +3930,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -3569,6 +4160,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -3641,7 +4252,7 @@
         "tags": [
           "pix"
         ],
-        "summary": "Consultar Devolucao",
+        "summary": "Consultar devolução",
         "description": "Consulta uma devolução de Pix recebido.",
         "operationId": "consultar_devolucao_pix_recebidos__e2eid__devolucao__devolucao_id__get",
         "parameters": [
@@ -3757,6 +4368,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -3955,6 +4586,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -4102,6 +4753,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -4235,6 +4906,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -4418,6 +5109,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -4611,6 +5322,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -4818,6 +5549,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -4893,7 +5644,7 @@
           "bolepix"
         ],
         "summary": "Criar",
-        "description": "Emite Bolepix (boleto + QR Pix EVP). Reenvio com o mesmo\nexternal_reference_id devolve a cobrança existente (idempotente no banco).",
+        "description": "Emite Bolepix (boleto + QR Pix EVP). Reenvio com o mesmo\nexternal_reference_id devolve a cobrança existente (idempotente no banco).\n\nOmitido, o `external_reference_id` é gerado aqui — e volta em `id` e no\n`Location`. É o único identificador de consulta, então perdê-lo é perder o\nboleto.",
         "operationId": "criar_bolepix_post",
         "parameters": [
           {
@@ -4934,6 +5685,14 @@
                   "$ref": "#/components/schemas/CobrancaOut"
                 }
               }
+            },
+            "headers": {
+              "Location": {
+                "description": "URL de consulta do Bolepix criado, com tenant_id, provider e banco",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -4942,6 +5701,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -5030,8 +5809,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[A-Z0-9]{26}$",
+              "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos",
+              "examples": [
+                "PEDIDO00000000000000004242"
+              ],
               "title": "External Reference Id"
-            }
+            },
+            "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos"
           },
           {
             "name": "tenant_id",
@@ -5125,6 +5910,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -5211,8 +6016,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[A-Z0-9]{26}$",
+              "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos",
+              "examples": [
+                "PEDIDO00000000000000004242"
+              ],
               "title": "External Reference Id"
-            }
+            },
+            "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos"
           },
           {
             "name": "tenant_id",
@@ -5306,6 +6117,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -5384,7 +6215,7 @@
         "tags": [
           "bolepix"
         ],
-        "summary": "Pdf",
+        "summary": "PDF do Bolepix",
         "description": "PDF do Bolepix em base64.",
         "operationId": "pdf_bolepix__external_reference_id__pdf_get",
         "parameters": [
@@ -5394,8 +6225,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[A-Z0-9]{26}$",
+              "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos",
+              "examples": [
+                "PEDIDO00000000000000004242"
+              ],
               "title": "External Reference Id"
-            }
+            },
+            "description": "Identificador do Bolepix: 26 caracteres, só maiúsculas e dígitos"
           },
           {
             "name": "tenant_id",
@@ -5489,6 +6326,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -5602,10 +6459,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Reenvio com a mesma chave devolve O MESMO link, sem criar outro no banco. Mesma chave com corpo diferente é 422.",
+              "description": "Reenvio com a mesma chave devolve O MESMO link, sem criar outro no banco. Mesma chave com outro pedido — corpo, provider ou banco diferentes — é 422.",
               "title": "Idempotency-Key"
             },
-            "description": "Reenvio com a mesma chave devolve O MESMO link, sem criar outro no banco. Mesma chave com corpo diferente é 422."
+            "description": "Reenvio com a mesma chave devolve O MESMO link, sem criar outro no banco. Mesma chave com outro pedido — corpo, provider ou banco diferentes — é 422."
           }
         ],
         "requestBody": {
@@ -5627,6 +6484,14 @@
                   "$ref": "#/components/schemas/CheckoutOut"
                 }
               }
+            },
+            "headers": {
+              "Location": {
+                "description": "URL de consulta do link criado, já com tenant_id, provider e banco",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "422": {
@@ -5635,6 +6500,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -5822,6 +6707,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -6003,6 +6908,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -6096,7 +7021,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "date",
               "description": "Data inicial (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
               "title": "Start Date"
             },
             "description": "Data inicial (YYYY-MM-DD)"
@@ -6107,10 +7036,14 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Data final (YYYY-MM-DD, máx. 60 dias após start)",
+              "format": "date",
+              "description": "Data final (YYYY-MM-DD; no máximo 60 dias após a inicial)",
+              "examples": [
+                "2026-01-31"
+              ],
               "title": "End Date"
             },
-            "description": "Data final (YYYY-MM-DD, máx. 60 dias após start)"
+            "description": "Data final (YYYY-MM-DD; no máximo 60 dias após a inicial)"
           },
           {
             "name": "provider",
@@ -6147,9 +7080,12 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 1,
+              "description": "Página, a partir de 1",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "Página, a partir de 1"
           },
           {
             "name": "size",
@@ -6158,9 +7094,12 @@
             "schema": {
               "type": "integer",
               "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (1 a 100)",
               "default": 50,
               "title": "Size"
-            }
+            },
+            "description": "Itens por página (1 a 100)"
           },
           {
             "name": "X-Bank-Credentials",
@@ -6216,6 +7155,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -6313,7 +7272,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "date",
               "description": "Data inicial (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
               "title": "Start Date"
             },
             "description": "Data inicial (YYYY-MM-DD)"
@@ -6324,10 +7287,14 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Data final (YYYY-MM-DD, máx. 60 dias após start)",
+              "format": "date",
+              "description": "Data final (YYYY-MM-DD; no máximo 60 dias após a inicial)",
+              "examples": [
+                "2026-01-31"
+              ],
               "title": "End Date"
             },
-            "description": "Data final (YYYY-MM-DD, máx. 60 dias após start)"
+            "description": "Data final (YYYY-MM-DD; no máximo 60 dias após a inicial)"
           },
           {
             "name": "provider",
@@ -6364,9 +7331,12 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 1,
+              "description": "Página, a partir de 1",
               "default": 1,
               "title": "Page"
-            }
+            },
+            "description": "Página, a partir de 1"
           },
           {
             "name": "size",
@@ -6375,9 +7345,12 @@
             "schema": {
               "type": "integer",
               "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (1 a 100)",
               "default": 50,
               "title": "Size"
-            }
+            },
+            "description": "Itens por página (1 a 100)"
           },
           {
             "name": "X-Bank-Credentials",
@@ -6433,6 +7406,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -6512,7 +7505,7 @@
           "extrato"
         ],
         "summary": "Consultar",
-        "description": "Extrato de movimentações da conta (exclusivo PJ no C6).",
+        "description": "Movimentações da conta no período. Resposta crua do banco (shape dele).\n\nBancos com extrato: C6, Sicoob e Inter — `GET /bancos` diz quais nesta\ninstalação. Quem não oferece responde `422`, não `500`.",
         "operationId": "consultar_extrato_get",
         "parameters": [
           {
@@ -6521,8 +7514,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Identificador do tenant (resolve as credenciais)",
               "title": "Tenant Id"
-            }
+            },
+            "description": "Identificador do tenant (resolve as credenciais)"
           },
           {
             "name": "start_date",
@@ -6530,7 +7525,11 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "date",
               "description": "Data inicial (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
               "title": "Start Date"
             },
             "description": "Data inicial (YYYY-MM-DD)"
@@ -6541,10 +7540,14 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Data final (YYYY-MM-DD)",
+              "format": "date",
+              "description": "Data final (YYYY-MM-DD). No Sicoob a API é MENSAL: as duas datas precisam cair no mesmo mês, senão 422.",
+              "examples": [
+                "2026-01-31"
+              ],
               "title": "End Date"
             },
-            "description": "Data final (YYYY-MM-DD)"
+            "description": "Data final (YYYY-MM-DD). No Sicoob a API é MENSAL: as duas datas precisam cair no mesmo mês, senão 422."
           },
           {
             "name": "provider",
@@ -6574,6 +7577,25 @@
               "title": "Banco"
             },
             "description": "Instituição (`c6`, `sicoob`, `inter`, `itau`…). Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve."
+          },
+          {
+            "name": "numero_conta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Número da conta corrente — usado pelo Sicoob, que exige a conta na consulta. Omitido, vai `0`, que é o que a rota mandava sempre por não ter onde receber o valor.",
+              "title": "Numero Conta"
+            },
+            "description": "Número da conta corrente — usado pelo Sicoob, que exige a conta na consulta. Omitido, vai `0`, que é o que a rota mandava sempre por não ter onde receber o valor."
           },
           {
             "name": "X-Bank-Credentials",
@@ -6620,7 +7642,56 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Consultar Extrato Get"
+                  "title": "Response Consultar Extrato Get",
+                  "description": "Resposta CRUA do banco — o shape é o dele, não desta API. Os três diferem; veja os exemplos."
+                },
+                "examples": {
+                  "c6": {
+                    "summary": "C6 — /v1/statement/",
+                    "value": {
+                      "transactions": [
+                        {
+                          "id": "TX1",
+                          "amount": 1500.0,
+                          "type": "CREDIT",
+                          "date": "2026-01-15",
+                          "description": "LIQUIDACAO BOLETO"
+                        }
+                      ]
+                    }
+                  },
+                  "sicoob": {
+                    "summary": "Sicoob — conta-corrente v4 (mensal)",
+                    "value": {
+                      "resultado": {
+                        "saldoAtual": "1500.00",
+                        "transacoes": [
+                          {
+                            "tipo": "CREDITO",
+                            "valor": "1500.00",
+                            "data": "15/01/2026",
+                            "descricao": "LIQUIDACAO COBRANCA"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "inter": {
+                    "summary": "Inter — /banking/v2/extrato",
+                    "value": {
+                      "transacoes": [
+                        {
+                          "cpmf": "",
+                          "dataEntrada": "2026-01-15",
+                          "tipoTransacao": "PIX",
+                          "tipoOperacao": "C",
+                          "valor": "1500.00",
+                          "titulo": "Pix recebido",
+                          "descricao": "PIX RECEBIDO"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -6631,6 +7702,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -6765,6 +7856,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -6856,8 +7967,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Início do período, RFC3339 (ex.: 2026-01-01T00:00:00Z)",
+              "examples": [
+                "2026-01-01T00:00:00Z"
+              ],
               "title": "Inicio"
-            }
+            },
+            "description": "Início do período, RFC3339 (ex.: 2026-01-01T00:00:00Z)"
           },
           {
             "name": "fim",
@@ -6865,8 +7981,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Fim do período, RFC3339",
+              "examples": [
+                "2026-01-31T23:59:59Z"
+              ],
               "title": "Fim"
-            }
+            },
+            "description": "Fim do período, RFC3339"
           },
           {
             "name": "provider",
@@ -6953,6 +8074,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -7158,6 +8299,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -7325,7 +8486,25 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": true,
-                "title": "Campos"
+                "title": "Campos",
+                "minProperties": 1,
+                "description": "Campos do PATCH BACEN — subconjunto, não o objeto inteiro. Varia por jornada; veja os exemplos."
+              },
+              "examples": {
+                "cancelar": {
+                  "summary": "Cancelar",
+                  "value": {
+                    "status": "CANCELADA"
+                  }
+                },
+                "valor": {
+                  "summary": "Alterar o valor do ciclo",
+                  "value": {
+                    "valor": {
+                      "original": "150.00"
+                    }
+                  }
+                }
               }
             }
           }
@@ -7349,6 +8528,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -7479,6 +8678,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -7668,6 +8887,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -7835,7 +9074,25 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": true,
-                "title": "Campos"
+                "title": "Campos",
+                "minProperties": 1,
+                "description": "Campos do PATCH BACEN — subconjunto, não o objeto inteiro. Varia por jornada; veja os exemplos."
+              },
+              "examples": {
+                "cancelar": {
+                  "summary": "Cancelar",
+                  "value": {
+                    "status": "CANCELADA"
+                  }
+                },
+                "valor": {
+                  "summary": "Alterar o valor do ciclo",
+                  "value": {
+                    "valor": {
+                      "original": "150.00"
+                    }
+                  }
+                }
               }
             }
           }
@@ -7859,6 +9116,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -8035,6 +9312,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -8224,6 +9521,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -8409,6 +9726,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -8493,8 +9830,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[a-zA-Z0-9]{26,35}$",
+              "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos",
+              "examples": [
+                "COBR0000000000000000000042"
+              ],
               "title": "Txid"
-            }
+            },
+            "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos"
           },
           {
             "name": "authorization",
@@ -8544,6 +9887,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -8630,8 +9993,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[a-zA-Z0-9]{26,35}$",
+              "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos",
+              "examples": [
+                "COBR0000000000000000000042"
+              ],
               "title": "Txid"
-            }
+            },
+            "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos"
           },
           {
             "name": "tenant_id",
@@ -8731,6 +10100,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -8813,8 +10202,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[a-zA-Z0-9]{26,35}$",
+              "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos",
+              "examples": [
+                "COBR0000000000000000000042"
+              ],
               "title": "Txid"
-            }
+            },
+            "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos"
           },
           {
             "name": "tenant_id",
@@ -8898,7 +10293,25 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": true,
-                "title": "Campos"
+                "title": "Campos",
+                "minProperties": 1,
+                "description": "Campos do PATCH BACEN — subconjunto, não o objeto inteiro. Varia por jornada; veja os exemplos."
+              },
+              "examples": {
+                "cancelar": {
+                  "summary": "Cancelar",
+                  "value": {
+                    "status": "CANCELADA"
+                  }
+                },
+                "valor": {
+                  "summary": "Alterar o valor do ciclo",
+                  "value": {
+                    "valor": {
+                      "original": "150.00"
+                    }
+                  }
+                }
               }
             }
           }
@@ -8922,6 +10335,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -9019,8 +10452,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Início do período, RFC3339 (ex.: 2026-01-01T00:00:00Z)",
+              "examples": [
+                "2026-01-01T00:00:00Z"
+              ],
               "title": "Inicio"
-            }
+            },
+            "description": "Início do período, RFC3339 (ex.: 2026-01-01T00:00:00Z)"
           },
           {
             "name": "fim",
@@ -9028,8 +10466,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Fim do período, RFC3339",
+              "examples": [
+                "2026-01-31T23:59:59Z"
+              ],
               "title": "Fim"
-            }
+            },
+            "description": "Fim do período, RFC3339"
           },
           {
             "name": "provider",
@@ -9120,6 +10563,26 @@
               }
             }
           },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Recurso não encontrado no banco.",
             "content": {
@@ -9204,8 +10667,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[a-zA-Z0-9]{26,35}$",
+              "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos",
+              "examples": [
+                "COBR0000000000000000000042"
+              ],
               "title": "Txid"
-            }
+            },
+            "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos"
           },
           {
             "name": "data",
@@ -9213,8 +10682,14 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "date",
+              "description": "Data da retentativa (YYYY-MM-DD)",
+              "examples": [
+                "2027-01-10"
+              ],
               "title": "Data"
-            }
+            },
+            "description": "Data da retentativa (YYYY-MM-DD)"
           },
           {
             "name": "tenant_id",
@@ -9310,6 +10785,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -9474,7 +10969,23 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": true,
-                "title": "Body"
+                "title": "Body",
+                "minProperties": 1,
+                "description": "Informe ao menos uma das duas URLs (https e alcançável de fora: quem chama é o banco).",
+                "properties": {
+                  "url_recorrencia": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "webhookrec — eventos da recorrência",
+                    "example": "https://api.empresa.com.br/webhooks/pixaut/rec"
+                  },
+                  "url_cobranca": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "webhookcobr — eventos das cobranças do ciclo",
+                    "example": "https://api.empresa.com.br/webhooks/pixaut/cobr"
+                  }
+                }
               }
             }
           }
@@ -9498,6 +11009,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -9617,7 +11148,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Cadastrar Config Webhook Banco Post"
+                  "title": "Response Cadastrar Config Webhook Banco Post",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -9628,6 +11160,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -9722,10 +11274,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": "BANK_SLIP",
-              "title": "Service"
-            }
+              "$ref": "#/components/schemas/ServicoWebhook",
+              "description": "O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)",
+              "default": "BANK_SLIP"
+            },
+            "description": "O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)"
           },
           {
             "name": "provider",
@@ -9801,7 +11354,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Consultar Config Webhook Banco Get"
+                  "title": "Response Consultar Config Webhook Banco Get",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -9812,6 +11366,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -9906,10 +11480,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": "BANK_SLIP",
-              "title": "Service"
-            }
+              "$ref": "#/components/schemas/ServicoWebhook",
+              "description": "O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)",
+              "default": "BANK_SLIP"
+            },
+            "description": "O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)"
           },
           {
             "name": "provider",
@@ -9985,7 +11560,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Remover Config Webhook Banco Delete"
+                  "title": "Response Remover Config Webhook Banco Delete",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -9996,6 +11572,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -10075,7 +11671,7 @@
           "config"
         ],
         "summary": "Configurar Pix",
-        "description": "Configura o webhook BACEN da chave: {tenant_id, provider?, banco?, chave, url, credentials?}.",
+        "description": "Configura o webhook BACEN da chave — o banco chama a URL quando um Pix cai nela.",
         "operationId": "configurar_pix_config_webhook_pix_put",
         "parameters": [
           {
@@ -10102,9 +11698,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true,
-                "title": "Body"
+                "$ref": "#/components/schemas/WebhookPixIn"
               }
             }
           }
@@ -10117,7 +11711,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Configurar Pix Config Webhook Pix Put"
+                  "title": "Response Configurar Pix Config Webhook Pix Put",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -10128,6 +11723,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -10223,8 +11838,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Chave Pix do recebedor",
+              "examples": [
+                "financeiro@empresa.com.br"
+              ],
               "title": "Chave"
-            }
+            },
+            "description": "Chave Pix do recebedor"
           },
           {
             "name": "provider",
@@ -10300,7 +11920,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Consultar Pix Config Webhook Pix Get"
+                  "title": "Response Consultar Pix Config Webhook Pix Get",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -10311,6 +11932,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -10406,8 +12047,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Chave Pix do recebedor",
+              "examples": [
+                "financeiro@empresa.com.br"
+              ],
               "title": "Chave"
-            }
+            },
+            "description": "Chave Pix do recebedor"
           },
           {
             "name": "provider",
@@ -10483,7 +12129,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Remover Pix Config Webhook Pix Delete"
+                  "title": "Response Remover Pix Config Webhook Pix Delete",
+                  "description": "Confirmação CRUA do banco — o shape é o dele, não desta API."
                 }
               }
             }
@@ -10494,6 +12141,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -10581,11 +12248,13 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request.",
-              "title": "Banco"
+              "$ref": "#/components/schemas/BancoEmissor",
+              "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`), **em minúsculas**. Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Slug fora da lista é `422`, e não `200`: 200 faria o banco parar de reentregar um evento que ninguém processou. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request.",
+              "examples": [
+                "c6"
+              ]
             },
-            "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request."
+            "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`), **em minúsculas**. Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Slug fora da lista é `422`, e não `200`: 200 faria o banco parar de reentregar um evento que ninguém processou. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request."
           }
         ],
         "responses": {
@@ -10645,11 +12314,13 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request.",
-              "title": "Banco"
+              "$ref": "#/components/schemas/BancoEmissor",
+              "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`), **em minúsculas**. Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Slug fora da lista é `422`, e não `200`: 200 faria o banco parar de reentregar um evento que ninguém processou. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request.",
+              "examples": [
+                "c6"
+              ]
             },
-            "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request."
+            "description": "Banco que está notificando — é o slug usado na URL cadastrada nele (`c6`, `sicoob`, `inter`), **em minúsculas**. Define qual `WEBHOOK_TOKEN__<BANCO>` valida a chamada. Slug fora da lista é `422`, e não `200`: 200 faria o banco parar de reentregar um evento que ninguém processou. Não confundir com o parâmetro `banco` das rotas de cobrança, que é a instituição do request."
           }
         ],
         "responses": {
@@ -10691,8 +12362,8 @@
         "tags": [
           "health"
         ],
-        "summary": "Health",
-        "description": "Sonda de disponibilidade do gateway (não toca nos bancos).",
+        "summary": "Sonda de disponibilidade",
+        "description": "Prova que **o processo está de pé e roteando** — e só isso.\n\nÉ a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o\n`healthCheckPath` do Render consultam, e os três **matam o container**\nquando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que\nreprovasse por problema transitório reiniciaria o serviço em laço, que é\npior que o problema detectado. Estado por banco fica em `GET /bancos`.\n\nO schema era o genérico do FastAPI (`additionalProperties: string`, sem\nexemplo): a rota mais consumida por automação era a menos especificada da\nAPI.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -10700,11 +12371,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Health Health Get"
+                  "$ref": "#/components/schemas/Saude"
+                },
+                "example": {
+                  "status": "ok"
                 }
               }
             }
@@ -10750,12 +12420,23 @@
         "title": "Banco",
         "description": "Instituição — as 19 tratadas, independente do caminho.\n\nOs quatro primeiros têm caminho ON (API REST implementada); todos, menos o\nInter, têm caminho OFF (layout na engine). `GET /bancos` responde a matriz\nexata por introspecção, e a combinação impossível (`on` + banco sem API,\n`off` + Inter) responde `422` dizendo quais existem."
       },
+      "BancoEmissor": {
+        "type": "string",
+        "enum": [
+          "c6",
+          "sicoob",
+          "inter"
+        ],
+        "title": "BancoEmissor",
+        "description": "Slugs que esta API sabe normalizar.\n\nEra `str` livre, e a combinação com o `_check_token` (que faz `.upper()`)\ndeixava passar: `/webhooks/C6` autenticava — o token bate — e caía no\n`_NORMALIZERS.get(\"C6\")`, que é `None`. O evento virava `ignorado` com\n**200**, e 200 diz ao banco \"recebi, pode parar de reentregar\". Uma\nmaiúscula na URL cadastrada, e toda liquidação sumia em silêncio."
+      },
       "BolepixCobranca": {
         "properties": {
           "valor": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "exclusiveMinimum": 0.0
               },
               {
                 "type": "string",
@@ -10763,7 +12444,7 @@
               }
             ],
             "title": "Valor",
-            "description": "Valor da cobrança",
+            "description": "Valor da cobrança — maior que zero",
             "examples": [
               "99.90"
             ]
@@ -10771,12 +12452,18 @@
           "vencimento": {
             "type": "string",
             "format": "date",
-            "title": "Vencimento"
+            "title": "Vencimento",
+            "examples": [
+              "2027-12-30"
+            ]
           },
           "descricao": {
             "type": "string",
             "title": "Descricao",
-            "description": "Descrição da cobrança (obrigatória no Bolepix)"
+            "description": "Descrição da cobrança (obrigatória no Bolepix)",
+            "examples": [
+              "Assinatura 12/2027"
+            ]
           },
           "pagador": {
             "$ref": "#/components/schemas/Pagador",
@@ -10785,14 +12472,18 @@
           "external_reference_id": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[A-Z0-9]{26}$"
               },
               {
                 "type": "null"
               }
             ],
             "title": "External Reference Id",
-            "description": "^[A-Z0-9]{26}$ — gerado automaticamente se omitido"
+            "description": "`^[A-Z0-9]{26}$` — 26 caracteres, só maiúsculas e dígitos. Gerado automaticamente se omitido, e devolvido em `id`. **É por ele que se consulta o Bolepix**, e reenviar o mesmo devolve a cobrança existente em vez de criar outra — mande o seu se houver botão humano na frente. String vazia vale como omitido: template que substitui variável não preenchida produz `\"\"`, e isso sempre significou \"gere um\".",
+            "examples": [
+              "PEDIDO00000000000000004242"
+            ]
           },
           "chave_pix": {
             "anyOf": [
@@ -10804,7 +12495,10 @@
               }
             ],
             "title": "Chave Pix",
-            "description": "Chave EVP; default: account_config.chave_pix"
+            "description": "Chave EVP do recebedor. Sem ela (aqui ou em `account_config.chave_pix`) não há segmento Pix, e o resultado é um boleto comum — que é `/cobranca`, não Bolepix. Por isso a ausência responde 422.",
+            "examples": [
+              "7d9f1a52-0c3b-4e21-9f88-1a2b3c4d5e6f"
+            ]
           },
           "nosso_numero": {
             "anyOf": [
@@ -10815,7 +12509,10 @@
                 "type": "null"
               }
             ],
-            "title": "Nosso Numero"
+            "title": "Nosso Numero",
+            "examples": [
+              "12345678"
+            ]
           },
           "instrucoes": {
             "anyOf": [
@@ -10834,14 +12531,15 @@
           "dias_apos_vencimento": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 0.0
               },
               {
                 "type": "null"
               }
             ],
             "title": "Dias Apos Vencimento",
-            "description": "days_after_due_date"
+            "description": "days_after_due_date — dias de tolerância APÓS o vencimento; negativo não existe (o boleto não vence antes de vencer)"
           }
         },
         "type": "object",
@@ -10857,7 +12555,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -10939,9 +12640,16 @@
             "description": "Blob por provider (ver CobrancaIn)"
           },
           "bank": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Bank",
-            "description": "Slug do banco na engine pyCobrança para renderizar o carnê",
+            "description": "Slug do layout na engine pyCobrança. **Redundante**: o layout vem do `banco`. Aceito por compatibilidade e precisa concordar — `bank` divergente responde 422, porque carnê desenhado como um banco e registrado em outro não é pagável.",
             "examples": [
               "banco_c6"
             ]
@@ -10951,8 +12659,9 @@
               "$ref": "#/components/schemas/Cobranca"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Parcelas",
-            "description": "Parcelas do carnê (registradas individualmente)"
+            "description": "Parcelas do carnê (registradas individualmente). Pelo menos uma, e cada uma com identificador próprio (`seu_numero`/`nosso_numero`)"
           },
           "credentials": {
             "anyOf": [
@@ -10972,7 +12681,6 @@
         "required": [
           "tenant_id",
           "provider",
-          "bank",
           "parcelas"
         ],
         "title": "CarneIn"
@@ -11008,7 +12716,8 @@
           "valor": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "exclusiveMinimum": 0.0
               },
               {
                 "type": "string",
@@ -11016,7 +12725,7 @@
               }
             ],
             "title": "Valor",
-            "description": "Valor total do checkout",
+            "description": "Valor total do checkout — maior que zero",
             "examples": [
               "150.00"
             ]
@@ -11095,7 +12804,10 @@
                 "type": "null"
               }
             ],
-            "title": "Descricao"
+            "title": "Descricao",
+            "examples": [
+              "Pedido 4242"
+            ]
           },
           "expira_em": {
             "anyOf": [
@@ -11108,7 +12820,10 @@
               }
             ],
             "title": "Expira Em",
-            "description": "Default do banco: 7 dias"
+            "description": "Default do banco: 7 dias",
+            "examples": [
+              "2027-12-30T23:59:59-03:00"
+            ]
           },
           "redirect_url": {
             "anyOf": [
@@ -11120,7 +12835,10 @@
               }
             ],
             "title": "Redirect Url",
-            "description": "Para onde o pagador volta após pagar"
+            "description": "Para onde o pagador volta após pagar — http(s) apenas",
+            "examples": [
+              "https://sua-loja.com.br/pedido/4242/retorno"
+            ]
           },
           "external_reference_id": {
             "anyOf": [
@@ -11132,7 +12850,10 @@
               }
             ],
             "title": "External Reference Id",
-            "description": "Seu identificador"
+            "description": "Seu identificador",
+            "examples": [
+              "PED-2027-0042"
+            ]
           },
           "pagador": {
             "anyOf": [
@@ -11158,7 +12879,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -11199,6 +12923,7 @@
             "title": "Credentials"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "tenant_id",
@@ -11305,7 +13030,10 @@
               }
             ],
             "title": "Nosso Numero",
-            "description": "Nosso número (opcional; o banco pode atribuir)"
+            "description": "Nosso número (opcional; o banco pode atribuir)",
+            "examples": [
+              "12345678"
+            ]
           },
           "seu_numero": {
             "anyOf": [
@@ -11317,7 +13045,10 @@
               }
             ],
             "title": "Seu Numero",
-            "description": "Seu número / identificador do emissor (opcional)"
+            "description": "Seu número / identificador do emissor (opcional)",
+            "examples": [
+              "PED-2027-0042"
+            ]
           },
           "pagador": {
             "$ref": "#/components/schemas/Pagador"
@@ -11537,24 +13268,36 @@
           "id_rec": {
             "type": "string",
             "title": "Id Rec",
-            "description": "idRec da recorrência aprovada"
+            "description": "idRec da recorrência aprovada",
+            "examples": [
+              "RR12345678202701101a2b3c4d5e6"
+            ]
           },
           "valor": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "number",
+                "exclusiveMinimum": 0.0
               },
               {
                 "type": "string",
                 "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
-            "title": "Valor"
+            "title": "Valor",
+            "description": "Valor da parcela do ciclo — maior que zero",
+            "examples": [
+              "150.00"
+            ]
           },
           "data_vencimento": {
             "type": "string",
             "format": "date",
-            "title": "Data Vencimento"
+            "title": "Data Vencimento",
+            "description": "Vencimento da parcela. O BACEN quer o agendamento com pelo menos **2 dias** de antecedência; menos que isso o banco pode recusar. Data no PASSADO é recusada aqui — não existe agendar para ontem.",
+            "examples": [
+              "2027-12-10"
+            ]
           },
           "info_adicional": {
             "anyOf": [
@@ -11565,7 +13308,10 @@
                 "type": "null"
               }
             ],
-            "title": "Info Adicional"
+            "title": "Info Adicional",
+            "examples": [
+              "Parcela 3/12"
+            ]
           },
           "extras": {
             "anyOf": [
@@ -11593,7 +13339,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -11804,7 +13553,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -11831,7 +13583,10 @@
           },
           "descricao": {
             "type": "string",
-            "title": "Descricao"
+            "title": "Descricao",
+            "examples": [
+              "Mensalidades 12/2027"
+            ]
           },
           "cobrancas": {
             "items": {
@@ -11866,7 +13621,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -11988,19 +13746,26 @@
               }
             ],
             "title": "Chave",
-            "description": "Chave Pix do recebedor. Se omitida, usa `account_config.chave_pix`."
+            "description": "Chave Pix do recebedor. Se omitida, usa `account_config.chave_pix`.",
+            "examples": [
+              "7d9f1a52-0c3b-4e21-9f88-1a2b3c4d5e6f"
+            ]
           },
           "txid": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9]{26,35}$"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Txid",
-            "description": "Txid ([a-zA-Z0-9]{26,35}). Obrigatório na cobv; na cob o banco gera."
+            "description": "Txid do BACEN: 26 a 35 caracteres, só letras e dígitos. Obrigatório na cobv. Na cob é opcional — enviado, é o identificador da cobrança (`PUT`); omitido, o banco gera um.",
+            "examples": [
+              "PEDIDO2027000000000000004242"
+            ]
           },
           "expiracao_segundos": {
             "type": "integer",
@@ -12019,7 +13784,10 @@
               }
             ],
             "title": "Data Vencimento",
-            "description": "Se presente, emite cobv (cobrança com vencimento) em vez de cob imediata."
+            "description": "Se presente, emite cobv (cobrança com vencimento) em vez de cob imediata.",
+            "examples": [
+              "2027-12-10"
+            ]
           },
           "validade_apos_vencimento": {
             "type": "integer",
@@ -12048,7 +13816,10 @@
               }
             ],
             "title": "Descricao",
-            "description": "solicitacaoPagador (texto ao pagador)"
+            "description": "solicitacaoPagador (texto ao pagador)",
+            "examples": [
+              "Mensalidade 12/2027"
+            ]
           }
         },
         "type": "object",
@@ -12256,7 +14027,10 @@
           "data_inicial": {
             "type": "string",
             "format": "date",
-            "title": "Data Inicial"
+            "title": "Data Inicial",
+            "examples": [
+              "2027-01-10"
+            ]
           },
           "data_final": {
             "anyOf": [
@@ -12268,7 +14042,10 @@
                 "type": "null"
               }
             ],
-            "title": "Data Final"
+            "title": "Data Final",
+            "examples": [
+              "2027-12-10"
+            ]
           },
           "valor_fixo": {
             "anyOf": [
@@ -12284,7 +14061,10 @@
               }
             ],
             "title": "Valor Fixo",
-            "description": "valorRec — cobranças de valor fixo"
+            "description": "valorRec — cobranças de valor fixo",
+            "examples": [
+              "150.00"
+            ]
           },
           "valor_minimo": {
             "anyOf": [
@@ -12300,7 +14080,10 @@
               }
             ],
             "title": "Valor Minimo",
-            "description": "valorMinimoRecebedor — valor variável"
+            "description": "valorMinimoRecebedor — valor variável",
+            "examples": [
+              "50.00"
+            ]
           },
           "politica_retentativa": {
             "type": "string",
@@ -12330,7 +14113,10 @@
               }
             ],
             "title": "Txid Ativacao",
-            "description": "ativacao.dadosJornada.txid (Jornadas 3/4)"
+            "description": "ativacao.dadosJornada.txid (Jornadas 3/4)",
+            "examples": [
+              "PEDIDO2027000000000000004242"
+            ]
           },
           "extras": {
             "anyOf": [
@@ -12360,7 +14146,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -12408,11 +14197,41 @@
         ],
         "title": "RecorrenciaIn"
       },
+      "Saude": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "examples": [
+              "ok"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "Saude",
+        "description": "Resposta da sonda. Um campo, valor fixo — o contrato é a simplicidade.\n\n`\"ok\"` MINÚSCULO. O `GET /api/health` da superfície offline responde `\"OK\"`\nmaiúsculo, por contrato herdado da v1.x: são sondas de processos diferentes\ndentro do mesmo container e os dois formatos têm consumidor — este é o que o\n`examples/oracle/cobranca_api_pkg.sql` e a coleção Postman comparam."
+      },
+      "ServicoWebhook": {
+        "type": "string",
+        "enum": [
+          "BANK_SLIP",
+          "CHECKOUT"
+        ],
+        "title": "ServicoWebhook",
+        "description": "O que o banco notifica naquela URL. Vocabulário do C6."
+      },
       "SolicitacaoRecorrenciaIn": {
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -12477,6 +14296,16 @@
         "title": "Status",
         "description": "Status normalizado da cobrança (igual para qualquer banco)."
       },
+      "StatusItem": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "completed",
+          "failed"
+        ],
+        "title": "StatusItem",
+        "description": "Estados possíveis de um item — o vocabulário fechado do filtro."
+      },
       "TipoCartao": {
         "type": "string",
         "enum": [
@@ -12529,7 +14358,10 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "title": "Tenant Id"
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
           },
           "provider": {
             "$ref": "#/components/schemas/Provider",
@@ -12552,12 +14384,14 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "description": "URL pública que o banco chamará (ex: https://.../webhooks/c6/{tenant})"
+            "description": "URL **pública e https** que o banco chamará (ex: https://.../webhooks/c6/{tenant})",
+            "examples": [
+              "https://api.minhaempresa.com.br/webhooks/c6/empresa_123"
+            ]
           },
           "service": {
-            "type": "string",
-            "title": "Service",
-            "description": "BANK_SLIP | CHECKOUT",
+            "$ref": "#/components/schemas/ServicoWebhook",
+            "description": "O que notificar: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)",
             "default": "BANK_SLIP"
           },
           "credentials": {
@@ -12573,6 +14407,7 @@
             "title": "Credentials"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "tenant_id",
@@ -12682,6 +14517,72 @@
         ],
         "title": "WebhookEvent",
         "description": "Evento normalizado de pagamento — também o corpo do push aos consumidores."
+      },
+      "WebhookPixIn": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "title": "Tenant Id",
+            "examples": [
+              "empresa_123"
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider",
+            "default": "c6"
+          },
+          "banco": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Banco"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "**Instituição**: `c6`, `sicoob`, `inter`, `itau`… Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve.",
+            "examples": [
+              "c6"
+            ]
+          },
+          "chave": {
+            "type": "string",
+            "title": "Chave",
+            "description": "Chave Pix do recebedor (a mesma das cobranças)",
+            "examples": [
+              "financeiro@minhaempresa.com.br"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "URL **pública e https** que o banco chamará quando um Pix cair na chave",
+            "examples": [
+              "https://api.minhaempresa.com.br/webhooks/c6/empresa_123"
+            ]
+          },
+          "credentials": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credentials"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "chave",
+          "url"
+        ],
+        "title": "WebhookPixIn",
+        "description": "Webhook BACEN por chave — o banco chama a URL quando um Pix cai na chave.\n\nEra `body: dict`: o Swagger não descrevia campo nenhum, campo com nome errado\npassava calado e `credentials` viajava sem tipo dentro de um dicionário\nlivre."
       },
       "Erro": {
         "title": "Erro",

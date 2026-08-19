@@ -25,7 +25,7 @@ class BankProvider(ABC):
         raise NotImplementedError
 
     # --- capacidades opcionais (nem todo provider tem) ------------------------
-    # Os routers checam com hasattr/try antes de expor; brcobrança (offline) não
+    # Os routers checam com hasattr/try antes de expor; a engine offline não
     # implementa nenhuma delas.
 
     def pdf(self, cobranca_id: str) -> CobrancaOut:

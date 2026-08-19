@@ -17,6 +17,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- `GET /bancos` anuncia mais três capacidades, que **discriminam**:
+  `pix_consulta` (o Itaú não tem `GET /pix/{txid}`), `conciliacao_transacoes`
+  (só o C6) e `webhook_entrada` (sem ela, `POST /webhooks/{banco}` não entende
+  a notificação daquele banco). As rotas existiam e eram invisíveis no catálogo.
 - **Swagger publicado no site**, gerado do código e sem depender do serviço no
   ar: [gateway](https://maxwbh.github.io/cobranca-api/swagger/) e
   [offline](https://maxwbh.github.io/cobranca-api/swagger/offline.html).
@@ -31,9 +35,189 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `registrado_pronto`, `fallback_offline`, `caminho_efetivo` e a flag que liga.
 
 ### Alterado
+- `COBRANCA_ERRO_HTTP=1` faz `POST /cobranca` responder **`422`** quando a engine
+  recusa os dados, em vez do `201` com `status: "erro"` — mesmo corpo, só o
+  código muda. Default segue `201` nesta versão; **na 3.0.0 o `422` vira padrão**.
 - Credenciais são guardadas e procuradas pelo **banco**, não pelo `provider`.
   Token emitido antes continua valendo; ao cadastrar com `provider=on`, informe
   o `banco`.
+- ⚠️ **`/docs`, `/api/docs` e `/redoc` não dependem mais da internet.** Os
+  renderizadores vão na imagem e são servidos em `/swagger-ui`; antes vinham de
+  CDN, e num deploy sem essa saída as páginas abriam em branco. O `/redoc` ganha
+  o tema da plataforma (vinha com o favicon do FastAPI). A imagem cresce ~2,5 MB.
+- ⚠️ **Parâmetro `true`/`false` fora do enum passa a ser `400`.** A spec já
+  declarava `enum: ['true','false']` para `include_data`, `pix` e
+  `somente_creditos`, e o código aceitava só `"true"`, tratando todo o resto
+  como `false`: `include_data=1` respondia `200` com o **PDF binário** quando o
+  chamador pediu JSON.
+- ⚠️ **As quatro rotas `/api/*` de upload ganham teto** (`UPLOAD_MAX_BYTES`,
+  default 10 MB → `413`). O arquivo era lido inteiro para a memória antes de
+  qualquer validação. Arquivo vazio também passa a ser recusado pelo nome do
+  campo.
+- ⚠️ **O `{banco}` de `POST /webhooks/{banco}` virou lista fechada** (`c6`,
+  `sicoob`, `inter`, em minúsculas). Slug fora da lista respondia **`200` com
+  `event: "ignorado"`** — e `200` faz o banco parar de reentregar, então a
+  notificação sumia. `/webhooks/C6` era o caso pior: o token batia (a checagem
+  faz `.upper()`) e o evento era descartado assim mesmo. Agora é `422`.
+- ⚠️ **`/pix-automatico` confere o pedido antes de ir ao banco.** O `txid` da
+  `cobr` passa a seguir o padrão BACEN (`^[a-zA-Z0-9]{26,35}$`, o mesmo da
+  cob/cobv), `inicio`/`fim` precisam ser RFC3339 e não invertidos, a `{data}` da
+  retentativa precisa ser data, `valor` do ciclo maior que zero e `PATCH` com ao
+  menos um campo. **`data_vencimento` no passado é recusada** — cobrança do
+  ciclo cinco dias atrás era aceita com `201`.
+- ⚠️ **A URL de `/pix-automatico/config/webhooks` passa pela mesma regra do
+  `/config/webhook-*`**: https e alcançável de fora. Era repassada crua.
+- ⚠️ **Os itens de `/jobs/boletos/{id}/items` ganham faixa e vocabulário.**
+  `limite` passa a exigir 1–500 (`limite=-1` devolvia o lote inteiro, com a
+  paginação desligada por acidente), `offset` não pode ser negativo e `status`
+  só aceita `pending`, `completed` ou `failed` — texto livre respondia `200` com
+  lista vazia, que se lê como "nenhum item nesse estado".
+- ⚠️ **`POST /bolepix` exige a chave Pix.** Sem ela o banco emitia boleto **sem
+  o segmento Pix** e a resposta era `201` — um Bolepix sem QR, que é o que o
+  nome promete. Boleto puro continua em `POST /cobranca`.
+- ⚠️ **`external_reference_id` do Bolepix é validado** (`^[A-Z0-9]{26}$`), no
+  corpo e no caminho das consultas. O padrão estava escrito em três lugares e
+  não valia em nenhum. `valor` passa a exigir maior que zero e
+  `dias_apos_vencimento`, não negativo.
+- ⚠️ **A `url` de `/config/webhook-*` passa a ser conferida.** Quem chama é o
+  banco, de fora: exige `https` e destino alcançável. `http://localhost` e IP
+  privado eram aceitos com `200` — o cadastro parecia feito e a notificação
+  nunca chegava. `WEBHOOK_URL_PERMITE_LOCAL=1` libera para homologação local.
+- ⚠️ **`service` em `/config/webhook-banco` virou enum** (`BANK_SLIP` |
+  `CHECKOUT`): qualquer texto ia para o banco, `""` inclusive.
+- **`PUT /config/webhook-pix` ganhou schema** (`WebhookPixIn`). Era corpo livre:
+  o Swagger não descrevia campo nenhum e campo com nome errado passava calado.
+- **`GET /extrato` ganha `numero_conta`.** O Sicoob exige a conta na consulta e
+  a rota não tinha onde recebê-la: toda chamada ia com `numeroContaCorrente: 0`.
+  Omitido, segue `0` — quem já chamava não muda.
+- `GET /extrato` confere as datas (`YYYY-MM-DD`, `end_date` não anterior a
+  `start_date`) antes de ir ao banco, e a spec passa a dizer que a resposta é
+  **crua do banco**, com um exemplo de C6, Sicoob e Inter — os três shapes
+  diferem e não há como normalizá-los sem inventar um formato.
+- ⚠️ **`GET /conciliacao/*` confere o período antes de ir ao banco.** `start_date`
+  e `end_date` passam a ser datas de verdade (`YYYY-MM-DD`), a janela de 60 dias
+  do C6 é aplicada e período invertido é `422` — antes o banco respondia lista
+  vazia, que quem chama lê como "não houve movimento". `page` ganha mínimo 1 e
+  `size` passa a aceitar de 1 a 100 (só tinha teto).
+- ⚠️ **`POST /carne` recusa antes de registrar.** Teto de 200 parcelas (`413`),
+  parcela duplicada, banco sem layout na engine e dado que a engine não desenha
+  agora respondem `4xx` **antes** da primeira ida ao banco — antes o erro vinha
+  depois de N boletos já registrados, e a resposta não dizia quais.
+- **`bank` no `POST /carne` virou opcional**: o layout vem do `banco`. Enviado e
+  divergente, `422` — carnê com a marca de um banco e parcelas registradas em
+  outro não é pagável.
+- `POST /carne` aceita `Authorization: Bearer bapi_...`, como as demais rotas —
+  a rota não lia o header, e o caminho de credencial recomendado não valia nela.
+- ⚠️ **`POST /checkout` recusa campo desconhecido no nível de cima do corpo.**
+  Só `checkout` recusava; fora dele, `card_number` e `save_card` respondiam
+  `201` e sumiam — o chamador concluía que a API tinha aceitado o dado de
+  cartão. Corpo com campo fora do envelope agora é `422`.
+- **`Idempotency-Key` do `/checkout` passa a considerar `provider` e `banco`.**
+  A mesma chave apontada para outro banco devolvia o link do primeiro sem
+  chamar o segundo; agora é `422`, como qualquer outro pedido diferente.
+- `GET /bancos` e `GET /health` passam a **descrever a própria resposta** na
+  spec: as duas respondiam "objeto qualquer", sem exemplo — e `/bancos` é para
+  onde o resto da documentação manda quem precisa da matriz exata.
+- `GET /openapi.json` ganha `ETag`: recarregar o `/docs` devolve `304` em vez de
+  324 KB — o `/api/openapi.json` já fazia isso.
+- `GET /api/openapi.json` responde em **~5 ms** (eram ~150 ms: o YAML era lido e
+  parseado a cada chamada). Com `ETag`, recarregar o Swagger devolve `304`.
+- Doc offline sem o arquivo `docs/openapi.yaml` responde **503 dizendo onde ele
+  foi procurado**, em vez de `500` anônimo nas três rotas.
+
+### Corrigido
+- **`txid` fora do padrão BACEN ia para o banco.** `[a-zA-Z0-9]{26,35}` era
+  citado na mensagem de erro da cobv e não aplicado em lugar nenhum: `"abc"`,
+  txid com hífen e txid de 40 caracteres viravam `400` do banco (traduzido em
+  `422` com `upstream`). Agora é `422` do contrato, antes da ida à rede, e vale
+  para cob, cobv e itens de lote.
+- **Três chaves diferentes para a mesma coisa nos erros de `/api/*`**:
+  `validation_errors` (remessa), `details` (retorno) e `erro` em português
+  (OFX). A canônica é `validation_errors` com `error`, e as antigas seguem
+  presentes como alias — quem lê por elas não quebra.
+- **Webhook com JSON válido de forma errada respondia `500`.** `"texto"` e
+  `[1,2,3]` estouravam no normalizador, e o banco reentregava em loop um payload
+  que nunca funcionaria. Corpo `{}` virava evento com todos os campos nulos,
+  empurrado ao consumidor assinado. Ambos agora são `422`.
+- Os quatro corpos livres de `/pix-automatico` (três `PATCH` e o de webhooks)
+  apareciam na spec como "objeto qualquer", sem um campo nem um exemplo. O dict
+  segue livre — o `PATCH` do BACEN é subconjunto variável por jornada — mas
+  agora o contrato descreve o que cabe ali.
+- **Os links das respostas de `/jobs` não eram seguíveis.** `self`, `items`,
+  `files` e os `href` do manifesto — inclusive o do `.zip` consolidado e o do
+  push de conclusão — saíam sem `tenant_id`, que as rotas exigem: seguir o que a
+  resposta oferecia dava `422`. Agora todos vêm prontos.
+- **Item de job além do 500º respondia `404`.** A busca varria um teto fixo, e
+  `JOB_MAX_ITENS` é configurável — o item existia e a API afirmava que não.
+- `410` (artefato expirado) passa a ser declarado nas cinco rotas de artefato:
+  estava no código e fora do contrato.
+- **O `external_reference_id` gerado pela API podia não voltar.** O `id` saía só
+  da resposta do banco; quando ela não o ecoava, o identificador se perdia e o
+  Bolepix ficava inconsultável. Agora volta sempre, e `POST /bolepix` ganha
+  `Location`.
+- **`/config/webhook-pix` em banco sem Pix respondia `500`** (Itaú, nas três
+  rotas). Agora é `422` dizendo quais bancos têm o webhook BACEN por chave.
+- **O `422` de capacidade dizia "banco 'on'"** em `/config/webhook-banco` e nas
+  quatro rotas de `/bolepix`: a checagem recebia o caminho no lugar da
+  instituição. Agora nomeia o banco.
+- **`GET /extrato` em banco sem API de conta respondia `500`** (Itaú). Agora é
+  `422` apontando para o retorno CNAB ou o OFX.
+- **`GET /conciliacao/*` em banco sem a funcionalidade respondia `500`.** A rota
+  não checava capacidade, e a checagem que as outras usam não via método apenas
+  herdado da classe base — o `NotImplementedError` virava "Internal Server
+  Error". Agora é `422` dizendo que a conciliação é do C6, e o critério passou a
+  ser o mesmo que o `GET /bancos` publica em `capacidades`.
+- ⚠️ **Parcela inválida sumia do carnê em silêncio.** A engine descarta o item
+  que não desenha e monta o resto: 12 parcelas entravam, 11 saíam no PDF, e a
+  resposta era `201` — o pagador não recebia o boleto de uma parcela que
+  continuava sendo cobrada. Agora é `422` com o índice e o motivo de cada uma.
+- **`POST /carne` respondia `500` sem corpo JSON** em cinco casos (lista de
+  parcelas vazia, `bank` inválido, dado que a engine recusa): "Internal Server
+  Error" em 21 bytes, sem dizer o que estava errado.
+- **`POST /checkout` não devolvia `Location`.** O `201` trazia o `id` e cabia a
+  quem chama montar a URL de consulta, adivinhando que `tenant_id`, `provider` e
+  `banco` são obrigatórios lá. Agora vem pronto, como em `/cobranca` e `/pix`.
+- **`valor` zero ou negativo virava link de pagamento.** `amount: -10.0` saía
+  daqui para o banco; agora é `422` do contrato.
+- ⚠️ **`redirect_url` aceitava qualquer esquema, `javascript:` inclusive** — e
+  quem publica essa URL é o banco, na página dele, na frente de quem está
+  digitando o cartão. Só `http://` e `https://` passam.
+- **O `422` de campo recusado devolvia o valor enviado.** `card_number` no corpo
+  do checkout voltava inteiro no `input`, e daí para o log de quem chamou. Campo
+  fora do schema agora ecoa `"<redigido>"`; o nome do campo continua ali.
+- **O `Location` do `201` levava a `422` no modelo novo.** Faltava o `banco`, que
+  o segundo eixo passou a exigir — quebrado em `POST /cobranca`, `/pix` e
+  `/pix/lote`, e são no apelido legado. Seguir o header agora funciona nos dois.
+- ⚠️ **O `422` de validação devolvia as credenciais do banco no corpo.** O
+  `input` do Pydantic ecoava `client_secret` e a senha do certificado mTLS de
+  volta ao chamador — e daí para log, APM e console do navegador. O envelope
+  `credentials` (e o header `X-Bank-Credentials`) agora vem `"<redigido>"`;
+  o resto do `input` continua ali, que é o que torna o `422` útil.
+- A spec declarava os erros vindos **do banco** e omitia os do **token**: `401`
+  aparecia em 4 das 67 operações e `403` em nenhuma, enquanto a API responde os
+  dois nas 61 que aceitam `bapi_`. Agora estão declarados onde acontecem.
+- ⚠️ **Boleto com `emv`/`pix_label` saía sem QR Pix**, com `200` e sem aviso: a
+  engine nunca leu esses campos. Agora respondem `400` apontando para
+  `chave_pix`, que é o que gera o QR (nos sete bancos que o suportam). Quem
+  enviava `emv` estava entregando boleto sem Pix — troque o campo.
+- JSON válido de forma errada (`"texto"`, `123`, objeto onde se espera lista)
+  respondia `500` em sete rotas `/api/*`; agora é `400` dizendo qual campo e que
+  tipo chegou.
+- `POST /api/boleto/multi` ignorava `template` inválido e gerava o lote em
+  `moderno`; agora responde `400`, como `GET /api/boleto` já fazia.
+- Formato descontinuado (`type=png`) devolvia `validation_errors` como objeto —
+  em todo o resto da API é lista plana. Agora é lista nas duas rotas.
+- Swagger offline (`/api/docs`) prometia campos que a resposta não tem: sete em
+  `/api/boleto/data`, três em `/api/boleto/nosso_numero`, e `fitid`/`name` no OFX
+  (o identificador vem em `id`). No resumo do OFX, `total_creditos` e
+  `total_debitos` são **somas em reais**, não contagens.
+- ⚠️ `POST /api/ofx/parse` marcava **todo lançamento como `credito`** e deixava
+  `total_debitos` em `0` — débito entrava na soma de créditos. Quem concilia por
+  este endpoint deve reprocessar os totais.
+- Boleto de layout que exige campo extra (Sicredi: `data_documento`, `byte_idt`)
+  respondia `500`; agora responde `400` nomeando o campo que falta.
+- Rotas de `/pix-automatico` num banco que não oferece Pix Automático (Itaú)
+  respondiam `500`; agora respondem `422` dizendo quais bancos oferecem.
 
 ## [2.2.0] - 2026-08-08
 

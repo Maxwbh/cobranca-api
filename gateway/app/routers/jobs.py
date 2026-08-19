@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Callable
+from urllib.parse import urlencode
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
@@ -103,6 +104,29 @@ _CORPO_JOB_REMESSAS = {
 _RESP_413 = {413: {"description": f"Acima de JOB_MAX_ITENS (default {JOB_MAX_ITENS}) — "
                                   "divida o volume em jobs menores."}}
 _RESP_404 = {404: {"description": "Job não encontrado para o tenant."}}
+#: As rotas de artefato levantam 410 quando a retenção vence — estava no código
+#: e fora do contrato, então o consumidor não tinha como distinguir "expirou" de
+#: "nunca existiu" sem tentar.
+_RESP_ARTEFATO = {**_RESP_404,
+                  410: {"description": "Artefatos expirados (retenção vencida)."}}
+
+# `limite=-1` devolvia o lote INTEIRO e `limite=0`, nada: o teto existia e o
+# piso não. `offset` negativo idem.
+_LIMITE = Query(default=100, ge=1, le=500, description="Itens por página (1 a 500)")
+_OFFSET = Query(default=0, ge=0, description="Itens a pular")
+# `status` era texto livre: `INVENTADO` respondia 200 com lista vazia, que se lê
+# como "nenhum item nesse estado" em vez de "esse estado não existe".
+_STATUS_ITEM = Query(default=None, description="Filtra por estado do item")
+
+
+def _link(caminho: str, tenant_id: str) -> str:
+    """Link que o consumidor consegue seguir.
+
+    As rotas de consulta exigem `tenant_id` — é o isolamento entre clientes — e
+    os links do corpo (`self`, `items`, `files`, e os `href` do manifesto)
+    saíam sem ele: seguir o que a resposta oferecia dava `422`. É o mesmo
+    defeito do `Location` das rotas de criação, aqui dentro do payload."""
+    return f"{caminho}?{urlencode({'tenant_id': tenant_id})}"
 
 
 def _store() -> js.JobStore:
@@ -127,7 +151,8 @@ def _notificar_conclusao(job_id: str, tenant_id: str, tipo: str, job: dict[str, 
         "completed": job.get("completed"),
         "failed": job.get("failed"),
         "duracao_ms": job.get("duracao_ms"),
-        "self": f"/jobs/{'cnab/remessas' if tipo == 'cnab_remessas' else 'boletos'}/{job_id}",
+        "self": _link(f"/jobs/{'cnab/remessas' if tipo == 'cnab_remessas' else 'boletos'}"
+                      f"/{job_id}", tenant_id),
     }
     if manifesto:
         evento["artifacts"] = {
@@ -208,7 +233,7 @@ def _processar(job_id: str, tenant_id: str, boletos: list[dict[str, Any]],
             continue
         completos += 1
         # Fase 2: PDF vai para o disco; o item guarda a referência (hash/tamanho).
-        artefato = art.salvar_item(job_id, item_id, pdf)
+        artefato = art.salvar_item(job_id, item_id, pdf, tenant_id)
         store.concluir_item(job_id, item_id, js.ITEM_COMPLETED,
                             {"bank": bank, **info, "artifact": artefato})
     final = (js.JOB_COMPLETED if not falhos
@@ -266,7 +291,8 @@ async def criar_job_boletos(
             job = store.obter(tenant_id, existente)
             return JSONResponse(status_code=200, content={
                 "job_id": existente, "status": job["status"], "total": job["total"],
-                "idempotent_replay": True, "self": f"/jobs/boletos/{existente}"})
+                "idempotent_replay": True,
+                "self": _link(f"/jobs/boletos/{existente}", tenant_id)})
 
     itens, duplicados = _itens_e_duplicados(boletos, _item_id)
     if duplicados:
@@ -283,8 +309,8 @@ async def criar_job_boletos(
                  "meta": {"template": template}}, itens)
     background.add_task(_processar, job_id, tenant_id, boletos, template)
     return {"job_id": job_id, "status": js.JOB_RECEIVED, "recebidos": len(boletos),
-            "self": f"/jobs/boletos/{job_id}",
-            "items": f"/jobs/boletos/{job_id}/items"}
+            "self": _link(f"/jobs/boletos/{job_id}", tenant_id),
+            "items": _link(f"/jobs/boletos/{job_id}/items", tenant_id)}
 
 
 @router.get("/boletos/{job_id}", responses=_RESP_404)
@@ -298,18 +324,20 @@ def consultar_job(job_id: str, tenant_id: str) -> Any:
         "total": job["total"], "completed": job["completed"], "failed": job["failed"],
         "criado_em": job["criado_em"], "atualizado_em": job["atualizado_em"],
         "meta": job["meta"], "metricas": job["meta"].get("metricas"),
-        "items": f"/jobs/boletos/{job_id}/items",
+        "items": _link(f"/jobs/boletos/{job_id}/items", tenant_id),
+        "artifacts": _link(f"/jobs/boletos/{job_id}/artifacts", tenant_id),
     }
 
 
 @router.get("/boletos/{job_id}/items", responses=_RESP_404)
-def listar_itens(job_id: str, tenant_id: str, status: str | None = None,
-                 limite: int = Query(default=100, le=500), offset: int = 0) -> Any:
+def listar_itens(job_id: str, tenant_id: str, status: js.StatusItem | None = _STATUS_ITEM,
+                 limite: int = _LIMITE, offset: int = _OFFSET) -> Any:
     """Itens do job (paginado; filtro opcional por `status`)."""
     store = _store()
     if not store.obter(tenant_id, job_id):
         raise HTTPException(status_code=404, detail="job não encontrado para o tenant")
-    itens = store.itens(job_id, status=status, limite=limite, offset=offset)
+    itens = store.itens(job_id, status=getattr(status, "value", status),
+                        limite=limite, offset=offset)
     return {"job_id": job_id, "total_retornado": len(itens),
             "limite": limite, "offset": offset, "items": itens}
 
@@ -322,16 +350,21 @@ def consultar_item(job_id: str, item_id: str, tenant_id: str) -> Any:
     quando um item falha, e o motivo fica no item, não no job.
     """
     store = _store()
-    if not store.obter(tenant_id, job_id):
+    job = store.obter(tenant_id, job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="job não encontrado para o tenant")
-    for item in store.itens(job_id, limite=500):
+    # A varredura parava em 500 itens. `JOB_MAX_ITENS` é env (default 200): com
+    # um teto maior, o item 600 existia e respondia 404 — o pior tipo de 404,
+    # porque afirma ausência. O total do job é o limite honesto.
+    total = int(job.get("total") or 0)
+    for item in store.itens(job_id, limite=max(total, 1)):
         if item["item_id"] == item_id:
             return item
     raise HTTPException(status_code=404, detail="item não encontrado no job")
 
 
 # ------------------------------------------------------------------ artefatos
-@router.get("/boletos/{job_id}/artifacts", responses=_RESP_404)
+@router.get("/boletos/{job_id}/artifacts", responses=_RESP_ARTEFATO)
 def manifesto_artefatos(job_id: str, tenant_id: str) -> Any:
     """Manifesto do job: arquivos, `sha256`, tamanhos, expiração e consolidado `.zip`.
 
@@ -348,7 +381,7 @@ def manifesto_artefatos(job_id: str, tenant_id: str) -> Any:
     return manifesto
 
 
-@router.get("/boletos/{job_id}/artifacts/items/{nome}", responses=_RESP_404)
+@router.get("/boletos/{job_id}/artifacts/items/{nome}", responses=_RESP_ARTEFATO)
 def baixar_artefato_item(job_id: str, nome: str, tenant_id: str) -> Any:
     """Download do PDF de um item."""
     if not _store().obter(tenant_id, job_id):
@@ -359,7 +392,7 @@ def baixar_artefato_item(job_id: str, nome: str, tenant_id: str) -> Any:
     return FileResponse(caminho, media_type="application/pdf", filename=nome)
 
 
-@router.get("/boletos/{job_id}/artifacts/{nome}", responses=_RESP_404)
+@router.get("/boletos/{job_id}/artifacts/{nome}", responses=_RESP_ARTEFATO)
 def baixar_artefato(job_id: str, nome: str, tenant_id: str) -> Any:
     """Download do consolidado (`.zip`), do `manifest.json` ou do `errors.json`."""
     if not _store().obter(tenant_id, job_id):
@@ -396,7 +429,7 @@ def _processar_remessas(job_id: str, tenant_id: str,
                                  "errors": [f"erro inesperado: {e}"]})
             continue
         completos += 1
-        artefato = art.salvar_remessa(job_id, sid, conteudo)
+        artefato = art.salvar_remessa(job_id, sid, conteudo, tenant_id)
         store.concluir_item(job_id, sid, js.ITEM_COMPLETED,
                             {"chave": sublote["chave"], "quantidade": sublote["quantidade"],
                              "artifact": artefato})
@@ -446,7 +479,8 @@ async def criar_job_remessas(
             job = store.obter(tenant_id, existente)
             return JSONResponse(status_code=200, content={
                 "job_id": existente, "status": job["status"], "total": job["total"],
-                "idempotent_replay": True, "self": f"/jobs/cnab/remessas/{existente}"})
+                "idempotent_replay": True,
+                "self": _link(f"/jobs/cnab/remessas/{existente}", tenant_id)})
 
     sublotes = pycob.agrupar_sublotes(titulos)
     # `sublote_id` sai do agrupamento e deve ser único por construção. A
@@ -468,8 +502,8 @@ async def criar_job_remessas(
     return {"job_id": job_id, "status": js.JOB_RECEIVED, "titulos": len(titulos),
             "sublotes": [{"sublote_id": s["sublote_id"], "chave": s["chave"],
                           "quantidade": s["quantidade"]} for s in sublotes],
-            "self": f"/jobs/cnab/remessas/{job_id}",
-            "files": f"/jobs/cnab/remessas/{job_id}/files"}
+            "self": _link(f"/jobs/cnab/remessas/{job_id}", tenant_id),
+            "files": _link(f"/jobs/cnab/remessas/{job_id}/files", tenant_id)}
 
 
 @router.get("/cnab/remessas/{job_id}", responses=_RESP_404)
@@ -488,10 +522,10 @@ def consultar_job_remessas(job_id: str, tenant_id: str) -> Any:
             "failed": job["failed"], "criado_em": job["criado_em"],
             "atualizado_em": job["atualizado_em"], "meta": job["meta"],
             "metricas": job["meta"].get("metricas"),
-            "files": f"/jobs/cnab/remessas/{job_id}/files"}
+            "files": _link(f"/jobs/cnab/remessas/{job_id}/files", tenant_id)}
 
 
-@router.get("/cnab/remessas/{job_id}/files", responses=_RESP_404)
+@router.get("/cnab/remessas/{job_id}/files", responses=_RESP_ARTEFATO)
 def listar_arquivos_remessa(job_id: str, tenant_id: str) -> Any:
     """Manifesto dos arquivos CNAB: 1 por sublote, com `sha256`, registros e chave."""
     job = _store().obter(tenant_id, job_id)
@@ -506,7 +540,7 @@ def listar_arquivos_remessa(job_id: str, tenant_id: str) -> Any:
     return manifesto
 
 
-@router.get("/cnab/remessas/{job_id}/files/{nome}", responses=_RESP_404)
+@router.get("/cnab/remessas/{job_id}/files/{nome}", responses=_RESP_ARTEFATO)
 def baixar_arquivo_remessa(job_id: str, nome: str, tenant_id: str) -> Any:
     """Download de um arquivo CNAB (`.rem`), do consolidado `.zip` ou do manifesto."""
     job = _store().obter(tenant_id, job_id)

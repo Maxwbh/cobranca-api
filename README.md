@@ -62,7 +62,7 @@
 <p align="center"><sub>
   Resposta <strong>real</strong>, capturada da API — caminho offline (Sicoob),
   sem credencial e sem convênio. O mesmo <code>POST /cobranca</code> com
-  <code>provider=c6</code> registra no banco.
+  <code>provider=on&amp;banco=c6</code> registra no banco.
 </sub></p>
 
 ### Dois mundos, um contrato
@@ -72,12 +72,19 @@
 | **O que faz** | Boleto **registrado**, Pix e Pix Automático (BACEN), **link de pagamento com cartão**, Bolepix, extrato e conciliação | Boleto em **PDF**, CNAB **240/400** (remessa e retorno), **carnê 3-vias**, parsing de **OFX** |
 | **Como** | OAuth2 + mTLS contra o banco | pyCobrança **no mesmo processo** — sem rede, sem sidecar |
 | **Precisa de** | Convênio e credenciais do banco | **Nada** — roda sem internet |
-| **Bancos** | C6 (336) · Sicoob (756) · Inter (077) | **18 bancos** |
+| **Bancos** | C6 (336) · Sicoob (756) · Inter (077) · Itaú (341)¹ | **18 bancos** |
 | **Serve para** | Cobrar e conciliar de verdade, com o banco | Gerar, validar e processar arquivo — inclusive sem convênio |
 
-**Não são dois produtos.** É o mesmo `POST /cobranca`: com `provider=c6` vai ao
-banco, sem `provider` cai na engine. Trocar de mundo é trocar um campo — e é o
-que permite começar offline hoje e ligar o banco quando o convênio sair.
+**Não são dois produtos.** É o mesmo `POST /cobranca`: `provider=on&banco=c6`
+vai ao banco, `provider=off&banco=c6` cai na engine. Trocar de mundo é trocar um
+campo — e é o que permite começar offline hoje e ligar o banco quando o convênio
+sair. (O nome do banco no `provider` — `provider=c6` — segue valendo como
+apelido até a 3.0.0.)
+
+<sub>¹ O Itaú tem provider escrito, mas nasce **desligado** por
+`ITAU_REGISTERED_READY`: sem a flag, `banco=itau` emite pela engine, que tem o
+layout 341. O payload de emissão ainda depende do catálogo do banco, que exige
+login.</sub>
 
 Tudo por **REST**, em **um único container 100% Python**, com **lote assíncrono**
 e artefatos assinados.
@@ -296,7 +303,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | "Preciso de CNAB 240/400 para enviar ao banco" | `POST /api/remessa` gera o arquivo pronto |
 | "Preciso processar o retorno do banco" | `POST /api/retorno` parseia e retorna JSON |
 | "Preciso conciliar pagamentos com extrato" | `POST /api/ofx/parse` extrai nosso_numero do OFX |
-| "Preciso de boleto com QR Code PIX" | Campo `emv` no payload + `pix=true` na remessa |
+| "Preciso de boleto com QR Code PIX" | Campo `chave_pix` no payload + `pix=true` na remessa |
 | "Não quero dependências de sistema" | Engine **100% Python** (pyCobrança) — PDF sem GhostScript |
 | "Preciso saber quais bancos/formatos são suportados" | `GET /api/bancos` retorna tudo dinamicamente |
 | "Preciso receber por cartão, sem guardar dados de cartão" | `POST /checkout` devolve um link; o PAN é digitado na página do banco |
@@ -337,7 +344,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | **`/docs`** | GET | Swagger do gateway |
 | `/bancos` | GET | Catálogo com capacidades reais e esquema de credenciais por banco |
 | `/credenciais` | POST | Credenciais do banco → token `bapi_` (zero-knowledge) |
-| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6, Sicoob, Inter) ou offline, conforme `provider` |
+| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6, Sicoob, Inter, Itaú) ou offline, conforme `provider` |
 | `/carne` | POST | Carnê 3-vias (registra N parcelas e monta o PDF) |
 | `/pix` · `/bolepix` · `/pix-automatico` | — | Pix BACEN, boleto híbrido e débito recorrente |
 | `/checkout` | POST/GET/DELETE | **Link de pagamento com cartão** (crédito/débito, parcelado, Pix no mesmo link) — C6 |
@@ -362,7 +369,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | `/api/boleto/validate` | GET | Validar dados do boleto |
 | `/api/boleto/data` | GET | Dados calculados |
 | `/api/boleto/nosso_numero` | GET | Apenas nosso_numero |
-| `/api/boleto` | GET | Gerar boleto (PDF/JPG/PNG/TIF) |
+| `/api/boleto` | GET | Gerar boleto em **PDF** (`jpg`/`png`/`tif` foram descontinuados) |
 | `/api/boleto/multi` | POST | Múltiplos boletos |
 | `/api/remessa` | POST | Remessa CNAB |
 | `/api/retorno` | POST | Retorno CNAB |
@@ -388,8 +395,8 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | Caixa | 104 | ✅ | 240 | 240 | ✅ |
 | Bradesco | 237 | ✅ | 400 | 400 | ✅ |
 | **Banco C6** | **336** | ✅ | 400 | 400 | ✅ |
-| Itaú | 341 | ✅ | 400 + 444 | 400 | ✅ |
-| Sicredi | 748 | ✅ | 240 | 240 | ✅ |
+| Itaú | 341 | ✅ | 400 | 400 | ✅ |
+| Sicredi | 748 | ✅ | 240 | 240 | — |
 | Sicoob | 756 | ✅ | 400 + 240 | 240 | ✅ |
 | Banrisul | 041 | ✅ | 400 | 400 | — |
 | Unicred | 136 | ✅ | 400 + 240 | 400 | — |

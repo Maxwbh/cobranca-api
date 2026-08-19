@@ -67,17 +67,32 @@ CREATE OR REPLACE PACKAGE cobranca_api AS
     pix_copia_cola   VARCHAR2(1000)
   );
 
+  -- OS DOIS EIXOS
+  --
+  -- `p_provider` e o CAMINHO ('on' = API do banco | 'off' = engine) e `p_banco`
+  -- a INSTITUICAO ('c6', 'sicoob', 'itau', 'banco_brasil', ...).
+  --
+  -- O nome do banco em `p_provider` ('c6', 'sicoob', 'inter', 'itau') segue
+  -- aceito como apelido de on+banco, e sai na 3.0.0. Mas o apelido so existe
+  -- para esses QUATRO: `p_provider => 'banco_brasil'` e 422, e `'off'` sem
+  -- `p_banco` tambem — a API responde pedindo o banco. Por isso `p_banco`
+  -- existe aqui: sem ele o pacote so alcanca os quatro online.
+  --
   -- Cadastra as credenciais do banco UMA vez e guarda o token bapi_ em g_token.
   -- O token so e devolvido nesta chamada: guarde-o se for reusar entre sessoes.
   --   POST /credenciais
   FUNCTION cadastrar_credenciais(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
-                                 p_credenciais_json IN CLOB) RETURN VARCHAR2;
+                                 p_credenciais_json IN CLOB,
+                                 p_banco IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2;
 
-  -- Cobranca REGISTRADA na API do banco (c6 | sicoob) — POST /cobranca.
+  -- Cobranca REGISTRADA na API do banco — POST /cobranca.
   -- Exige g_token do MESMO tenant+banco (o token e amarrado aos dois).
+  --   registrar_cobranca(..., p_provider => 'on',  p_banco => 'c6')
+  --   registrar_cobranca(..., p_provider => 'off', p_banco => 'banco_brasil')
   FUNCTION registrar_cobranca(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
                               p_boleto IN t_boleto,
-                              p_account_config_json IN VARCHAR2 DEFAULT '{}')
+                              p_account_config_json IN VARCHAR2 DEFAULT '{}',
+                              p_banco IN VARCHAR2 DEFAULT NULL)
     RETURN t_cobranca;
 
   -- Resultado do link de pagamento com cartao (checkout)
@@ -96,6 +111,9 @@ CREATE OR REPLACE PACKAGE cobranca_api AS
   -- duplo clique cria DOIS links para a mesma venda. Derive da venda
   -- ('venda-'||id), nunca de SYSTIMESTAMP — chave nova a cada clique nao
   -- protege de nada.
+  -- `p_valor` maior que zero e `p_redirect_url` ABSOLUTA (http:// ou https://):
+  -- quem publica essa URL e o banco, na pagina dele -- relativa la resolve para
+  -- o dominio do banco. A API recusa os dois casos com 422.
   FUNCTION criar_checkout(p_tenant IN VARCHAR2, p_valor IN NUMBER,
                           p_descricao IN VARCHAR2 DEFAULT NULL,
                           p_parcelas IN NUMBER DEFAULT 1,
@@ -103,16 +121,19 @@ CREATE OR REPLACE PACKAGE cobranca_api AS
                           p_referencia IN VARCHAR2 DEFAULT NULL,
                           p_redirect_url IN VARCHAR2 DEFAULT NULL,
                           p_idempotency_key IN VARCHAR2 DEFAULT NULL,
-                          p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+                          p_provider IN VARCHAR2 DEFAULT 'c6',
+                          p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout;
 
   -- Status do link — GET /checkout/{id}. `liquidado` e o unico que da baixa;
   -- `erro` e cartao recusado (o LINK acabou, a divida nao).
   FUNCTION consultar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
-                              p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+                              p_provider IN VARCHAR2 DEFAULT 'c6',
+                              p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout;
 
   -- Cancela o link — DELETE /checkout/{id}
   FUNCTION cancelar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
-                             p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout;
+                             p_provider IN VARCHAR2 DEFAULT 'c6',
+                             p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout;
 
   -- Remessa CNAB (texto) — POST /api/remessa
   FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,
@@ -335,12 +356,15 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
   -- Cobranca ONLINE (API do banco): credencial -> token bapi_ -> cobranca
   --------------------------------------------------------------------------
   FUNCTION cadastrar_credenciais(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
-                                 p_credenciais_json IN CLOB) RETURN VARCHAR2 IS
+                                 p_credenciais_json IN CLOB,
+                                 p_banco IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
     l_resp CLOB;
   BEGIN
     l_resp := f_post_json('/credenciais',
                 TO_CLOB('{"tenant_id":"' || f_esc(p_tenant) || '",'
                         || '"provider":"' || f_esc(p_provider) || '",'
+                        || CASE WHEN p_banco IS NOT NULL
+                                THEN '"banco":"' || f_esc(p_banco) || '",' END
                         || '"credentials":') || p_credenciais_json || TO_CLOB('}'));
     APEX_JSON.parse(l_resp);
     g_token := APEX_JSON.get_varchar2('token');
@@ -349,7 +373,8 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
 
   FUNCTION registrar_cobranca(p_tenant IN VARCHAR2, p_provider IN VARCHAR2,
                               p_boleto IN t_boleto,
-                              p_account_config_json IN VARCHAR2 DEFAULT '{}')
+                              p_account_config_json IN VARCHAR2 DEFAULT '{}',
+                              p_banco IN VARCHAR2 DEFAULT NULL)
     RETURN t_cobranca IS
     l_resp CLOB;
     l_out  t_cobranca;
@@ -364,6 +389,8 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
       TO_CLOB('{'
         || '"tenant_id":"' || f_esc(p_tenant)   || '",'
         || '"provider":"'  || f_esc(p_provider) || '",'
+        || CASE WHEN p_banco IS NOT NULL
+                THEN '"banco":"' || f_esc(p_banco) || '",' END
         || '"account_config":' || p_account_config_json || ','
         || '"cobranca":{'
         ||   '"valor":' || l_val || ','
@@ -405,7 +432,8 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
                           p_referencia IN VARCHAR2 DEFAULT NULL,
                           p_redirect_url IN VARCHAR2 DEFAULT NULL,
                           p_idempotency_key IN VARCHAR2 DEFAULT NULL,
-                          p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+                          p_provider IN VARCHAR2 DEFAULT 'c6',
+                          p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout IS
     l_body CLOB;
     l_ck   VARCHAR2(4000);
   BEGIN
@@ -433,6 +461,8 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
 
     l_body := TO_CLOB('{"tenant_id":"' || f_esc(p_tenant) || '",'
                       || '"provider":"' || f_esc(p_provider) || '",'
+                      || CASE WHEN p_banco IS NOT NULL
+                              THEN '"banco":"' || f_esc(p_banco) || '",' END
                       || '"checkout":{' || l_ck || '}}');
 
     -- Reenvio com a mesma chave devolve o MESMO link, sem criar outro no banco.
@@ -445,21 +475,27 @@ CREATE OR REPLACE PACKAGE BODY cobranca_api AS
   END criar_checkout;
 
   FUNCTION consultar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
-                              p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+                              p_provider IN VARCHAR2 DEFAULT 'c6',
+                              p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout IS
   BEGIN
     RETURN f_checkout_out(
       f_get_clob('/checkout/' || UTL_URL.escape(p_checkout_id)
                  || '?tenant_id=' || UTL_URL.escape(p_tenant)
-                 || '&provider='  || UTL_URL.escape(p_provider)));
+                 || '&provider='  || UTL_URL.escape(p_provider)
+                 || CASE WHEN p_banco IS NOT NULL
+                         THEN '&banco=' || UTL_URL.escape(p_banco) END));
   END consultar_checkout;
 
   FUNCTION cancelar_checkout(p_tenant IN VARCHAR2, p_checkout_id IN VARCHAR2,
-                             p_provider IN VARCHAR2 DEFAULT 'c6') RETURN t_checkout IS
+                             p_provider IN VARCHAR2 DEFAULT 'c6',
+                             p_banco IN VARCHAR2 DEFAULT NULL) RETURN t_checkout IS
   BEGIN
     RETURN f_checkout_out(
       f_delete_clob('/checkout/' || UTL_URL.escape(p_checkout_id)
                     || '?tenant_id=' || UTL_URL.escape(p_tenant)
-                    || '&provider='  || UTL_URL.escape(p_provider)));
+                    || '&provider='  || UTL_URL.escape(p_provider)
+                    || CASE WHEN p_banco IS NOT NULL
+                            THEN '&banco=' || UTL_URL.escape(p_banco) END));
   END cancelar_checkout;
 
   FUNCTION gerar_remessa(p_bank IN VARCHAR2, p_tipo IN VARCHAR2,

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from typing import Literal
+
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, Field
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.core.vault import CredentialNotFound
 from app.registry import CaminhoInvalido
-from app.core.swagger_tema import pagina_swagger
+from app.core.swagger_tema import VENDOR_SWAGGER, pagina_redoc, pagina_swagger
 from app.providers.c6 import ProcessamentoPendente
 from app.routers import (
     bancos, bolepix, carne, checkout, cobranca, conciliacao, credenciais,
@@ -84,6 +92,19 @@ TAGS = [
      "description": "ENTRADA de notificações dos bancos → evento normalizado → push assinado (HMAC) ao consumidor dono do tenant."},
     {"name": "health", "description": "Sonda de disponibilidade."},
 ]
+
+
+class Saude(BaseModel):
+    """Resposta da sonda. Um campo, valor fixo — o contrato é a simplicidade.
+
+    `"ok"` MINÚSCULO. O `GET /api/health` da superfície offline responde `"OK"`
+    maiúsculo, por contrato herdado da v1.x: são sondas de processos diferentes
+    dentro do mesmo container e os dois formatos têm consumidor — este é o que o
+    `examples/oracle/cobranca_api_pkg.sql` e a coleção Postman comparam.
+    """
+
+    status: Literal["ok"] = Field(examples=["ok"])
+
 
 app = FastAPI(
     title="Cobranca-API",
@@ -242,6 +263,25 @@ _RESPOSTAS_DO_BANCO: dict[str, dict] = {
     "504": _resposta("Banco indisponível ou tempo esgotado (rede/timeout)."),
 }
 
+# Os erros do TOKEN vêm antes dos do banco e valem nas mesmas rotas: o `bapi_` é
+# resolvido na dependência, antes de qualquer chamada externa. A spec declarava
+# `401` só em `credenciais` e `webhooks`, e `403` em NENHUMA das 67 operações —
+# enquanto a API responde os dois em todas as 61 que aceitam token.
+#
+# É a mesma lacuna que criou o `_RESPOSTAS_DO_BANCO`, deixada pela metade: quem
+# integra descobria o `403` de token trocado em produção. E o
+# `examples/oracle/README.md` já o documentava em prosa, o que torna a omissão
+# na spec ainda mais fácil de não notar — a informação existe, só não onde o
+# Swagger e os geradores de cliente leem.
+_RESPOSTAS_DO_TOKEN: dict[str, dict] = {
+    "401": _resposta("Token `bapi_` ausente do cofre, inválido ou revogado.",
+                     _ERRO_SIMPLES),
+    "403": _resposta(
+        "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: "
+        "token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale "
+        "para o token de outro tenant.", _ERRO_SIMPLES),
+}
+
 # Tags cujas rotas realmente saem para o banco. As de fora respondem sem cruzar a
 # rede: `bancos` é introspecção do código, `credenciais` só cifra e guarda,
 # `health` é sonda — e `webhooks` é ENTRADA do banco, não chamada a ele.
@@ -307,7 +347,7 @@ def _openapi_enriquecido() -> dict:
             respostas = operacao.setdefault("responses", {})
             tags = set(operacao.get("tags") or ())
             if tags & _TAGS_QUE_FALAM_COM_O_BANCO:
-                for status, corpo in _RESPOSTAS_DO_BANCO.items():
+                for status, corpo in (_RESPOSTAS_DO_TOKEN | _RESPOSTAS_DO_BANCO).items():
                     respostas.setdefault(status, corpo)
                 if "422" in respostas:
                     respostas["422"]["description"] = _422_AMPLIADO
@@ -319,6 +359,45 @@ def _openapi_enriquecido() -> dict:
 
 
 app.openapi = _openapi_enriquecido
+
+
+# A spec do gateway tem 284 KB e o `/docs` a busca inteira a cada abertura, sem
+# ETag: o irmão offline (`/api/openapi.json`) já devolve `304` desde a revisão
+# anterior, e as duas superfícies respondiam diferente para a mesma pergunta.
+#
+# Gerar é barato (o FastAPI cacheia o schema; o enriquecimento é idempotente e
+# custa ~0,1 ms) — o que pesa é serializar e trafegar. Por isso o cache guarda
+# os BYTES, e não o dict.
+#
+# A rota built-in sai da lista em vez de `openapi_url=None`: aquele desliga
+# também o `/redoc`, que depende dela para existir.
+# O `/redoc` do FastAPI sai junto: era a única página de documentação sem o
+# tema da plataforma, com o favicon do `fastapi.tiangolo.com` e buscando
+# renderizador, fonte e ícone em três terceiros. A de baixo o substitui.
+_ROTAS_SUBSTITUIDAS = {app.openapi_url, app.redoc_url}
+app.router.routes = [r for r in app.router.routes
+                     if getattr(r, "path", None) not in _ROTAS_SUBSTITUIDAS]
+
+_spec_serializada: tuple[int, bytes, str] | None = None
+
+
+def _spec_bytes() -> tuple[bytes, str]:
+    global _spec_serializada
+    schema = app.openapi()
+    if _spec_serializada is None or _spec_serializada[0] != id(schema):
+        corpo = json.dumps(schema, ensure_ascii=False).encode()
+        _spec_serializada = (id(schema), corpo,
+                             hashlib.sha256(corpo).hexdigest()[:32])
+    return _spec_serializada[1], _spec_serializada[2]
+
+
+@app.get(app.openapi_url, include_in_schema=False)
+def openapi_json(request: Request) -> Response:
+    corpo, etag = _spec_bytes()
+    cabecalhos = {"ETag": f'"{etag}"', "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == f'"{etag}"':
+        return Response(status_code=304, headers=cabecalhos)
+    return Response(content=corpo, media_type="application/json", headers=cabecalhos)
 
 app.include_router(bancos.router)
 app.include_router(credenciais.router)
@@ -336,6 +415,58 @@ app.include_router(webhook_banco.pix_router)
 app.include_router(webhooks.router)
 # Catch-all /api/* por último (convenção; rotas tipadas ficam na raiz, sem colisão).
 app.include_router(offline.router)
+
+
+# O `422` do Pydantic devolve `input` — o valor que chegou — e isso é ótimo para
+# diagnóstico em quase toda a API. Em `credentials` é vazamento: são o
+# `client_secret` e a senha do certificado mTLS voltando no corpo da resposta,
+# de onde vão para log de aplicação, APM e console do navegador. O cabeçalho do
+# `core/vault.py` manda NUNCA logar credencial; devolver na resposta é pior,
+# porque nem passa por um filtro de log.
+#
+# Doze schemas aceitam `credentials` no corpo (`/cobranca`, `/checkout`, `/pix`…),
+# então a redação vive aqui, uma vez, e não rota a rota.
+#
+# Por NOME DO ENVELOPE, não por nome do segredo: o esquema de credenciais é de
+# cada banco (`pfx_password` no C6, `key_pem` no Inter) e banco novo traz nome
+# novo. Redigir o envelope inteiro não depende de manter lista de segredo em dia.
+_CAMPOS_SIGILOSOS = {"credentials", "x-bank-credentials"}
+_REDIGIDO = "<redigido>"
+
+
+def _redigir(valor: object, chave: object = None) -> object:
+    if isinstance(chave, str) and chave.lower() in _CAMPOS_SIGILOSOS:
+        return _REDIGIDO
+    if isinstance(valor, dict):
+        return {k: _redigir(v, k) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_redigir(v) for v in valor]
+    return valor
+
+
+@app.exception_handler(RequestValidationError)
+async def _validacao_sem_segredo(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """O `422` de sempre, com o envelope de credenciais redigido."""
+    erros = []
+    for erro in exc.errors():
+        erro = dict(erro)
+        # Campo que a API não conhece: o nome basta para o chamador corrigir, e o
+        # valor não tem uso diagnóstico — quem enviou já sabe o que enviou. Devolvê-lo
+        # é que tem custo: `card_number` no corpo do checkout voltava inteiro no
+        # `422`, e daí para o log de quem chamou. Campo recusado não ecoa valor.
+        if erro.get("type") == "extra_forbidden":
+            erro["input"] = _REDIGIDO
+            erro.pop("ctx", None)
+        # O campo com defeito pode SER o sigiloso — aí o `input` é o segredo cru.
+        elif any(str(p).lower() in _CAMPOS_SIGILOSOS for p in erro.get("loc", ())):
+            erro["input"] = _REDIGIDO
+            erro.pop("ctx", None)
+        else:
+            for campo in ("input", "ctx"):
+                if campo in erro:
+                    erro[campo] = _redigir(erro[campo])
+        erros.append(erro)
+    return JSONResponse(status_code=422, content=jsonable_encoder({"detail": erros}))
 
 
 @app.exception_handler(CaminhoInvalido)
@@ -436,6 +567,13 @@ async def _credential_not_found(request: Request, exc: CredentialNotFound) -> JS
     )
 
 
+# O renderizador do Swagger sai da PRÓPRIA aplicação quando os arquivos estão
+# na imagem — ver `swagger_tema.CDN_SWAGGER` para o porquê. Sem eles (checkout
+# sem `docs/`), `ASSETS_SWAGGER` já aponta para a CDN e não há o que montar.
+if VENDOR_SWAGGER is not None:
+    app.mount("/swagger-ui", StaticFiles(directory=VENDOR_SWAGGER), name="swagger-ui")
+
+
 @app.get("/docs", include_in_schema=False)
 def swagger_ui() -> HTMLResponse:
     """Swagger UI do gateway com a identidade visual da plataforma."""
@@ -450,7 +588,38 @@ def swagger_ui() -> HTMLResponse:
     ))
 
 
-@app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
-    """Sonda de disponibilidade do gateway (não toca nos bancos)."""
-    return {"status": "ok"}
+@app.get("/redoc", include_in_schema=False)
+def redoc_ui() -> HTMLResponse:
+    """A mesma spec do `/docs`, em leitura linear — útil numa spec de 67 rotas."""
+    return HTMLResponse(pagina_redoc(
+        titulo="Cobranca-API — Gateway (Redoc)",
+        superficie="Gateway REST · referência",
+        pill="4 bancos ON · 18 OFF",
+        detalhe=f"v{app.version} · leitura linear da mesma spec",
+        links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
+               ("Swagger →", "/docs", True)],
+        spec_url=app.openapi_url,
+    ))
+
+
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Sonda de disponibilidade",
+    response_model=Saude,
+    responses={200: {"content": {"application/json": {"example": {"status": "ok"}}}}},
+)
+def health() -> Saude:
+    """Prova que **o processo está de pé e roteando** — e só isso.
+
+    É a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o
+    `healthCheckPath` do Render consultam, e os três **matam o container**
+    quando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que
+    reprovasse por problema transitório reiniciaria o serviço em laço, que é
+    pior que o problema detectado. Estado por banco fica em `GET /bancos`.
+
+    O schema era o genérico do FastAPI (`additionalProperties: string`, sem
+    exemplo): a rota mais consumida por automação era a menos especificada da
+    API.
+    """
+    return Saude(status="ok")

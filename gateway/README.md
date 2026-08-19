@@ -185,6 +185,8 @@ O roteamento fica em `registry.build_provider`.
 | `WEBHOOK_TOKEN__<BANCO>` | token do webhook de **entrada** (ex.: `WEBHOOK_TOKEN__C6`) — 401 se divergir. **Obrigatório**: sem ele a rota recusa |
 | `WEBHOOK_ALLOW_UNAUTHENTICATED` | `1` aceita webhook sem token (comportamento anterior a 2.3.0) — **inseguro**, ver abaixo |
 | `WEBHOOK_CONFIRM` | `0` desliga a reconsulta ao banco antes de propagar `liquidado` (default: ligada) |
+| `WEBHOOK_URL_PERMITE_LOCAL` | `1` aceita `http://` e destino não roteável em `/config/webhook-*` — só para homologação com túnel local |
+| `UPLOAD_MAX_BYTES` | Teto por arquivo nas rotas `/api/*` de upload (default 10 MB) — acima disso, `413` |
 | `WEBHOOK_DEDUP` | `0` desliga o dedup de reentrega do banco (default: ligado) |
 | `OUTBOX_DRAIN_INTERVAL` | segundos entre drenagens da fila de push (default `30`; `0` desliga a thread **e a limpeza**) |
 | `WEBHOOK_INBOX_RETENCAO_DIAS` | idade máxima das marcas de dedup (default `7`) |

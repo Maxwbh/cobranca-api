@@ -1,7 +1,9 @@
-# Guia de Campos para Boletos - BRCobranca
+# Guia de Campos para Boletos — engine pyCobrança
 
 > 📚 Documentação completa dos campos aceitos por cada banco
-> 🕒 Última atualização: 2026-06-17
+> 🕒 Última atualização: 2026-08-19 — os exemplos desta página foram
+> **executados**: os de boleto voltam `valid: true` em `GET /api/boleto/validate`,
+> e os três de remessa geram arquivo CNAB em `POST /api/remessa`.
 
 ## 📋 Índice
 
@@ -25,27 +27,54 @@
 
 ## Campos Comuns
 
-Todos os bancos herdam da classe `Brcobranca::Boleto::Base` e compartilham campos básicos.
+Todos os bancos herdam de `BancoBase` (pyCobrança) e compartilham campos básicos.
 
 ### Obrigatórios 🔒
 
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `agencia` | String | Código da agência bancária |
-| `conta_corrente` | String | Número da conta corrente |
-| `nosso_numero` | String | Número sequencial do boleto **no banco** |
-| `cedente` | String | Nome do beneficiário (emissor) |
-| `documento_cedente` | String | CPF/CNPJ do beneficiário |
-| `sacado` | String | Nome do pagador |
-| `sacado_documento` | String | CPF/CNPJ do pagador |
-| `valor` | Decimal | Valor do boleto |
-| `data_vencimento` | Date/String | Data de vencimento |
+| Campo | Tipo | Descrição | A engine recusa sem ele? |
+|-------|------|-----------|:---:|
+| `valor` | Decimal | Valor do boleto | **sim** |
+| `data_vencimento` | Date/String | Data de vencimento | **sim** |
+| `cedente` | String | Nome do beneficiário (emissor) | **sim** |
+| `carteira` | String | Carteira do convênio | **sim** |
+| `convenio` | String | Convênio/código do beneficiário | **sim** (nos bancos que usam) |
+| `nosso_numero` | String | Número sequencial do boleto **no banco** | não ⚠️ |
+| `agencia` | String | Código da agência bancária | não ⚠️ |
+| `conta_corrente` | String | Número da conta corrente | não ⚠️ |
+| `sacado` | String | Nome do pagador | não ⚠️ |
+| `sacado_documento` | String | CPF/CNPJ do pagador | não ⚠️ |
+| `documento_cedente` | String | CPF/CNPJ do beneficiário | não ⚠️ |
+
+> ⚠️ **A coluna da direita é a diferença entre "obrigatório" e "validado", e ela
+> morde.** Os cinco primeiros a engine recusa; os demais ela **aceita ausentes e
+> gera o boleto assim mesmo**. Sem `nosso_numero`, a linha digitável sai com o
+> campo zerado — documento com cara de válido, que o banco não concilia:
+>
+> ```
+> com nosso_numero=7   → 00190.00009 01234.567004 00000.007187 8 16770000150000
+> sem nosso_numero     → 00190.00009 01234.567004 00000.000182 3 16770000150000
+> ```
+>
+> Errar aqui não dá erro; dá prejuízo depois. Trate a lista inteira como
+> obrigatória no **seu** código — a validação da engine não vai te salvar.
+
+### Nomes com apelido
+
+`documento_cedente` e `cedente_documento` são o **mesmo campo**, e o mesmo vale
+para `sacado_documento` e `documento_sacado` — a engine aceita as duas grafias.
+As mensagens de erro usam a forma `cedente_documento`, então não estranhe ver um
+nome no erro e outro no seu payload.
+
+> **CPF e CNPJ são validados de verdade** (dígito verificador). Documento
+> inventado como `12345678000100` volta `400` com
+> `cedente_documento inválido (CPF/CNPJ)` — é por isso que os exemplos abaixo
+> usam documentos com DV correto.
 
 ### Recomendados 📝
 
 | Campo | Descrição | Benefício |
 |-------|-----------|-----------|
-| `documento_numero` | Número da NF/pedido/contrato | Rastreabilidade e controle interno |
+| `numero_documento` | Número da NF/pedido/contrato | Rastreabilidade e controle interno |
 | `sacado_endereco` | Endereço completo do pagador | Compliance e localização |
 | `data_documento` | Data de emissão | Controle temporal |
 | `instrucao1` a `instrucao6` | Instruções para o caixa/pagador | Comunicação clara |
@@ -73,8 +102,12 @@ Todos os bancos herdam da classe `Brcobranca::Boleto::Base` e compartilham campo
 
 | Campo | Tipo | Validação | Notas |
 |-------|------|-----------|-------|
-| `convenio` | String | 4 a 8 dígitos | **OBRIGATÓRIO** |
+| `convenio` | String | **4, 6 ou 7 dígitos** | **OBRIGATÓRIO** |
 | `carteira` | String | 2 dígitos | Padrão: `'18'` |
+
+> ⚠️ **Convênio de 5 ou 8 dígitos é recusado**: `convênio deve ter 4, 6 ou 7
+> dígitos`. Versões anteriores desta página diziam "4 a 8" e traziam exemplos
+> com `01234567` (oito) — que a engine nunca aceitou.
 
 ### Tamanho do `nosso_numero` ⚠️
 
@@ -83,25 +116,35 @@ O tamanho máximo depende do convênio:
 - Convênio 4 dígitos → nosso_numero máx **7 dígitos**
 - Convênio 6 dígitos (sem codigo_servico) → nosso_numero máx **5 dígitos**
 - Convênio 6 dígitos (com codigo_servico) → nosso_numero máx **17 dígitos**
-- Convênio 7 dígitos → nosso_numero máx **10 dígitos**
-- Convênio 8 dígitos → nosso_numero máx **9 dígitos**
+- Convênio 7 dígitos → nosso_numero máx **10 dígitos** *(conferido: 11 dígitos
+  volta `nosso número deve ter no máximo 10 dígitos para este convênio`)*
 
 ### Campos Aceitos ✅
 
-- ✅ `documento_numero` - **SEM LIMITE DE TAMANHO**
+- ✅ `numero_documento` - a validação **não impõe limite** (conferido até 120 caracteres)
 - ✅ `aceite` - Aceita 'S' ou 'N'
 - ✅ `especie_documento` - Aceita qualquer valor válido
 
 ### Remessa CNAB (Banco do Brasil)
 
+> ⚠️ **A remessa não vai como corpo JSON — vai como arquivo.** `POST /api/remessa`
+> recebe **multipart/form-data** com o campo `data` contendo este JSON. Mandar o
+> objeto direto no corpo responde `422 Field required: data`. Os blocos abaixo
+> são o **conteúdo do arquivo**:
+>
+> ```bash
+> curl -X POST "$API/api/remessa?bank=banco_brasil&type=cnab400" \
+>      -F "data=@remessa.json;type=application/json" -o remessa.rem
+> ```
+
 ```json
-// POST /api/remessa?bank=banco_brasil&type=cnab400
+// conteúdo de remessa.json — POST /api/remessa?bank=banco_brasil&type=cnab400
 {
   "empresa_mae": "Empresa Teste LTDA",
-  "documento_cedente": "12345678000100",
+  "documento_cedente": "11222333000181",
   "agencia": "3073",
   "conta_corrente": "12345678",
-  "convenio": "01234567",
+  "convenio": "1234567",
   "carteira": "18",
   "variacao_carteira": "017",
   "pagamentos": [
@@ -110,7 +153,7 @@ O tamanho máximo depende do convênio:
       "data_vencimento": "2026/12/31",
       "valor": 1500.00,
       "nome_sacado": "Joao da Silva",
-      "documento_sacado": "12345678900",
+      "documento_sacado": "11144477735",
       "endereco_sacado": "Rua Teste, 100",
       "bairro_sacado": "Centro",
       "cep_sacado": "01000000",
@@ -127,14 +170,14 @@ O tamanho máximo depende do convênio:
 {
   "agencia": "3073",
   "conta_corrente": "12345678",
-  "convenio": "01234567",
+  "convenio": "1234567",
   "carteira": "18",
   "nosso_numero": "7",
-  "documento_numero": "CTR-2023-0012-017/017",
+  "numero_documento": "CTR-2023-0012-017/017",
   "cedente": "Empresa Exemplo LTDA",
-  "documento_cedente": "12345678000100",
+  "documento_cedente": "11222333000181",
   "sacado": "João da Silva",
-  "sacado_documento": "12345678900",
+  "sacado_documento": "11144477735",
   "sacado_endereco": "Rua Exemplo, 100, Centro, Cidade, UF, CEP 12345000",
   "valor": 1500.00,
   "data_vencimento": "2025/12/31",
@@ -158,19 +201,29 @@ O tamanho máximo depende do convênio:
 |-------|------|-----------|-------|
 | `convenio` | String | numérico | Código do convênio/beneficiário |
 | `carteira` | String | 2 dígitos | Padrão: `'1'` |
-| `variacao` | String | 2 dígitos | **OBRIGATÓRIO** - Ex: `'01'` |
+| `variacao` | String | 2 dígitos | Exigido pelo **convênio**, não pela engine — ex: `'01'` |
 | `modalidade` | String | 2 dígitos | Padrão: `'01'` |
 
-### ⚠️ ATENÇÃO: Campos com Restrições
+### ⚠️ ATENÇÃO: regras do BANCO que a engine NÃO valida
 
-| Campo | Valor Correto | ❌ Valor Errado | Motivo |
-|-------|---------------|-----------------|--------|
-| `aceite` | `'N'` | `'S'` | Sicoob **EXIGE** `'N'` |
-| `especie_documento` | `'DM'` | omitir | **OBRIGATÓRIO** enviar |
+| Campo | Valor esperado pelo Sicoob | A engine recusa o contrário? |
+|-------|---------------|:---:|
+| `aceite` | `'N'` | **não** — `'S'` passa na validação |
+| `especie_documento` | `'DM'` | **não** — omitir passa na validação |
+| `variacao` | `'01'` (ou a do convênio) | **não** — omitir passa na validação |
+
+> **Estas três são regras do convênio, não da engine.** Rodar
+> `GET /api/boleto/validate` com `aceite: "S"` devolve `valid: true`, e mesmo
+> assim o boleto pode ser recusado no registro. Quem confia na validação para
+> pegar esse erro descobre no banco — e aí já emitiu.
+>
+> A versão anterior desta página dizia que o Sicoob "EXIGE" e que o campo era
+> "OBRIGATÓRIO", sem dizer **quem** exige. A diferença é toda: o que a engine
+> exige, ela recusa; o que o banco exige, você garante no seu código.
 
 ### Campos Aceitos ✅
 
-- ✅ `documento_numero` - Aceito e recomendado
+- ✅ `numero_documento` - Aceito e recomendado
 - ✅ Todos os campos de endereço
 - ✅ Instruções (instrucao1 a instrucao6)
 - ✅ Campos de avalista
@@ -181,13 +234,13 @@ O tamanho máximo depende do convênio:
 
 ```python
 # ❌ ERRADO - Filtrando campos
-campos_removidos = ['documento_numero', 'especie_documento', 'aceite']
+campos_removidos = ['numero_documento', 'especie_documento', 'aceite']
 
 # ✅ CORRETO - Enviando com valores corretos
 boleto_sicoob = {
     "aceite": "N",  # DEVE ser 'N' para Sicoob
     "especie_documento": "DM",  # DEVE enviar
-    "documento_numero": "NF-2023-001",  # PODE e DEVE enviar
+    "numero_documento": "NF-2023-001",  # PODE e DEVE enviar
     # ... outros campos
 }
 ```
@@ -203,13 +256,13 @@ boleto_sicoob = {
   "variacao": "01",
   "modalidade": "01",
   "nosso_numero": "1234567",
-  "documento_numero": "NF-2025-001234",
+  "numero_documento": "NF-2025-001234",
   "aceite": "N",
   "especie_documento": "DM",
   "cedente": "Cooperativa Exemplo",
-  "documento_cedente": "12345678000100",
+  "documento_cedente": "11222333000181",
   "sacado": "Maria dos Santos",
-  "sacado_documento": "98765432100",
+  "sacado_documento": "11144477735",
   "sacado_endereco": "Rua da Cooperativa, 50, Bairro, Cidade, UF, CEP 54321000",
   "valor": 2500.00,
   "data_vencimento": "2025/12/31",
@@ -227,10 +280,10 @@ boleto_sicoob = {
 > ⚠️ **O campo `variacao` é obrigatório no boleto, mas NÃO existe na classe de remessa CNAB 240 do Sicoob.** Enviar `variacao` na remessa causará `NoMethodError`.
 
 ```json
-// POST /api/remessa?bank=sicoob&type=cnab240
+// conteúdo do arquivo — POST /api/remessa?bank=sicoob&type=cnab240 (multipart, campo `data`)
 {
   "empresa_mae": "Cooperativa Teste",
-  "documento_cedente": "98765432000100",
+  "documento_cedente": "11222333000181",
   "agencia": "4327",
   "conta_corrente": "417270",
   "convenio": "229385",
@@ -241,7 +294,7 @@ boleto_sicoob = {
       "data_vencimento": "2026/12/31",
       "valor": 2500.00,
       "nome_sacado": "Maria Santos",
-      "documento_sacado": "98765432100",
+      "documento_sacado": "11144477735",
       "endereco_sacado": "Av. Principal, 50",
       "bairro_sacado": "Centro",
       "cep_sacado": "20000000",
@@ -256,6 +309,17 @@ boleto_sicoob = {
 
 ## Banco C6 (336)
 
+### ⚠️ Carteira: só `10` ou `20`
+
+Esta a engine **recusa**, e com mensagem clara:
+
+```
+carteira '1' não suportada (use uma de: 10, 20)
+```
+
+É a pegadinha mais comum de quem chega do Sicoob (carteira `1`) ou do Banco do
+Brasil (carteira `18`): o mesmo payload, trocando só o banco, para de valer.
+
 ### Boleto (GET /api/boleto)
 
 ```json
@@ -264,7 +328,13 @@ boleto_sicoob = {
   "conta_corrente": "1234567",
   "carteira": "10",
   "convenio": "100",
-  "nosso_numero": "12345678"
+  "nosso_numero": "12345678",
+  "cedente": "Empresa C6 LTDA",
+  "documento_cedente": "11222333000181",
+  "sacado": "João da Silva",
+  "sacado_documento": "11144477735",
+  "valor": 1500.00,
+  "data_vencimento": "2026/12/31"
 }
 ```
 
@@ -273,10 +343,10 @@ boleto_sicoob = {
 > ⚠️ **`convenio` não existe na classe de remessa do C6!** Enviar esse campo causará erro. Use `codigo_beneficiario` em vez disso.
 
 ```json
-// POST /api/remessa?bank=banco_c6&type=cnab400
+// conteúdo do arquivo — POST /api/remessa?bank=banco_c6&type=cnab400 (multipart, campo `data`)
 {
   "empresa_mae": "Empresa C6 LTDA",
-  "documento_cedente": "33445566000177",
+  "documento_cedente": "11222333000181",
   "agencia": "0001",
   "conta_corrente": "1234567",
   "digito_conta": "0",
@@ -288,7 +358,7 @@ boleto_sicoob = {
       "data_vencimento": "2026/12/31",
       "valor": 1500.00,
       "nome_sacado": "Joao da Silva",
-      "documento_sacado": "12345678900",
+      "documento_sacado": "11144477735",
       "endereco_sacado": "Rua Teste, 100",
       "bairro_sacado": "Centro",
       "cep_sacado": "01000000",
@@ -303,40 +373,49 @@ boleto_sicoob = {
 
 ## Diferenças Importantes
 
-### `nosso_numero` vs `documento_numero`
+### `nosso_numero` vs `numero_documento`
 
 | Campo | Propósito | Obrigatoriedade | Aparece em |
 |-------|-----------|-----------------|------------|
 | `nosso_numero` | Identificação **BANCÁRIA** do boleto | 🔒 **OBRIGATÓRIO** | Código de barras, linha digitável |
-| `documento_numero` | Identificação **INTERNA** (NF, pedido) | 📝 **RECOMENDADO** | Apenas no PDF impresso |
+| `numero_documento` | Identificação **INTERNA** (NF, pedido) | 📝 **RECOMENDADO** | Apenas no PDF impresso |
 
 **Importante:**
-- `documento_numero` **NÃO** afeta o código de barras ou linha digitável
-- `documento_numero` é usado apenas para rastreamento e controle interno
+- `numero_documento` **NÃO** afeta o código de barras ou linha digitável
+- `numero_documento` é usado apenas para rastreamento e controle interno
 - `nosso_numero` **DEVE** ser sequencial e único por convênio
 
-### `numero_documento` vs `documento_numero`
+### O campo se chama `numero_documento`
 
-⚠️ **Atenção ao nome do campo!**
+⚠️ **`documento_numero` era o nome da gem Ruby e não existe mais.** Enviado
+hoje, ele é **descartado em silêncio** — o boleto sai com o campo vazio, sem
+erro nenhum:
 
-- **Na API/Cliente:** Use `numero_documento` (compatibilidade)
-- **Na gem BRCobranca:** Internamente é `documento_numero`
-- **Solução:** A API faz mapeamento automático
-
-```ruby
-# A API converte automaticamente:
-"numero_documento" → "documento_numero" (nome correto na gem)
+```bash
+# verificado na engine atual
+enviando numero_documento -> numero_documento no boleto: 'NF-1'
+enviando documento_numero -> numero_documento no boleto: ''
 ```
+
+Use `numero_documento` na API e na engine: o nome é o mesmo nos dois lados, e
+não há mapeamento a lembrar.
 
 ### Estratégia Recomendada 💡
 
 **Envie o MÁXIMO de campos possíveis!**
 
-1. ✅ Envie `documento_numero` sempre que disponível
+1. ✅ Envie `numero_documento` sempre que disponível
 2. ✅ Envie endereços completos (cedente e sacado)
 3. ✅ Envie instruções claras
 4. ✅ Envie datas (documento e processamento)
-5. ❌ **NÃO** filtre campos por banco - deixe a gem validar
+5. ❌ **NÃO** filtre campos por banco — mandar a mais não quebra; a menos, sim
+
+> ⚠️ **O item 5 já disse "deixe a engine validar". Não deixe.** A engine valida
+> o que é do formato — carteira, convênio, tamanho de nosso número, DV de
+> CPF/CNPJ — e **não** valida o que é do convênio (o `aceite` do Sicoob) nem a
+> ausência de campos que ela consegue contornar (`nosso_numero`, `sacado`).
+> Enviar tudo continua sendo a estratégia certa; confiar na validação para
+> descobrir o que faltou, não.
 
 **Benefícios:**
 - Melhor rastreabilidade
@@ -357,5 +436,6 @@ boleto_sicoob = {
 
 ---
 
-**Engine:** [PyCobrança](https://github.com/Maxwbh/pyCobranca) (Python) — versão em uso: `GET /api/metadata`
-**Versão da API:** 2.1.0
+**Engine:** [pyCobrança](https://github.com/Maxwbh/pyCobranca) (Python) — versão em uso: `GET /api/metadata`
+**Versão da API:** a que responde em `GET /api/metadata` (número fixo aqui
+envelhece a cada release — este ficou parado na 2.1.0 por duas versões).

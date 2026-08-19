@@ -13,6 +13,7 @@ import os
 import re
 import sqlite3
 import uuid
+from enum import Enum
 from datetime import datetime, timezone
 from typing import Any
 
@@ -23,6 +24,14 @@ JOB_PROCESSING = "processing"
 JOB_COMPLETED = "completed"
 JOB_PARTIAL = "partially_completed"
 JOB_FAILED = "failed"
+
+class StatusItem(str, Enum):
+    """Estados possíveis de um item — o vocabulário fechado do filtro."""
+
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+
 
 ITEM_PENDING = "pending"
 ITEM_COMPLETED = "completed"

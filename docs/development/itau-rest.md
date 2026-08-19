@@ -1,8 +1,20 @@
-# Itaú Unibanco (341) — Integração REST · **PLANEJADO**
+# Itaú Unibanco (341) — Integração REST · **ESQUELETO**
 
-> **Status:** roadmap (não implementado). Ver [roadmap-providers.md](roadmap-providers.md).
+> **Status:** o provider **existe** (`gateway/app/providers/itau.py`) e o banco
+> aparece no `GET /bancos`, mas os paths e o payload de emissão ainda **não
+> foram confirmados** — o catálogo exige login. Por isso ele nasce **desligado**
+> por `ITAU_REGISTERED_READY`: sem a flag, `banco=itau` emite pela engine, que
+> tem o layout 341. Ver [roadmap-providers.md](roadmap-providers.md), Fase 0.
+>
+> **Chamada:** `provider=on&banco=itau` (`provider=itau` segue valendo como
+> apelido legado até a 3.0.0).
+>
+> **Não tem Pix Automático:** o provider não herda o mixin BACEN de recorrência,
+> e as rotas `/pix-automatico/*` respondem `422` nomeando quem oferece —
+> [pix-automatico.md](pix-automatico.md).
+>
 > É o banco com **maior base de cobrança do país** e o que mais aparece no
-> caminho offline (CNAB 400/444 da engine). O que falta é o caminho **online**.
+> caminho offline (CNAB 400/444 da engine). O que falta é fechar o **online**.
 >
 > **Leia a seção de onboarding antes de estimar prazo.** A dificuldade do Itaú
 > não é técnica, é de acesso: as credenciais de cobrança **não** saem por

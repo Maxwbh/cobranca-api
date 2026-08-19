@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.core import pycob
@@ -35,6 +36,53 @@ LOTE_MAX = int(os.environ.get("LOTE_MAX_ITENS", "200"))
 #: Os contadores (`X-Boletos-Count`, `X-Boletos-Failed`, `X-Batch-Status`) sao
 #: pequenos e vem SEMPRE.
 HEADER_JSON_MAX = int(os.environ.get("HEADER_JSON_MAX_BYTES", str(8 * 1024)))
+
+#: Teto por arquivo enviado. As quatro rotas de upload faziam `await ler()` do
+#: arquivo INTEIRO para a memória, sem olhar o tamanho: um POST grande derruba o
+#: processo antes de qualquer validação. O teto vem antes da leitura útil e
+#: responde 413, que é o mesmo código do lote acima de LOTE_MAX.
+UPLOAD_MAX = int(os.environ.get("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024)))
+
+#: Vocabulário do enum que a spec publicada já declara para `include_data` e
+#: `pix`. O código aceitava só `"true"` e tratava TODO o resto como `false` —
+#: `include_data=1` respondia 200 com o PDF binário, quando o chamador pediu
+#: JSON. Parâmetro fora do enum é erro do chamador, não um `false` silencioso.
+_BOOL_ACEITOS = {"true": True, "false": False}
+
+
+class ParametroInvalido(pycob.DadosInvalidos):
+    """Erro de parâmetro do chamador — o router traduz para 400."""
+
+
+def _bool_param(nome: str, valor: str) -> bool:
+    escolhido = _BOOL_ACEITOS.get((valor or "").strip().lower())
+    if escolhido is None:
+        raise ParametroInvalido(
+            [f"`{nome}` deve ser 'true' ou 'false'; recebido: {valor!r}"])
+    return escolhido
+
+
+async def _ler_upload(arquivo: Any, campo: str) -> bytes:
+    """Lê o arquivo enviado, com teto e sem aceitar vazio."""
+    dados = await arquivo.read()
+    if len(dados) > UPLOAD_MAX:
+        raise ArquivoGrandeDemais(campo, len(dados))
+    if not dados:
+        raise ParametroInvalido([f"`{campo}`: arquivo vazio"])
+    return dados
+
+
+class ArquivoGrandeDemais(Exception):
+    def __init__(self, campo: str, tamanho: int) -> None:
+        super().__init__(campo)
+        self.campo = campo
+        self.tamanho = tamanho
+
+    def resposta(self) -> JSONResponse:
+        return JSONResponse(status_code=413, content={
+            "error": f"Arquivo acima do limite de {UPLOAD_MAX} bytes",
+            "campo": self.campo, "recebidos": self.tamanho,
+            "hint": "divida o arquivo (o teto vem de UPLOAD_MAX_BYTES)"})
 
 
 def _json_cabecalho(valor: list[dict[str, Any]], flag: str,
@@ -64,6 +112,83 @@ def _spec_path() -> Path:
 
 _SPEC = _spec_path()
 
+#: A spec offline é escrita à mão e servida em três formas (`/api/openapi.json`,
+#: `/api/openapi.yaml`, `/api/docs`). Ler e parsear 75 KB de YAML A CADA chamada
+#: custava ~150 ms — trinta vezes o resto da superfície, e é justamente o que o
+#: Swagger da própria API busca ao abrir.
+#:
+#: A chave é o mtime, não "carregou uma vez": em produção o arquivo não muda e
+#: o custo vira um `stat`; em desenvolvimento, editar o YAML e recarregar a
+#: página continua mostrando a edição, sem reiniciar o processo.
+_cache_spec: tuple[float, bytes, dict[str, Any], str] | None = None
+
+
+class SpecAusente(HTTPException):
+    """Doc offline sem o arquivo → 503 dizendo ONDE ele foi procurado.
+
+    `docs/openapi.yaml` é asset de RUNTIME, copiado para a imagem — já ficou de
+    fora por causa do `.dockerignore`, e as três rotas passaram a responder
+    "Internal Server Error". 500 anônimo manda procurar no lugar errado (a
+    aplicação); o caminho no corpo aponta para o empacotamento, que é onde o
+    defeito está. 503 porque a API segue inteira: só a documentação caiu.
+
+    Herda de `HTTPException` em vez de virar um handler próprio no `main`: o
+    handler casa por classe, e `importlib.reload` deste módulo — que os testes
+    do carnê fazem para reler `LOTE_MAX_ITENS` — cria uma classe NOVA que o
+    handler antigo não reconhece. O erro voltaria a ser 500, e só na suíte
+    inteira. Pendurar no `HTTPException` resolve pela MRO.
+    """
+
+    def __init__(self, detalhe: str) -> None:
+        super().__init__(status_code=503, detail=(
+            f"{detalhe}. O arquivo é asset de RUNTIME: confira o COPY do"
+            " Dockerfile e as exceções do .dockerignore"))
+
+
+def _carregar_spec() -> tuple[bytes, dict[str, Any], str]:
+    """Bytes crus, árvore JSON e ETag da spec offline.
+
+    Devolve o YAML **cru** junto com a árvore porque `/api/openapi.yaml` promete
+    o arquivo byte a byte: reserializar traria outro texto, com outra ordem e
+    outros comentários.
+    """
+    global _cache_spec
+    try:
+        mtime = _SPEC.stat().st_mtime
+    except OSError as e:
+        # Já aconteceu em produção: o `.dockerignore` excluiu o YAML da imagem e
+        # as três rotas passaram a responder "Internal Server Error", sem dizer
+        # o que faltava. O caminho procurado é a informação que resolve.
+        raise SpecAusente(f"spec offline não encontrada em {_SPEC}") from e
+
+    if _cache_spec is None or _cache_spec[0] != mtime:
+        cru = _SPEC.read_bytes()
+        arvore = yaml.safe_load(cru.decode("utf-8"))
+        # Sem `default=str`: converter em silêncio faria `/api/openapi.json` e
+        # `/api/openapi.yaml` responderem coisas diferentes para o mesmo campo
+        # (data não quotada vira texto num e segue data no outro). Quem barra
+        # isso antes de subir é o CI; aqui é a segunda linha, e ela nomeia o
+        # campo em vez de deixar um TypeError anônimo subir.
+        try:
+            json.dumps(arvore)
+        except TypeError as e:
+            raise SpecAusente(
+                f"{_SPEC} tem valor que o JSON não expressa ({e}) — quote-o no"
+                " YAML, senão /api/openapi.json e /api/openapi.yaml divergem") from e
+        _cache_spec = (mtime, cru, arvore, hashlib.sha256(cru).hexdigest()[:32])
+    return _cache_spec[1], _cache_spec[2], _cache_spec[3]
+
+
+def _resposta_condicional(request: Request, etag: str) -> Response | None:
+    """304 quando o navegador já tem esta versão — o Swagger reabre muito."""
+    if request.headers.get("if-none-match") == f'"{etag}"':
+        return Response(status_code=304, headers=_cabecalhos_spec(etag))
+    return None
+
+
+def _cabecalhos_spec(etag: str) -> dict[str, str]:
+    return {"ETag": f'"{etag}"', "Cache-Control": "no-cache"}
+
 
 def _erro_validacao(e: pycob.DadosInvalidos) -> JSONResponse:
     return JSONResponse(status_code=400, content={
@@ -73,11 +198,45 @@ def _erro_validacao(e: pycob.DadosInvalidos) -> JSONResponse:
     })
 
 
+# JSON válido não é payload válido: `"texto"`, `123` e `[]` passam pelo
+# `json.loads` e só explodem lá dentro, quando a engine chama `.get()` no que
+# achava ser um objeto — `AttributeError`, 500, "Internal Server Error" para
+# quem só errou a FORMA do corpo. O parse já respondia 400 nesse caso; a forma
+# não era conferida em lugar nenhum.
+_NOME_JSON = {dict: "objeto", list: "lista", str: "texto", bool: "booleano",
+              int: "número", float: "número", type(None): "null"}
+
+
+def _tipo_json(valor: Any) -> str:
+    return _NOME_JSON.get(type(valor), type(valor).__name__)
+
+
+def _objeto(valor: Any, campo: str) -> dict[str, Any]:
+    if not isinstance(valor, dict):
+        raise pycob.DadosInvalidos(
+            [f"`{campo}` deve ser um objeto JSON — recebi {_tipo_json(valor)}"])
+    return valor
+
+
+def _lista_de_objetos(valor: Any, campo: str) -> list[dict[str, Any]]:
+    if not isinstance(valor, list):
+        raise pycob.DadosInvalidos(
+            [f"`{campo}` deve ser uma lista JSON — recebi {_tipo_json(valor)}"])
+    # Só os primeiros: lote de 200 itens de tipo errado não vira 200 linhas de erro.
+    ruins = [i for i, item in enumerate(valor) if not isinstance(item, dict)][:5]
+    if ruins:
+        raise pycob.DadosInvalidos(
+            [f"`{campo}[{i}]` deve ser um objeto JSON — recebi {_tipo_json(valor[i])}"
+             for i in ruins])
+    return valor
+
+
 def _data_param(data: str) -> dict[str, Any]:
     try:
-        return json.loads(data)
+        valores = json.loads(data)
     except json.JSONDecodeError as e:
         raise pycob.DadosInvalidos([f"JSON inválido no parâmetro data: {e}"]) from e
+    return _objeto(valores, "data")
 
 
 # ------------------------------------------------------------------ saúde/meta
@@ -165,6 +324,11 @@ def boleto_nosso_numero(bank: str, data: str) -> Any:
     return {k: d[k] for k in ("bank", "nosso_numero", "nosso_numero_formatado", "nosso_numero_dv")}
 
 
+#: Modelos aceitos no lote. `carne` (3 vias por A4) só existe aqui e em
+#: `/api/render/carne`; os demais vêm da engine, para não haver duas listas.
+_TEMPLATES_LOTE = ("carne", *sorted(pycob.MODELOS_BOLETO))
+
+
 def _headers_boleto(d: dict[str, Any]) -> dict[str, str]:
     return {
         "X-Nosso-Numero": d["nosso_numero"],
@@ -181,14 +345,18 @@ def boleto(bank: str, data: str, type: str = "pdf",
     if type != "pdf":
         return JSONResponse(status_code=400, content={
             "error": f"Formato '{type}' descontinuado — a engine pyCobranca gera PDF",
-            "validation_errors": {"type": ["use 'pdf'"]}})
+            # Lista plana como em todo o resto da superfície. Aqui era o único
+            # lugar que devolvia objeto-por-campo: quem itera `validation_errors`
+            # esperando mensagens recebia a string "type".
+            "validation_errors": ["`type` deve ser 'pdf'"]})
     try:
+        detalhar = _bool_param("include_data", include_data)
         valores = _data_param(data)
         info = pycob.dados_boleto(bank, valores)
         pdf = pycob.pdf_boleto(bank, valores, template)
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
-    if include_data.lower() == "true":
+    if detalhar:
         return {**info, "content_base64": base64.b64encode(pdf).decode(),
                 "content_type": "application/pdf", "filename": f"boleto-{bank}.pdf"}
     return Response(content=pdf, media_type="application/pdf", headers={
@@ -201,9 +369,21 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
                        include_data: str = "false", template: str = "moderno") -> Any:
     if type != "pdf":
         return JSONResponse(status_code=400, content={
-            "error": f"Formato '{type}' descontinuado — a engine pyCobranca gera PDF"})
+            "error": f"Formato '{type}' descontinuado — a engine pyCobranca gera PDF",
+            "validation_errors": ["`type` deve ser 'pdf'"]})
+    # `pdf_multi` cai em `moderno` quando não reconhece o modelo. Silêncio aqui
+    # é pior que erro: o irmão `GET /api/boleto` responde 400 para o mesmo
+    # valor, então `template=modrno` saía 200 com o lote no modelo errado e
+    # ninguém tinha como saber. Quem valida é a rota — o teto de qualidade da
+    # engine é gerar o PDF, não conferir o contrato REST.
+    if template not in _TEMPLATES_LOTE:
+        return JSONResponse(status_code=400, content={
+            "error": "Dados do boleto inválidos",
+            "validation_errors": [f"template '{template}' inválido"
+                                  f" (use: {', '.join(_TEMPLATES_LOTE)})"]})
     try:
-        boletos = json.loads(await data.read())
+        detalhar = _bool_param("include_data", include_data)
+        boletos = _lista_de_objetos(json.loads(await _ler_upload(data, "data")), "data")
         if len(boletos) > LOTE_MAX:
             return JSONResponse(status_code=413, content={
                 "error": f"Lote acima do limite de {LOTE_MAX} itens",
@@ -221,6 +401,8 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
                         " cada item precisa de um valor distinto",
                 "duplicados": repetidos})
         pdf, itens = pycob.pdf_multi(boletos, template=template)
+    except ArquivoGrandeDemais as e:
+        return e.resposta()
     except (json.JSONDecodeError, pycob.DadosInvalidos) as e:
         erros = e.erros if isinstance(e, pycob.DadosInvalidos) else [str(e)]
         return JSONResponse(status_code=400, content={
@@ -229,7 +411,7 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
     falhas = [i for i in itens if i["status"] == "failed"]
     resumo = {"total": len(itens), "completed": len(ok), "failed": len(falhas),
               "status": "partially_completed" if falhas else "completed"}
-    if include_data.lower() == "true":
+    if detalhar:
         return {**resumo, "boletos": ok, "erros": falhas,
                 "content_base64": base64.b64encode(pdf).decode(),
                 "content_type": "application/pdf", "filename": "boletos-multi.pdf"}
@@ -248,15 +430,18 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
 async def remessa(bank: str, type: str, data: UploadFile = File(...),
                   pix: str = "false") -> Any:
     try:
-        valores = json.loads(await data.read())
-        conteudo = pycob.gerar_remessa(bank, type, valores, pix=pix.lower() == "true")
+        com_pix = _bool_param("pix", pix)
+        valores = _objeto(json.loads(await _ler_upload(data, "data")), "data")
+        conteudo = pycob.gerar_remessa(bank, type, valores, pix=com_pix)
+    except ArquivoGrandeDemais as e:
+        return e.resposta()
     except json.JSONDecodeError as e:
         return JSONResponse(status_code=400, content={
             "error": "Erro ao gerar remessa", "validation_errors": [f"JSON inválido: {e}"]})
     except pycob.DadosInvalidos as e:
         return JSONResponse(status_code=400, content={
             "error": "Erro ao gerar remessa", "validation_errors": e.erros})
-    sufixo = "-pix" if pix.lower() == "true" else ""
+    sufixo = "-pix" if com_pix else ""
     return Response(content=conteudo, media_type="text/plain", headers={
         "Content-Disposition": f"attachment; filename=remessa-{bank}-{type}{sufixo}.rem"})
 
@@ -264,10 +449,16 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
 @router.post("/api/retorno", include_in_schema=False)
 async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
     try:
-        return pycob.parse_retorno(await data.read(), layout_hint=type)
+        return pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type)
+    except ArquivoGrandeDemais as e:
+        return e.resposta()
     except pycob.DadosInvalidos as e:
+        # `validation_errors` é a chave canônica em toda a superfície; esta rota
+        # era a única com `details`, e quem escreve um handler genérico de erro
+        # tinha de conhecer as duas. A antiga fica como alias.
         return JSONResponse(status_code=400, content={
-            "error": "Erro ao processar retorno", "details": e.erros})
+            "error": "Erro ao processar retorno",
+            "validation_errors": e.erros, "details": e.erros})
 
 
 # ------------------------------------------------------------------ OFX
@@ -278,18 +469,39 @@ async def ofx_parse(file: UploadFile = File(...), somente_creditos: str = Form("
     O `nosso_numero` sai do memo com regra POR BANCO (`extrair_nosso_numero`),
     não com regex genérico: cada banco formata o memo do seu jeito.
     """
-    raw = await file.read()
-    so_creditos = somente_creditos.lower() == "true"
     try:
+        so_creditos = _bool_param("somente_creditos", somente_creditos)
+        raw = await _ler_upload(file, "file")
         extrato = pycob.ler_ofx(raw, somente_creditos=so_creditos)
+    except ArquivoGrandeDemais as e:
+        return e.resposta()
     except pycob.DadosInvalidos as e:
         # arquivo invalido = 400. Bug inesperado NAO vira 400 falso: sobe a 500.
+        # `error` acompanha o resto da superfície; `erro` fica como alias.
         return JSONResponse(status_code=400, content={
-            "erro": "Arquivo OFX inválido", "validation_errors": e.erros})
+            "error": "Arquivo OFX inválido", "erro": "Arquivo OFX inválido",
+            "validation_errors": e.erros})
+
+    def _direcao(t) -> str:
+        """Crédito ou débito — pelo TRNTYPE do arquivo, não pelo sinal.
+
+        A engine **normaliza o valor para positivo** e guarda a direção em
+        `tipo` (o TRNTYPE do OFX). Deduzir do sinal, como se fazia aqui, dava
+        `credito` para TUDO: o `-350,50` de um pagamento chegava como `350,50`,
+        entrava na soma de créditos e `total_debitos` ficava eternamente `0`.
+        Num extrato de conciliação isso conta dinheiro que saiu como dinheiro
+        que entrou.
+
+        O sinal continua valendo como segunda opinião: arquivo que preserve o
+        negativo é débito mesmo que o TRNTYPE não diga.
+        """
+        if t.valor < 0 or str(getattr(t, "tipo", "") or "").upper() == "DEBIT":
+            return "debito"
+        return "credito"
 
     transacoes = [{
-        "tipo": "credito" if t.valor > 0 else "debito",
-        "valor": float(t.valor),
+        "tipo": _direcao(t),
+        "valor": abs(float(t.valor)),
         "data": t.data.isoformat() if t.data else None,
         "memo": (t.memo or "").strip(),
         "id": t.fitid or None,
@@ -297,7 +509,7 @@ async def ofx_parse(file: UploadFile = File(...), somente_creditos: str = Form("
     } for t in extrato.transacoes]
 
     creditos = sum(x["valor"] for x in transacoes if x["tipo"] == "credito")
-    debitos = sum(-x["valor"] for x in transacoes if x["tipo"] == "debito")
+    debitos = sum(x["valor"] for x in transacoes if x["tipo"] == "debito")
     datas = [t["data"] for t in transacoes if t["data"]]
     corpo = {
         "banco": {"org": extrato.org, "fid": extrato.fid},
@@ -318,7 +530,7 @@ async def ofx_parse(file: UploadFile = File(...), somente_creditos: str = Form("
 @router.post("/api/render/boleto", include_in_schema=False)
 async def render_boleto(body: dict) -> Any:
     try:
-        bank, valores = body.get("bank", ""), body.get("data") or {}
+        bank, valores = body.get("bank", ""), _objeto(body.get("data") or {}, "data")
         # `template` nao era nem declarado aqui: o irmao GET /api/boleto aceita,
         # entao quem migrava de um para o outro perdia a escolha do modelo em
         # silencio. Os dois caminhos passam a se comportar igual.
@@ -332,8 +544,13 @@ async def render_boleto(body: dict) -> Any:
 
 @router.post("/api/render/carne", include_in_schema=False)
 async def render_carne(body: dict) -> Any:
+    try:
+        itens = _lista_de_objetos(body.get("boletos") or [], "boletos")
+    except pycob.DadosInvalidos as e:
+        return JSONResponse(status_code=400, content={"error": "Falha ao gerar carnê",
+                                                       "validation_errors": e.erros})
     bank = body.get("bank")
-    boletos = [dict(b, bank=b.get("bank") or bank) for b in body.get("boletos") or []]
+    boletos = [dict(b, bank=b.get("bank") or bank) for b in itens]
     # O teto valia só para /api/boleto/multi. Como o carnê renderiza pelo mesmo
     # `pdf_multi`, e de forma síncrona, dava para passar do limite trocando de
     # endpoint — sem nenhum teto, um lote grande vai direto ao OOM em vez de
@@ -386,14 +603,14 @@ async def render_fatura(body: dict) -> Any:
                     "(`fatura.blocos`); para arte livre, chame a engine pyCobrança "
                     "in-process na própria aplicação."})
 
-    corpo: dict[str, Any] = {}
-    if body.get("itens") is not None:
-        corpo["itens"] = body["itens"]
-    if fatura_body is not None:
-        corpo["fatura"] = fatura_body
-
-    bank, data = body.get("bank", ""), body.get("data") or {}
     try:
+        corpo: dict[str, Any] = {}
+        if body.get("itens") is not None:
+            corpo["itens"] = _lista_de_objetos(body["itens"], "itens")
+        if fatura_body is not None:
+            corpo["fatura"] = _objeto(fatura_body, "fatura")
+
+        bank, data = body.get("bank", ""), _objeto(body.get("data") or {}, "data")
         info = pycob.dados_boleto(bank, data)
         pdf = pycob.pdf_fatura(bank, data, corpo or None)
     except pycob.DadosInvalidos as e:
@@ -407,7 +624,8 @@ async def render_fatura(body: dict) -> Any:
 async def render_remessa(body: dict) -> Any:
     try:
         conteudo = pycob.gerar_remessa(body.get("bank", ""), body.get("type", ""),
-                                        body.get("data") or {}, pix=bool(body.get("pix")))
+                                        _objeto(body.get("data") or {}, "data"),
+                                        pix=bool(body.get("pix")))
     except pycob.DadosInvalidos as e:
         return JSONResponse(status_code=400, content={"error": "Erro ao gerar remessa",
                                                        "validation_errors": e.erros})
@@ -416,18 +634,25 @@ async def render_remessa(body: dict) -> Any:
 
 # ------------------------------------------------------------------ docs offline
 @router.get("/api/openapi.json", include_in_schema=False)
-def api_openapi_json() -> Any:
-    return json.loads(json.dumps(yaml.safe_load(_SPEC.read_text(encoding="utf-8")), default=str))
+def api_openapi_json(request: Request) -> Response:
+    _, arvore, etag = _carregar_spec()
+    return _resposta_condicional(request, etag) or JSONResponse(
+        content=arvore, headers=_cabecalhos_spec(etag))
 
 
 @router.get("/api/openapi.yaml", include_in_schema=False)
-def api_openapi_yaml() -> Response:
-    return Response(content=_SPEC.read_text(encoding="utf-8"),
-                    media_type="application/yaml; charset=utf-8")
+def api_openapi_yaml(request: Request) -> Response:
+    cru, _, etag = _carregar_spec()
+    return _resposta_condicional(request, etag) or Response(
+        content=cru, media_type="application/yaml; charset=utf-8",
+        headers=_cabecalhos_spec(etag))
 
 
 @router.get("/api/docs", include_in_schema=False)
 def api_docs(request: Request) -> HTMLResponse:
+    # A página só existe para exibir a spec: sem ela, um 200 entregaria um
+    # Swagger que nunca carrega e o operador ficaria olhando tela em branco.
+    _carregar_spec()
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Offline (Swagger)",
         superficie="Offline · pyCobrança",

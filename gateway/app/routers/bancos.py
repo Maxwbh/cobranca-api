@@ -13,6 +13,7 @@ from app.providers.inter import InterProvider
 from app.providers.itau import ItauProvider
 from app.providers.sicoob import SicoobProvider
 from app.registry import _REST_POR_BANCO, _SLUG_ENGINE, registered_ready
+from app.routers._capacidades import implementa
 from app.schemas import Banco
 
 router = APIRouter(prefix="/bancos", tags=["bancos"])
@@ -37,7 +38,21 @@ _CAPACIDADES = {
     "extrato": "extrato",
     "listar_recebiveis": "conciliacao_cartao",
     "cadastrar_webhook": "webhook_banco",
+    # Três rotas públicas que o catálogo não mencionava, e que DISCRIMINAM:
+    # `GET /pix/{txid}` não existe no Itaú, `GET /conciliacao/transacoes` só no
+    # C6, e sem `normalizar_webhook` o `POST /webhooks/{banco}` não entende a
+    # notificação daquele banco. É o mesmo argumento do `checkout_cartao` acima
+    # — a rota existia e era invisível.
+    "consultar_pix": "pix_consulta",
+    "listar_transacoes": "conciliacao_transacoes",
+    "normalizar_webhook": "webhook_entrada",
 }
+
+# `consultar` fica DE FORA de propósito, e o motivo é o limite do método: a
+# introspecção lê "sobrescrito = suporta", e o provider offline sobrescreve
+# `consultar` para devolver `pendente` com a dica "conciliar via retorno/OFX".
+# Sobrescrever ali é honestidade, não capacidade — anunciar faria o consumidor
+# esperar consulta de status onde não há estado para consultar.
 
 # Mecanismo de autenticação DA API — único para todos os bancos:
 # 1. POST /credenciais recebe os parâmetros DO BANCO (esquema próprio de cada um),
@@ -110,13 +125,9 @@ _CAMINHOS = {
 
 
 def _capacidades(klass: type) -> list[str]:
-    caps = []
-    for metodo, capacidade in _CAPACIDADES.items():
-        impl = getattr(klass, metodo, None)
-        base = getattr(BankProvider, metodo, None)
-        if impl is not None and impl is not base:  # sobrescrito = suportado de fato
-            caps.append(capacidade)
-    return sorted(caps)
+    # Mesmo critério que o `exige_capacidade` aplica na requisição — uma função
+    # só, para o catálogo não voltar a discordar do que a rota faz.
+    return sorted(cap for metodo, cap in _CAPACIDADES.items() if implementa(klass, metodo))
 
 
 def _caminho_do_banco(banco: Banco) -> dict:
@@ -139,9 +150,81 @@ def _caminho_do_banco(banco: Banco) -> dict:
     }
 
 
-@router.get("", response_model=dict)
+# A resposta é HETEROGÊNEA de propósito: o registro do `pycobranca` traz
+# `bancos_cnab` e não tem `flag` nem `codigo_banco`. Modelo Pydantic único
+# forçaria campos opcionais em todo mundo e diria menos, não mais — então o
+# schema é escrito aqui, descrevendo o que cada campo DECIDE. Um teste compara
+# estas chaves com as que a rota devolve, para a descrição não envelhecer.
+_SCHEMA_BANCO = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string", "description": "Valor aceito em `banco` (e no `provider` legado).",
+               "example": "c6"},
+        "nome": {"type": "string", "example": "C6 Bank"},
+        "codigo_banco": {"type": "string", "nullable": True,
+                         "description": "COMPE. `null` no registro da engine, que não é um banco.",
+                         "example": "336"},
+        "tipo": {"type": "string", "enum": ["rest", "offline"]},
+        "caminhos": {"type": "array", "items": {"type": "string", "enum": ["on", "off"]},
+                     "description": "Caminhos que ESTE banco tem. O Inter só tem `on`: "
+                                    "não há layout offline dele, e cair na engine emitiria "
+                                    "um boleto de outro banco.",
+                     "example": ["on", "off"]},
+        "registrado_pronto": {"type": "boolean",
+                              "description": "A flag desta instalação está ligada."},
+        "caminho_efetivo": {"type": "string", "enum": ["on", "off"],
+                            "description": "**O que acontece de fato** ao pedir `provider=on` "
+                                           "agora. Com a flag desligada e havendo fallback, "
+                                           "vira `off` — a chamada responde `201` sem ter "
+                                           "passado pelo banco."},
+        "fallback_offline": {"type": "string", "nullable": True,
+                             "description": "Slug da engine usado quando o `on` é rebaixado.",
+                             "example": "banco_c6"},
+        "flag": {"type": "string", "description": "Variável de ambiente que liga o caminho `on`.",
+                 "example": "C6_REGISTERED_READY"},
+        "capacidades": {"type": "array", "items": {"type": "string"},
+                        "description": "Introspectadas das classes de provider — método "
+                                       "sobrescrito = capacidade real, então a lista não "
+                                       "envelhece com o código.",
+                        "example": ["boleto", "pix", "pix_consulta", "webhook_entrada"]},
+        "credentials": {"type": "object",
+                        "description": "Esquema de credenciais DESTE banco, para o "
+                                       "`POST /credenciais`. O mecanismo é um só; os campos "
+                                       "são de cada instituição."},
+        "bancos_cnab": {"type": "array", "items": {"type": "string"},
+                        "description": "Só no registro da engine: os 18 slugs do catálogo offline."},
+        "observacao": {"type": "string",
+                       "description": "Só no registro da engine: quando ela entra sem ninguém pedir."},
+        "sandbox": {"type": "string"},
+        "documentacao": {"type": "string", "example": "docs/development/c6-rest.md"},
+    },
+    "required": ["id", "nome", "tipo", "caminhos", "capacidades"],
+}
+
+_SCHEMA_CATALOGO = {
+    "type": "object",
+    "properties": {
+        "caminhos": {"type": "object", "description": "O que `on` e `off` significam, e o apelido legado."},
+        "autenticacao_api": {"type": "object", "description": "Como autenticar — igual para todos os bancos."},
+        "bancos": {"type": "array", "items": _SCHEMA_BANCO},
+    },
+    "required": ["caminhos", "autenticacao_api", "bancos"],
+}
+
+
+@router.get(
+    "",
+    response_model=dict,
+    summary="Catálogo de bancos desta instalação",
+    responses={200: {"content": {"application/json": {"schema": _SCHEMA_CATALOGO}}}},
+)
 def listar() -> dict:
-    """Bancos disponíveis, caminho (on/off) de cada um, capacidades reais e como autenticar."""
+    """Bancos disponíveis, caminho (on/off) de cada um, capacidades reais e como autenticar.
+
+    É a rota para onde o resto da documentação manda quem precisa da matriz
+    exata — e ela respondia com `summary: "Listar"` e schema "objeto qualquer".
+    Os campos que decidem integração estão descritos no schema da resposta.
+    """
     return {
         "caminhos": _CAMINHOS,
         "autenticacao_api": _MECANISMO_API,

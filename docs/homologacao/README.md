@@ -10,6 +10,7 @@ evidência. Sicoob e Inter seguem o mesmo roteiro, sem formulário do banco.
 | `evidencia-sandbox-c6.json` | A evidência crua do C6 — status HTTP e corpo de cada caso, como o banco devolveu |
 | `evidencia-sandbox-sicoob.json` | A evidência crua do Sicoob (veja a ressalva abaixo) |
 | `evidencia-sandbox-inter.json` | A evidência crua do Banco Inter — **13 casos em 2xx, zero falhas**, com o banco ecoando o que foi enviado |
+| `evidencia-open-finance.json` | O que os quatro bancos publicam no **Diretório de Participantes** do Open Finance (fonte pública, sem credencial) — leitura em [open-finance.md](../development/open-finance.md) |
 
 ## O que cada sandbox prova — e a diferença não é detalhe
 

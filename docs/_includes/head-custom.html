@@ -260,6 +260,19 @@
     .faixa-stats > div { flex: 1 1 42%; padding: 0.7rem 0.6rem 0.6rem; }
     .faixa-stats strong { font-size: 1.4rem; }
     .cta-final { padding: 1.5rem 1rem 1.3rem; }
+
+    /* Tabela larga rola sozinha em vez de vazar da tela. O `display:table` +
+       `overflow:hidden` lá em cima (que arredonda o canto) desfaz o
+       comportamento padrão do Cayman, e a coluna da direita ficava cortada,
+       sem nem sinalizar que havia mais — pior que barra de rolagem. Aqui o
+       canto arredondado perde para a legibilidade. */
+    .main-content table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+    .main-content table td, .main-content table th { white-space: normal; }
   }
 </style>
 

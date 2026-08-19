@@ -16,7 +16,10 @@ integrar começa pela [documentação da API](../).
 | [Roadmap de providers](roadmap-providers.md) | Fila de bancos e PSPs, princípio de esforço e a régua de escopo (o que nunca entra) |
 | [Separação em 3 produtos](separacao-3-produtos.md) | Como API, engine e integrações se dividem |
 | [Plano de jobs em lote](plano-jobs-lote.md) | Desenho do processamento assíncrono |
-| [Cenário de teste (Postman/HML)](plano-cenario-teste-postman-hml.md) | Regressão da homologação |
+| [Serviços online por banco](servicos-online-por-banco.md) | O que cada um dos 18 bancos do catálogo offline oferece de API online, um a um |
+| [Pix Automático por banco](pix-automatico.md) | O que está validado em cada banco, e o que a evidência prova |
+| [Open Finance](open-finance.md) | O que os bancos publicam no diretório, o que a entrada custaria e por que segue fora de escopo |
+| [Cenário de teste (Postman/HML)](https://github.com/Maxwbh/cobranca-api/blob/main/postman/README.md) | Coleção de regressão, matriz de rastreabilidade e critérios de aceite |
 
 ## Integrados
 

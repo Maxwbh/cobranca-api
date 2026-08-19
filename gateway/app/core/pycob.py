@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 import io
-
 import inspect
 import re
 import tempfile
+from contextlib import contextmanager
 from datetime import date
 from typing import Any
 
@@ -36,6 +36,26 @@ class DadosInvalidos(ValueError):
         super().__init__("; ".join(erros))
         self.erros = erros
 
+
+
+@contextmanager
+def erro_do_banco():
+    """Converte `BoletoInvalido` em `DadosInvalidos` — 400, não 500.
+
+    `boleto.validar()` não pega tudo: há layout que só descobre a falta na hora
+    de FORMATAR. O Sicredi é o caso limite — sem `data_documento` (de onde sai o
+    ano do nosso número) e sem `byte_idt`, ele levanta ao montar o nosso número
+    formatado, depois de `validar()` ter dito que estava tudo certo.
+
+    Antes disto a exceção escapava dos handlers e o consumidor recebia
+    **500 Internal Server Error** por um campo que faltava no payload dele — e a
+    mensagem da engine, que dizia exatamente qual campo era, ficava no log do
+    servidor em vez de chegar a quem podia agir.
+    """
+    try:
+        yield
+    except BoletoInvalido as e:
+        raise DadosInvalidos(_erros(e)) from e
 
 
 def _erros(e: Exception) -> list[str]:
@@ -138,8 +158,28 @@ def _linhas(valor: Any, campo: str) -> Any:
     return linhas
 
 
+#: Campos que a documentação anunciava e a engine NUNCA leu — herança da era
+#: Ruby, onde o QR vinha pronto no payload. Hoje quem desenha o Bolepix é
+#: `chave_pix` (+ `tipo_chave_pix`/`txid`): a engine monta o EMV e o QR ela
+#: mesma, e um payload pronto não tem por onde entrar.
+#:
+#: Sem esta lista eles caíam no descarte silencioso de campo desconhecido lá
+#: embaixo: 200, boleto sem QR, e o pagador sem como pagar por Pix — o pior
+#: desfecho possível, porque nada indica que faltou algo.
+_CAMPOS_SEM_CONSUMIDOR = {
+    "emv": "o payload EMV pronto não é lido pela engine",
+    "pix_label": "o rótulo do QR é do modelo, não do payload",
+}
+
+
 def construir_boleto(bank: str, data: dict[str, Any]):
     """Constrói a instância do banco a partir do payload do contrato REST."""
+    mortos = sorted(c for c in _CAMPOS_SEM_CONSUMIDOR if (data or {}).get(c))
+    if mortos:
+        raise DadosInvalidos(
+            [f"`{c}` não gera QR Pix — {_CAMPOS_SEM_CONSUMIDOR[c]}. Para o Bolepix,"
+             " envie `chave_pix` (e `txid`, se quiser rastrear): a engine monta"
+             " o EMV e desenha o QR" for c in mortos])
     klass = _classe_banco(bank)
     aceitos = set(inspect.signature(klass.__init__).parameters) - {"self"}
     kwargs: dict[str, Any] = {}
@@ -186,21 +226,22 @@ def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
-    formatado = boleto.nosso_numero_formatado()
-    dv = getattr(boleto, "nosso_numero_dv", None)
-    if callable(dv):
-        dv = dv()
-    if dv is None:
-        m = re.search(r"-(\w+)$", formatado)
-        dv = m.group(1) if m else ""
-    return {
-        "bank": bank,
-        "nosso_numero": str(boleto.nosso_numero),
-        "nosso_numero_formatado": formatado,
-        "nosso_numero_dv": str(dv),
-        "codigo_barras": boleto.codigo_barras,
-        "linha_digitavel": boleto.linha_digitavel,
-    }
+    with erro_do_banco():
+        formatado = boleto.nosso_numero_formatado()
+        dv = getattr(boleto, "nosso_numero_dv", None)
+        if callable(dv):
+            dv = dv()
+        if dv is None:
+            m = re.search(r"-(\w+)$", formatado)
+            dv = m.group(1) if m else ""
+        return {
+            "bank": bank,
+            "nosso_numero": str(boleto.nosso_numero),
+            "nosso_numero_formatado": formatado,
+            "nosso_numero_dv": str(dv),
+            "codigo_barras": boleto.codigo_barras,
+            "linha_digitavel": boleto.linha_digitavel,
+        }
 
 
 def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> bytes:
@@ -218,7 +259,8 @@ def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> by
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
-    return render_boleto_pdf(boleto.contexto_render(), modelo=template)
+    with erro_do_banco():
+        return render_boleto_pdf(boleto.contexto_render(), modelo=template)
 
 
 def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = None) -> bytes:
@@ -234,10 +276,11 @@ def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = N
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
-    contexto = boleto.contexto_render()
-    if corpo:
-        contexto = {**contexto, **corpo}
-    return render_fatura_pdf(contexto)
+    with erro_do_banco():
+        contexto = boleto.contexto_render()
+        if corpo:
+            contexto = {**contexto, **corpo}
+        return render_fatura_pdf(contexto)
 
 
 def item_id(item: dict[str, Any], indice: int) -> str:

@@ -4,6 +4,11 @@
 > `gateway/tests/test_cobranca_inter.py` e **validado no sandbox do banco** —
 > `scripts/homologacao_inter.py`, evidência em
 > [`evidencia-sandbox-inter.json`](../homologacao/evidencia-sandbox-inter.json).
+>
+> **Chamada:** `provider=on&banco=inter` (`provider=inter` segue valendo como
+> apelido legado até a 3.0.0). O Inter é o único sem caminho `off`: a engine não
+> tem o layout 077, e `provider=off&banco=inter` responde `422` em vez de emitir
+> no banco errado.
 
 O contrato abaixo não é suposição: foi extraído do **SDK oficial do banco**,
 [`inter-co/pj-sdk-java`](https://github.com/inter-co/pj-sdk-java) (`Constants.java`,

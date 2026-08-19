@@ -115,6 +115,9 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Estrutura modular, services, middleware, fluxos
 - [development/roadmap-providers.md](development/roadmap-providers.md) — **Roadmap online**: próximos providers REST (bancos e PSP)
 - [development/plano-jobs-lote.md](development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
+- [development/servicos-online-por-banco.md](development/servicos-online-por-banco.md) — **Serviços online dos 18 bancos**: quem tem API de boleto registrado e de Pix, um a um
+- [development/pix-automatico.md](development/pix-automatico.md) — **Pix Automático por banco**: o que está validado, e o que a evidência prova
+- [development/open-finance.md](development/open-finance.md) — **Open Finance**: o que os bancos publicam no diretório e o que a entrada custaria
 - Homologação: [homologacao/](./homologacao/README.md) — roteiro v3.0 do C6 preenchido com evidência real do sandbox, mais as execuções de Sicoob e Inter e o que cada uma prova
 - Integrações REST **implementadas**: [c6-rest.md](development/c6-rest.md) · [sicoob-rest.md](development/sicoob-rest.md) · [inter-rest.md](development/inter-rest.md)
 - Integrações REST **planejadas**: [banco-do-brasil](development/banco-do-brasil-rest.md) · [btg](development/btg-rest.md) · [mercado-pago](development/mercado-pago-rest.md)

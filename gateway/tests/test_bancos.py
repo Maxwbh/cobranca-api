@@ -92,3 +92,90 @@ def test_inter_nao_anuncia_capacidade_que_nao_tem(client):
         assert tem in inter["capacidades"], tem
     for nao_tem in ("checkout_cartao", "conciliacao_cartao", "bolepix", "boleto_alteracao"):
         assert nao_tem not in inter["capacidades"], nao_tem
+
+
+# --- a documentacao tem de ser copiavel --------------------------------------------
+#
+# Apertar contrato tem um custo escondido: o exemplo que o Swagger/Redoc INVENTA
+# quando o campo nao tem `examples` (`"string"`, `0`, `2019-08-24`) deixa de
+# passar. Quem abre a doc, clica em "Try it out" e "Execute" leva 422 de cara --
+# a doc ensinando errado.
+
+def _sem_null(schema):
+    for chave in ("anyOf", "oneOf"):
+        reais = [x for x in schema.get(chave, []) if x.get("type") != "null"]
+        if reais:
+            return {**reais[0], **{k: v for k, v in schema.items() if k != chave}}
+    return schema
+
+
+def _schemas_de_request(spec):
+    """Só os schemas alcançáveis a partir de um requestBody."""
+    comps = spec["components"]["schemas"]
+    vistos = set()
+
+    def anda(s, prof=0):
+        if prof > 8 or not isinstance(s, dict):
+            return
+        if "$ref" in s:
+            nome = s["$ref"].split("/")[-1]
+            if nome not in vistos:
+                vistos.add(nome)
+                anda(comps.get(nome, {}), prof + 1)
+            return
+        for chave in ("anyOf", "oneOf", "allOf"):
+            for x in s.get(chave, []):
+                anda(x, prof + 1)
+        for v in (s.get("properties") or {}).values():
+            anda(v, prof + 1)
+        if "items" in s:
+            anda(s["items"], prof + 1)
+
+    for ops in spec["paths"].values():
+        for op in ops.values():
+            corpo = op.get("requestBody", {}).get("content", {}).get("application/json", {})
+            if corpo.get("schema"):
+                anda(corpo["schema"])
+    return {n: comps[n] for n in vistos if n in comps}
+
+
+def test_todo_campo_de_texto_do_request_tem_exemplo(client):
+    """Sem `examples`, a UI mostra `"string"` (ou uma data de 2019) — e onde o
+    campo tem `pattern` ou validador, esse valor inventado nao passa. Aconteceu
+    com `redirect_url` (exige http(s)), `txid` (padrao BACEN) e
+    `data_vencimento` do Pix Automatico (recusa passado)."""
+    spec = client.get("/openapi.json").json()
+    sem_exemplo = []
+    for nome, sch in _schemas_de_request(spec).items():
+        for campo, s in (sch.get("properties") or {}).items():
+            achatado = _sem_null(s)
+            tem = (s.get("examples") or "example" in s or "default" in s
+                   or achatado.get("examples") or "example" in achatado)
+            if tem or achatado.get("enum"):
+                continue
+            if achatado.get("type") == "string":
+                sem_exemplo.append(f"{nome}.{campo}")
+    assert not sem_exemplo, (
+        "campos de request sem `examples` — a UI vai inventar um valor que pode "
+        f"nao passar na propria validacao: {sem_exemplo}")
+
+
+def test_exemplo_declarado_respeita_a_restricao_do_proprio_campo(client):
+    """Exemplo que o schema recusa e pior que exemplo nenhum: o usuario copia e
+    leva 422 sem entender por que."""
+    import re
+
+    spec = client.get("/openapi.json").json()
+    ruins = []
+    for nome, sch in _schemas_de_request(spec).items():
+        for campo, s in (sch.get("properties") or {}).items():
+            achatado = _sem_null(s)
+            exemplos = s.get("examples") or achatado.get("examples") or []
+            for ex in exemplos:
+                padrao = achatado.get("pattern")
+                if padrao and isinstance(ex, str) and not re.match(padrao, ex):
+                    ruins.append(f"{nome}.{campo}={ex!r} viola {padrao}")
+                minimo = achatado.get("exclusiveMinimum")
+                if minimo is not None and isinstance(ex, (int, float)) and ex <= minimo:
+                    ruins.append(f"{nome}.{campo}={ex!r} viola exclusiveMinimum {minimo}")
+    assert not ruins, ruins

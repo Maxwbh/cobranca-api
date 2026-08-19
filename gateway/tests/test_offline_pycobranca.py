@@ -620,3 +620,927 @@ def test_multi_sem_duplicata_continua_aceito(client):
                                     "application/json")})
     assert r.status_code == 200, r.text
     assert r.content[:4] == b"%PDF"
+
+
+# Campo que só falta na FORMATAÇÃO: 400 com a mensagem do banco, nunca 500.
+#
+# `boleto.validar()` aprovava o Sicredi e a exceção estourava depois, ao montar
+# o nosso número formatado — fora do handler. O consumidor recebia
+# `500 Internal Server Error` por um campo que faltava no payload DELE, e a
+# mensagem da engine, que dizia qual era, ficava só no log do servidor.
+DADOS_SICREDI = {
+    "cedente": "Empresa Exemplo", "documento_cedente": "11222333000181",
+    "sacado": "Fulano", "sacado_documento": "11144477735",
+    "valor": 1500.0, "data_vencimento": "2026/12/31",
+    "agencia": "1234", "conta_corrente": "1234", "nosso_numero": "123",
+    "carteira": "1", "convenio": "1234",
+}
+
+
+@pytest.mark.parametrize("rota,params", [
+    ("/api/boleto/data", {}),
+    ("/api/boleto", {"type": "pdf"}),
+    ("/api/boleto/nosso_numero", {}),
+])
+def test_boleto_invalido_na_formatacao_vira_400(client, rota, params):
+    import json as _json
+    r = client.get(rota, params={"bank": "sicredi",
+                                 "data": _json.dumps(DADOS_SICREDI), **params})
+    assert r.status_code == 400, f"{rota} devolveu {r.status_code}: {r.text[:200]}"
+    erros = r.json()["validation_errors"]
+    assert any("data_documento" in e for e in erros), erros
+
+
+def test_mensagem_do_banco_chega_ate_o_consumidor(client):
+    """O erro seguinte da cadeia também: um 400 de cada vez, sempre com o campo."""
+    import json as _json
+    dados = {**DADOS_SICREDI, "data_documento": "2026/08/19"}
+    r = client.get("/api/boleto/data", params={"bank": "sicredi", "data": _json.dumps(dados)})
+    assert r.status_code == 400, r.text
+    assert any("byte_idt" in e for e in r.json()["validation_errors"])
+
+
+# Débito não pode ser contado como crédito.
+#
+# A engine normaliza `valor` para POSITIVO e guarda a direção em `tipo`
+# (o TRNTYPE do OFX). O roteador deduzia do sinal — que nunca é negativo depois
+# da normalização —, então TODA transação saía como `credito` e `total_debitos`
+# era eternamente 0. Num extrato de conciliação, o dinheiro que saiu entrava na
+# soma do que entrou.
+def test_ofx_separa_credito_de_debito(client):
+    with open(FIXTURES / "extrato_sicoob.ofx", "rb") as f:
+        r = client.post("/api/ofx/parse", files={"file": ("e.ofx", f.read(), "application/octet-stream")})
+    assert r.status_code == 201, r.text
+    corpo = r.json()
+    tipos = [t["tipo"] for t in corpo["transacoes"]]
+    # o arquivo tem 2 CREDIT e 2 DEBIT
+    assert tipos.count("credito") == 2 and tipos.count("debito") == 2, tipos
+    assert corpo["resumo"]["total_creditos"] == 3750.0
+    assert corpo["resumo"]["total_debitos"] == 530.5
+    # valor sempre positivo: a direção está em `tipo`, não no sinal
+    assert all(t["valor"] > 0 for t in corpo["transacoes"])
+
+
+def test_ofx_somente_creditos_filtra_de_verdade(client):
+    with open(FIXTURES / "extrato_sicoob.ofx", "rb") as f:
+        bruto = f.read()
+    r = client.post("/api/ofx/parse", files={"file": ("e.ofx", bruto, "application/octet-stream")},
+                    data={"somente_creditos": "true"})
+    corpo = r.json()
+    assert corpo["resumo"]["quantidade"] == 2
+    assert {t["tipo"] for t in corpo["transacoes"]} == {"credito"}
+    assert corpo["resumo"]["total_debitos"] == 0
+
+
+# JSON válido de forma errada era 500.
+#
+# `"texto"`, `123` e `{"boletos": [...]}` passam pelo `json.loads` — só quebram
+# lá dentro, quando a engine chama `.get()` no que achava ser um objeto. O
+# consumidor levava "Internal Server Error" por ter errado a FORMA do corpo,
+# que é exatamente o tipo de erro que a API tem de saber nomear. O parse já
+# respondia 400; a forma não era conferida em lugar nenhum.
+@pytest.mark.parametrize("rota", [
+    "/api/boleto/validate", "/api/boleto/data", "/api/boleto/nosso_numero", "/api/boleto",
+])
+@pytest.mark.parametrize("data,tipo", [('"x"', "texto"), ("123", "número"), ("[]", "lista")])
+def test_data_que_nao_e_objeto_vira_400(client, rota, data, tipo):
+    r = client.get(rota, params={"bank": "banco_brasil", "type": "pdf", "data": data})
+    assert r.status_code == 400, f"{rota} devolveu {r.status_code}: {r.text[:200]}"
+    erros = r.json()["validation_errors"]
+    assert any(f"`data` deve ser um objeto JSON — recebi {tipo}" in e for e in erros), erros
+
+
+@pytest.mark.parametrize("corpo,esperado", [
+    (b'{"bank": "banco_brasil", "boletos": []}', "`data` deve ser uma lista JSON — recebi objeto"),
+    (b'"texto"', "`data` deve ser uma lista JSON — recebi texto"),
+    (b'123', "`data` deve ser uma lista JSON — recebi número"),
+    (b'["a"]', "`data[0]` deve ser um objeto JSON — recebi texto"),
+])
+def test_multi_com_lote_de_forma_errada_vira_400(client, corpo, esperado):
+    r = client.post("/api/boleto/multi",
+                    files={"data": ("lote.json", corpo, "application/json")})
+    assert r.status_code == 400, r.text
+    assert esperado in r.json()["validation_errors"], r.json()
+
+
+def test_remessa_com_data_que_nao_e_objeto_vira_400(client):
+    r = client.post("/api/remessa", params={"bank": "banco_brasil", "type": "cnab400"},
+                    files={"data": ("r.json", b"[]", "application/json")})
+    assert r.status_code == 400, r.text
+    assert "`data` deve ser um objeto JSON — recebi lista" in r.json()["validation_errors"]
+
+
+@pytest.mark.parametrize("rota,corpo,esperado", [
+    ("/api/render/boleto", {"bank": "banco_brasil", "data": "x"},
+     "`data` deve ser um objeto JSON — recebi texto"),
+    ("/api/render/carne", {"bank": "banco_brasil", "boletos": "x"},
+     "`boletos` deve ser uma lista JSON — recebi texto"),
+    ("/api/render/carne", {"bank": "banco_brasil", "boletos": ["a"]},
+     "`boletos[0]` deve ser um objeto JSON — recebi texto"),
+    ("/api/render/fatura", {"bank": "banco_brasil", "data": DADOS_BB, "itens": "x"},
+     "`itens` deve ser uma lista JSON — recebi texto"),
+    ("/api/render/fatura", {"bank": "banco_brasil", "data": DADOS_BB, "fatura": "x"},
+     "`fatura` deve ser um objeto JSON — recebi texto"),
+    ("/api/render/remessa", {"bank": "banco_brasil", "type": "cnab400", "data": "x"},
+     "`data` deve ser um objeto JSON — recebi texto"),
+])
+def test_render_com_campo_de_forma_errada_vira_400(client, rota, corpo, esperado):
+    r = client.post(rota, json=corpo)
+    assert r.status_code == 400, f"{rota} devolveu {r.status_code}: {r.text[:200]}"
+    assert esperado in r.json()["validation_errors"], r.json()
+
+
+# Template inválido no lote saía 200 com o modelo errado.
+#
+# `pdf_multi` cai em `moderno` quando não reconhece o modelo — silêncio pior
+# que erro, porque o irmão `GET /api/boleto` responde 400 para o mesmo valor.
+# `template=modrno` gerava o lote inteiro no modelo default sem avisar ninguém.
+def test_multi_recusa_template_invalido(client):
+    lote = json.dumps([{**DADOS_BB, "bank": "banco_brasil"}]).encode()
+    r = client.post("/api/boleto/multi", params={"template": "modrno"},
+                    files={"data": ("lote.json", lote, "application/json")})
+    assert r.status_code == 400, r.text
+    assert any("template 'modrno' inválido" in e for e in r.json()["validation_errors"])
+
+
+@pytest.mark.parametrize("template", ["moderno", "classico", "carne"])
+def test_multi_aceita_os_tres_modelos(client, template):
+    lote = json.dumps([{**DADOS_BB, "bank": "banco_brasil"}]).encode()
+    r = client.post("/api/boleto/multi", params={"template": template},
+                    files={"data": ("lote.json", lote, "application/json")})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf"
+
+
+# `validation_errors` é lista plana em TODA a superfície — este era o único
+# ponto que devolvia objeto-por-campo (`{"type": ["use 'pdf'"]}`), então quem
+# iterava a lista esperando mensagens recebia a string "type".
+@pytest.mark.parametrize("chamada", [
+    lambda c: c.get("/api/boleto", params={"bank": "banco_brasil", "type": "png",
+                                           "data": json.dumps(DADOS_BB)}),
+    lambda c: c.post("/api/boleto/multi", params={"type": "png"},
+                     files={"data": ("lote.json", b"[]", "application/json")}),
+])
+def test_formato_descontinuado_devolve_lista_plana(client, chamada):
+    r = chamada(client)
+    assert r.status_code == 400, r.text
+    erros = r.json()["validation_errors"]
+    assert isinstance(erros, list) and all(isinstance(e, str) for e in erros), erros
+    assert any("pdf" in e for e in erros), erros
+
+
+# `emv` e `pix_label` eram aceitos e DESCARTADOS em silêncio.
+#
+# Vinham da era Ruby, onde o QR chegava pronto no payload. Hoje quem desenha o
+# Bolepix é `chave_pix`: a engine monta o EMV e o QR. Mandar `emv` devolvia 200
+# com um boleto SEM QR — e nada na resposta indicava a falta, então o boleto
+# chegava ao pagador sem como pagar por Pix. O exemplo `generate_test_boletos.py`
+# gerava seis boletos "pix" assim.
+@pytest.mark.parametrize("campo", ["emv", "pix_label"])
+def test_campo_de_pix_sem_consumidor_vira_400(client, campo):
+    dados = {**DADOS_BB, campo: "valor qualquer"}
+    r = client.get("/api/boleto", params={"bank": "banco_brasil", "type": "pdf",
+                                          "data": json.dumps(dados)})
+    assert r.status_code == 400, r.text
+    erros = r.json()["validation_errors"]
+    assert any(f"`{campo}` não gera QR Pix" in e for e in erros), erros
+    assert any("chave_pix" in e for e in erros), erros
+
+
+def test_campo_vazio_nao_e_recusado(client):
+    """Só o valor preenchido acusa: `emv: ""` é ausência, não intenção."""
+    r = client.get("/api/boleto", params={"bank": "banco_brasil", "type": "pdf",
+                                          "data": json.dumps({**DADOS_BB, "emv": ""})})
+    assert r.status_code == 200, r.text
+
+
+def test_chave_pix_desenha_o_qr(client):
+    """O caminho que funciona, medido pelo PDF — não pelo status."""
+    sem = client.get("/api/boleto", params={"bank": "banco_brasil", "type": "pdf",
+                                            "data": json.dumps(DADOS_BB)})
+    com = client.get("/api/boleto", params={
+        "bank": "banco_brasil", "type": "pdf",
+        "data": json.dumps({**DADOS_BB, "chave_pix": "11222333000181",
+                            "tipo_chave_pix": "cnpj"})})
+    assert sem.status_code == com.status_code == 200
+    assert len(com.content) > len(sem.content), "PDF com Pix não ficou maior — cadê o QR?"
+
+
+def test_banco_sem_pix_recusa_a_chave(client):
+    """Silêncio seria pior: o boleto sairia sem o QR que o emissor pediu."""
+    r = client.get("/api/boleto", params={
+        "bank": "banrisul", "type": "pdf",
+        "data": json.dumps({**DADOS_BB, "agencia": "1234", "conta_corrente": "12345",
+                            "carteira": "1", "chave_pix": "11222333000181",
+                            "tipo_chave_pix": "cnpj"})})
+    assert r.status_code == 400, r.text
+    assert any("não suporta PIX" in e for e in r.json()["validation_errors"])
+
+
+# ---------------------------------------------------------------- spec offline
+#
+# `/api/openapi.json`, `/api/openapi.yaml` e `/api/docs` servem o mesmo arquivo.
+# Ele era lido e parseado A CADA chamada: ~150 ms por request de 75 KB de YAML,
+# trinta vezes o resto da superfície — e é o que o Swagger da própria API busca
+# ao abrir.
+def test_json_e_yaml_descrevem_a_mesma_spec(client):
+    import yaml as _yaml
+    from app.routers import offline as _off
+    do_json = client.get("/api/openapi.json").json()
+    do_yaml = _yaml.safe_load(client.get("/api/openapi.yaml").content)
+    assert do_json == do_yaml
+    assert do_json == _yaml.safe_load(_off._SPEC.read_text(encoding="utf-8"))
+
+
+def test_yaml_sai_byte_a_byte(client):
+    """Reserializar traria outra ordem e perderia os comentários."""
+    from app.routers import offline as _off
+    r = client.get("/api/openapi.yaml")
+    assert r.content == _off._SPEC.read_bytes()
+
+
+def test_etag_igual_nas_duas_formas_e_304_no_recarregamento(client):
+    j = client.get("/api/openapi.json")
+    y = client.get("/api/openapi.yaml")
+    assert j.headers["etag"] == y.headers["etag"]
+    r = client.get("/api/openapi.json", headers={"If-None-Match": j.headers["etag"]})
+    assert r.status_code == 304 and not r.content
+
+
+def test_edicao_do_arquivo_aparece_sem_reiniciar(client):
+    """O cache é por mtime — em dev, editar o YAML tem de refletir na hora."""
+    from app.routers import offline as _off
+    original = _off._SPEC.read_text(encoding="utf-8")
+    try:
+        _off._SPEC.write_text(original.replace("  version: 2.2.0", "  version: 9.9.9"),
+                              encoding="utf-8")
+        assert client.get("/api/openapi.json").json()["info"]["version"] == "9.9.9"
+    finally:
+        _off._SPEC.write_text(original, encoding="utf-8")
+    assert client.get("/api/openapi.json").json()["info"]["version"] == "2.2.0"
+
+
+# Sem o arquivo, as três rotas respondiam "Internal Server Error" — já
+# aconteceu em produção, com o `.dockerignore` excluindo o YAML da imagem. O 500
+# anônimo manda procurar na aplicação; o defeito está no empacotamento.
+@pytest.mark.parametrize("rota", ["/api/openapi.json", "/api/openapi.yaml", "/api/docs"])
+def test_spec_ausente_responde_503_com_o_caminho(client, rota):
+    import pathlib
+    from app.routers import offline as _off
+    guardado, _off._SPEC, _off._cache_spec = _off._SPEC, pathlib.Path("/nao/existe.yaml"), None
+    try:
+        r = client.get(rota)
+        assert r.status_code == 503, r.text
+        assert "/nao/existe.yaml" in r.json()["detail"]
+    finally:
+        _off._SPEC, _off._cache_spec = guardado, None
+    assert client.get(rota).status_code == 200
+
+
+def test_503_sobrevive_a_reload_do_modulo(client):
+    """`SpecAusente` herda de HTTPException por causa deste caso.
+
+    `tests/test_carne.py` recarrega este módulo para reler `LOTE_MAX_ITENS`. Com
+    um handler casando por classe no `main`, a classe recriada pelo reload não
+    era reconhecida e o 503 virava 500 — só na suíte inteira, nunca no arquivo
+    isolado.
+    """
+    import importlib
+    import pathlib
+
+    from app import routers
+    importlib.reload(routers.offline)
+    off = routers.offline
+    guardado, off._SPEC, off._cache_spec = off._SPEC, pathlib.Path("/nao/existe.yaml"), None
+    try:
+        r = client.get("/api/openapi.json")
+        assert r.status_code == 503, r.text
+    finally:
+        off._SPEC, off._cache_spec = guardado, None
+
+
+# ------------------------------------------------------- páginas de documentação
+#
+# `/docs` e `/api/docs` buscavam CSS e JS na unpkg.com. Este produto é
+# self-hosted, em rede que libera saída HOST A HOST (é o que o
+# `examples/oracle/acl_setup.sql` configura): alcançar a API não implica
+# alcançar a unpkg. Onde não alcança, a página abre com o cabeçalho da
+# plataforma e o Swagger não renderiza — em branco, sem erro nenhum.
+@pytest.mark.parametrize("rota", ["/docs", "/api/docs", "/redoc"])
+def test_pagina_nao_carrega_recurso_de_terceiro(client, rota):
+    import re
+
+    html = client.get(rota).text
+    # Só o que o NAVEGADOR BUSCA para renderizar — `<link>`, `<script>`, `<img>`.
+    # `<a href>` externo é link de navegação: o usuário clica se quiser, e a
+    # página não depende dele para aparecer.
+    recursos = re.findall(r'<(?:link|script|img)\b[^>]*?(?:href|src)="([^"]+)"', html)
+    externos = sorted(u for u in recursos if u.startswith(("http://", "https://")))
+    assert externos == [], f"{rota} busca recurso externo: {externos}"
+
+
+@pytest.mark.parametrize("arquivo", ["swagger-ui.css", "swagger-ui-bundle.js"])
+def test_renderizador_sai_da_propria_aplicacao(client, arquivo):
+    r = client.get(f"/swagger-ui/{arquivo}")
+    assert r.status_code == 200, r.text
+    assert len(r.content) > 10_000, "arquivo do swagger-ui truncado?"
+
+
+@pytest.mark.parametrize("rota", ["/docs", "/api/docs"])
+def test_pagina_aponta_para_o_renderizador_servido(client, rota):
+    html = client.get(rota).text
+    assert '"/swagger-ui/swagger-ui.css"' in html
+    assert '"/swagger-ui/swagger-ui-bundle.js"' in html
+
+
+def test_cdn_de_reserva_tem_versao_pinada():
+    """`@5` flutuante deixaria a página mudar sozinha a cada release do upstream."""
+    import re
+
+    from app.core.swagger_tema import CDN_SWAGGER
+    assert re.search(r"@\d+\.\d+\.\d+$", CDN_SWAGGER), CDN_SWAGGER
+
+
+# A spec do gateway declarava os erros vindos DO BANCO (409, 424, 429, 502, 504)
+# e esquecia os do TOKEN, que vêm antes e valem nas mesmas rotas: `401` só
+# aparecia em `credenciais`/`webhooks` e `403` em NENHUMA das 67 operações,
+# enquanto a API responde os dois em todas as que aceitam `bapi_`.
+def test_spec_declara_os_erros_de_token_onde_eles_acontecem(client):
+    from app.main import app
+
+    spec = app.openapi()
+    operacoes = [(m.upper(), p, o) for p, d in spec["paths"].items() for m, o in d.items()
+                 if m in ("get", "post", "put", "patch", "delete")]
+    com_token = [(m, p) for m, p, o in operacoes if o.get("security")]
+    assert len(com_token) >= 60, "cadê as rotas que aceitam token?"
+    for m, p, o in operacoes:
+        if not o.get("security"):
+            continue
+        faltando = {"401", "403"} - set(o.get("responses") or {})
+        assert not faltando, f"{m} {p} aceita token e não declara {sorted(faltando)}"
+
+
+def test_401_e_403_do_token_acontecem_de_verdade(client):
+    """A declaração vale pelo que a API faz — não pelo que a spec afirma."""
+    token = client.post("/credenciais", json={
+        "tenant_id": "e1", "provider": "on", "banco": "c6",
+        "credentials": {"client_id": "x", "client_secret": "y"}}).json()["token"]
+
+    r = client.get("/cobranca/1", params={"tenant_id": "e1", "provider": "on", "banco": "c6"},
+                   headers={"Authorization": "Bearer bapi_naoexiste"})
+    assert r.status_code == 401, r.text
+
+    # o bapi_ amarra tenant E banco: trocar qualquer um dos dois é 403
+    r = client.get("/cobranca/1", params={"tenant_id": "e1", "provider": "on", "banco": "sicoob"},
+                   headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403, r.text
+    r = client.get("/cobranca/1", params={"tenant_id": "outro", "provider": "on", "banco": "c6"},
+                   headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403, r.text
+
+
+def test_rota_sem_token_nao_ganha_401(client):
+    """`/bancos` é introspecção e `/health` é sonda — declarar ali seria ruído."""
+    from app.main import app
+
+    spec = app.openapi()
+    for rota in ("/bancos", "/health"):
+        assert "401" not in spec["paths"][rota]["get"]["responses"], rota
+
+
+# `/redoc` vinha pronto do FastAPI: sem o tema da plataforma, com o favicon do
+# `fastapi.tiangolo.com` e buscando renderizador, fonte e ícone em três
+# terceiros. Era a única das três páginas de documentação fora do padrão — e a
+# única que continuava quebrada num deploy sem saída para a internet.
+def test_redoc_usa_a_casca_da_plataforma(client):
+    html = client.get("/redoc").text
+    assert "cob-topbar" in html and "Cobranca<span>-API</span>" in html
+    assert "fastapi.tiangolo.com" not in html
+    assert "fonts.googleapis.com" not in html
+    assert '<redoc spec-url="/openapi.json">' in html
+    assert '"/swagger-ui/redoc.standalone.js"' in html
+
+
+def test_renderizador_do_redoc_sai_da_propria_aplicacao(client):
+    r = client.get("/swagger-ui/redoc.standalone.js")
+    assert r.status_code == 200 and len(r.content) > 100_000
+
+
+# A spec do gateway tem ~324 KB e o `/docs` a busca inteira a cada abertura. O
+# irmão offline já devolvia 304 desde a revisão anterior; as duas superfícies
+# respondiam diferente para a mesma pergunta.
+def test_openapi_do_gateway_tem_etag_e_304(client):
+    r = client.get("/openapi.json")
+    assert r.status_code == 200 and r.headers.get("etag")
+    assert r.json()["openapi"].startswith("3.")
+    r304 = client.get("/openapi.json", headers={"If-None-Match": r.headers["etag"]})
+    assert r304.status_code == 304 and not r304.content
+
+
+def test_as_duas_specs_respondem_igual_ao_condicional(client):
+    """Consistência entre as superfícies: mesma pergunta, mesma resposta."""
+    for rota in ("/openapi.json", "/api/openapi.json"):
+        etag = client.get(rota).headers["etag"]
+        assert client.get(rota, headers={"If-None-Match": etag}).status_code == 304, rota
+
+
+# ------------------------------------------------------------------ sondas
+#
+# As duas respondem `status`, com CAIXA DIFERENTE, e é deliberado: o `"OK"` do
+# `/api/health` é contrato herdado da v1.x e o `"ok"` do `/health` é o que o
+# `examples/oracle/cobranca_api_pkg.sql` e a coleção Postman comparam por
+# igualdade. Trocar qualquer um dos dois quebra um consumidor real — o teste
+# fixa os dois para que a mudança seja uma decisão, não um deslize.
+def test_sondas_respondem_status_com_a_caixa_de_cada_superficie(client):
+    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/api/health").json()["status"] == "OK"
+
+
+def test_health_do_gateway_nao_toca_em_nada(client):
+    """É o que mata o container quando falha (Dockerfile, compose, Render)."""
+    assert client.get("/health").json() == {"status": "ok"}
+    # sem credencial, sem banco ligado, sem cofre: continua ok
+    assert client.get("/health").status_code == 200
+
+
+def test_timestamp_do_api_health_e_iso_com_offset(client):
+    """A página prometia sufixo `Z`; a API devolve `+00:00` com microssegundos."""
+    from datetime import datetime
+
+    ts = client.get("/api/health").json()["timestamp"]
+    assert not ts.endswith("Z"), ts
+    assert datetime.fromisoformat(ts).utcoffset().total_seconds() == 0, ts
+
+
+def test_health_do_gateway_tem_schema_proprio_na_spec(client):
+    """Era `additionalProperties: string` sem exemplo — a rota mais consumida
+    por automação era a menos especificada da API."""
+    from app.main import app
+
+    op = app.openapi()["paths"]["/health"]["get"]
+    corpo = op["responses"]["200"]["content"]["application/json"]
+    assert corpo["schema"] == {"$ref": "#/components/schemas/Saude"}
+    assert corpo["example"] == {"status": "ok"}
+    assert app.openapi()["components"]["schemas"]["Saude"]["properties"]["status"]["const"] == "ok"
+
+
+def test_exemplo_do_api_health_na_spec_bate_com_a_resposta(client):
+    """O exemplo tem de ser algo que a API realmente devolveria."""
+    from datetime import datetime
+
+    import yaml
+
+    from app.routers import offline as _off
+    spec = yaml.safe_load(_off._SPEC.read_text(encoding="utf-8"))
+    exemplo = spec["paths"]["/api/health"]["get"]["responses"]["200"]["content"]["application/json"]["example"]
+    real = client.get("/api/health").json()
+    assert set(exemplo) == set(real)
+    assert exemplo["status"] == real["status"]
+    # mesmo formato de instante, não só mesmo campo
+    datetime.fromisoformat(exemplo["timestamp"])
+    assert not exemplo["timestamp"].endswith("Z")
+
+
+# ------------------------------------------------------------------- catálogo
+#
+# `GET /bancos` é a rota para onde o resto da documentação manda quem precisa da
+# matriz exata ("`GET /bancos` responde a matriz exata, por introspecção"). Se
+# ela mentir, mente tudo que aponta para ela.
+def test_caminho_efetivo_e_o_que_a_cobranca_faz_de_verdade(client, monkeypatch):
+    """A promessa central do catálogo, medida nos dois estados da flag."""
+    conta = {"agencia": "1234", "conta_corrente": "12345", "carteira": "109",
+             "convenio": "12345", "cedente": "E", "documento_cedente": "11222333000181",
+             "nosso_numero": "123"}
+    corpo = {"tenant_id": "t", "provider": "on", "banco": "itau", "account_config": conta,
+             "cobranca": {"valor": 150.0, "vencimento": "2027-12-30", "seu_numero": "P1",
+                          "pagador": {"nome": "J", "documento": "52998224725"}}}
+
+    def catalogo():
+        return next(b for b in client.get("/bancos").json()["bancos"] if b["id"] == "itau")
+
+    monkeypatch.delenv("ITAU_REGISTERED_READY", raising=False)
+    assert catalogo()["caminho_efetivo"] == "off"
+    r = client.post("/cobranca", json=corpo)
+    assert r.status_code == 201 and r.json()["linha_digitavel"], "devia sair pela engine"
+
+    monkeypatch.setenv("ITAU_REGISTERED_READY", "true")
+    assert catalogo()["caminho_efetivo"] == "on"
+    # foi ao banco: sem credencial no cofre, 424 — e não um 201 da engine
+    assert client.post("/cobranca", json=corpo).status_code == 424
+
+
+def test_capacidades_novas_discriminam_os_bancos(client):
+    """`GET /pix/{txid}` não existe no Itaú; `/conciliacao/transacoes` só no C6;
+    sem `normalizar_webhook` o `POST /webhooks/{banco}` não entende a notificação."""
+    caps = {b["id"]: set(b["capacidades"]) for b in client.get("/bancos").json()["bancos"]}
+    assert "conciliacao_transacoes" in caps["c6"]
+    assert "conciliacao_transacoes" not in caps["sicoob"]
+    for banco in ("c6", "sicoob", "inter"):
+        assert {"pix_consulta", "webhook_entrada"} <= caps[banco], banco
+    assert not ({"pix_consulta", "webhook_entrada"} & caps["itau"])
+
+
+def test_consultar_fica_fora_das_capacidades(client):
+    """O provider offline sobrescreve `consultar` para devolver `pendente` com
+    uma dica — sobrescrever ali é honestidade, não capacidade. Anunciar faria o
+    consumidor esperar consulta de status onde não há estado."""
+    from app.routers.bancos import _CAPACIDADES
+
+    assert "consultar" not in _CAPACIDADES
+    caps = {b["id"]: set(b["capacidades"]) for b in client.get("/bancos").json()["bancos"]}
+    assert not any("consulta" in c for c in caps["pycobranca"])
+
+
+def test_schema_do_catalogo_descreve_os_campos_que_a_rota_devolve(client):
+    """O schema era `additionalProperties: true` — "um objeto qualquer" — na rota
+    que a documentação inteira usa como fonte. Descrito à mão, precisa de guarda
+    contra envelhecer."""
+    from app.main import app
+
+    op = app.openapi()["paths"]["/bancos"]["get"]
+    schema = op["responses"]["200"]["content"]["application/json"]["schema"]
+    corpo = client.get("/bancos").json()
+    assert set(schema["properties"]) == set(corpo)
+    declarados = set(schema["properties"]["bancos"]["items"]["properties"])
+    reais = {k for b in corpo["bancos"] for k in b}
+    assert declarados == reais, f"só no schema {declarados - reais} | só na resposta {reais - declarados}"
+
+
+def test_documentacao_de_cada_banco_existe(client):
+    import pathlib
+
+    from app.routers import offline as _off
+    raiz = _off._SPEC.parent.parent
+    for b in client.get("/bancos").json()["bancos"]:
+        caminho = b.get("documentacao")
+        if caminho:
+            assert (raiz / caminho).exists(), f"{b['id']} aponta para {caminho}, que não existe"
+
+
+# ------------------------------------------------------------------ credenciais
+#
+# O `422` do Pydantic devolve `input` — o valor que chegou. Em `credentials` isso
+# é o `client_secret` e a senha do certificado mTLS voltando no corpo da
+# resposta, de onde vão para log de aplicação, APM e console do navegador. O
+# cabeçalho do `core/vault.py` manda NUNCA logar credencial; devolver na
+# resposta é pior, porque nem passa por um filtro de log.
+SEGREDO = "s3cr3t-do-banco"
+SENHA_PFX = "senha-do-pfx"
+
+
+@pytest.mark.parametrize("chamada", [
+    lambda c: c.post("/credenciais", json={"tenant_id": "a", "credentials": {
+        "client_id": "cid", "client_secret": SEGREDO, "pfx_password": SENHA_PFX}}),
+    lambda c: c.post("/credenciais", json={"tenant_id": "a", "provider": "on",
+                                           "banco": "c6", "credentials": SEGREDO}),
+    lambda c: c.post("/cobranca", json={"tenant_id": "a", "provider": "on", "banco": "c6",
+                                        "credentials": {"client_secret": SEGREDO}}),
+    lambda c: c.post("/checkout", json={"tenant_id": "a", "provider": "on", "banco": "c6",
+                                        "credentials": {"pfx_password": SENHA_PFX}}),
+    lambda c: c.get("/cobranca/1", params={"tenant_id": "a"},
+                    headers={"X-Bank-Credentials": json.dumps({"client_secret": SEGREDO})}),
+])
+def test_422_nao_devolve_credencial(client, chamada):
+    r = chamada(client)
+    assert r.status_code == 422, r.text
+    assert SEGREDO not in r.text and SENHA_PFX not in r.text, r.text[:300]
+
+
+def test_422_continua_dizendo_o_que_chegou_fora_de_credentials(client):
+    """A redação não pode custar o diagnóstico: `input` é o que torna o 422 útil."""
+    r = client.post("/cobranca", json={"tenant_id": "a", "provider": "xyz", "banco": "c6"})
+    assert r.status_code == 422
+    erro = r.json()["detail"][0]
+    assert erro["input"] == "xyz" and erro["loc"] == ["body", "provider"]
+
+
+def test_cofre_guarda_cifrado_e_sem_o_token(client, tmp_path, monkeypatch):
+    """Zero-knowledge: sem o token, a linha no banco é um blob inútil."""
+    import hashlib
+    import sqlite3
+
+    caminho = tmp_path / "cred.db"
+    monkeypatch.setenv("CREDENTIAL_DB_PATH", str(caminho))
+    token = client.post("/credenciais", json={
+        "tenant_id": "acme", "provider": "on", "banco": "c6",
+        "credentials": {"client_id": "cid", "client_secret": SEGREDO}}).json()["token"]
+
+    linha = sqlite3.connect(caminho).execute(
+        "SELECT token_hash, tenant_id, provider, salt, nonce, ciphertext FROM credential_tokens"
+    ).fetchone()
+    bruto = b"".join(x if isinstance(x, bytes) else str(x).encode() for x in linha)
+    assert SEGREDO.encode() not in bruto, "credencial em claro no cofre"
+    assert token.encode() not in bruto, "o token não pode ser guardado"
+    assert linha[0] == hashlib.sha256(token.encode()).hexdigest()
+
+
+def test_revogacao_invalida_o_token_na_hora(client):
+    token = client.post("/credenciais", json={
+        "tenant_id": "rev", "provider": "on", "banco": "c6",
+        "credentials": {"client_id": "i"}}).json()["token"]
+    cab = {"Authorization": f"Bearer {token}"}
+    alvo = ("/cobranca/1", {"tenant_id": "rev", "provider": "on", "banco": "c6"})
+    assert client.get(alvo[0], params=alvo[1], headers=cab).status_code == 200
+    assert client.delete("/credenciais", headers=cab).status_code == 204
+    assert client.get(alvo[0], params=alvo[1], headers=cab).status_code == 401
+    assert client.delete("/credenciais", headers=cab).status_code == 401
+
+
+def test_apelido_legado_e_o_modelo_novo_compartilham_a_credencial(client):
+    """Promessa escrita no router: token emitido antes da mudança segue valendo."""
+    t_legado = client.post("/credenciais", json={
+        "tenant_id": "b", "provider": "c6",
+        "credentials": {"client_id": "i"}}).json()["token"]
+    r = client.get("/cobranca/1", params={"tenant_id": "b", "provider": "on", "banco": "c6"},
+                   headers={"Authorization": f"Bearer {t_legado}"})
+    assert r.status_code == 200, r.text
+
+    t_novo = client.post("/credenciais", json={
+        "tenant_id": "d", "provider": "on", "banco": "c6",
+        "credentials": {"client_id": "i"}}).json()["token"]
+    r = client.get("/cobranca/1", params={"tenant_id": "d", "provider": "c6"},
+                   headers={"Authorization": f"Bearer {t_novo}"})
+    assert r.status_code == 200, r.text
+
+
+# --------------------------------------------------------------------- cobrança
+#
+# `201 Created` é a afirmação mais forte que o HTTP tem de "criei o recurso", e a
+# rota a usa para dizer que NÃO criou: dados recusados pela engine voltam `201`
+# com `status: "erro"` e `id: null`. Quem faz `raise_for_status()` dá o boleto
+# por emitido.
+#
+# Que é defeito, e não estilo, está na comparação interna abaixo: a MESMA
+# violação responde `400` em duas rotas `/api/*` e `422` quando é o banco que a
+# detecta — só aqui ela passa por sucesso.
+CONTA_BB = {"agencia": "3073", "conta_corrente": "12345678", "convenio": "1234567",
+            "carteira": "18", "cedente": "E", "documento_cedente": "11222333000181",
+            "nosso_numero": "123"}
+COBRANCA = {"valor": 150.0, "vencimento": "2027-12-30", "seu_numero": "P1",
+            "pagador": {"nome": "J", "documento": "52998224725"}}
+
+
+def _registrar(client, **conta):
+    return client.post("/cobranca", json={
+        "tenant_id": "t", "provider": "off", "banco": "banco_brasil",
+        "account_config": {**CONTA_BB, **conta}, "cobranca": COBRANCA})
+
+
+def test_mesma_violacao_tem_codigos_opostos_por_rota(client):
+    """A evidência de que o `201` com erro é inconsistência, não convenção."""
+    dados = {"valor": 150.0, "cedente": "E", "documento_cedente": "11222333000181",
+             "sacado": "J", "sacado_documento": "52998224725", "agencia": "3073",
+             "conta_corrente": "12345678", "convenio": "1234567", "carteira": "999",
+             "nosso_numero": "123", "data_vencimento": "2027-12-30"}
+    assert client.get("/api/boleto/validate", params={
+        "bank": "banco_brasil", "data": json.dumps(dados)}).status_code == 400
+    assert client.post("/api/render/boleto",
+                       json={"bank": "banco_brasil", "data": dados}).status_code == 400
+    # e a mesma carteira em POST /cobranca, no default
+    r = _registrar(client, carteira="999")
+    assert r.status_code == 201 and r.json()["status"] == "erro"
+
+
+def test_default_mantem_o_201_com_status_erro(client, monkeypatch):
+    """Contrato atual, ensinado em três documentos — não muda sozinho."""
+    monkeypatch.delenv("COBRANCA_ERRO_HTTP", raising=False)
+    r = _registrar(client, carteira="999")
+    assert r.status_code == 201
+    corpo = r.json()
+    assert corpo["status"] == "erro" and corpo["id"] is None
+    assert "Location" not in r.headers
+    assert corpo["raw"]["validation_errors"]
+
+
+def test_flag_faz_a_recusa_virar_422_com_o_mesmo_corpo(client, monkeypatch):
+    monkeypatch.setenv("COBRANCA_ERRO_HTTP", "1")
+    r = _registrar(client, carteira="999")
+    assert r.status_code == 422, r.text
+    corpo = r.json()
+    # o corpo é o MESMO: quem migra continua lendo raw.validation_errors
+    assert corpo["status"] == "erro" and corpo["id"] is None
+    assert corpo["raw"]["validation_errors"]
+
+
+def test_flag_nao_afeta_o_caminho_de_sucesso(client, monkeypatch):
+    monkeypatch.setenv("COBRANCA_ERRO_HTTP", "1")
+    r = _registrar(client)
+    assert r.status_code == 201 and r.json()["status"] == "registrado"
+    assert r.headers["Location"].startswith("/cobranca/123?")
+
+
+def test_location_do_201_e_seguivel(client):
+    """Location sem tenant_id e provider devolveria 422 a quem confia no header."""
+    r = _registrar(client)
+    caminho, _, query = r.headers["Location"].partition("?")
+    seguido = client.get(caminho, params=dict(p.split("=") for p in query.split("&")))
+    assert seguido.status_code == 200, seguido.text
+
+
+@pytest.mark.parametrize("provider,banco", [("off", "banco_brasil"), ("on", "c6"), ("c6", None)])
+def test_location_e_seguivel_nos_dois_modelos(client, provider, banco):
+    """O `banco` ficou de fora do `Location` quando o segundo eixo nasceu: o
+    header apontava para `422` justamente no modelo NOVO, e são no legado
+    (`provider=c6`), que carrega o banco no próprio valor."""
+    conta = {**CONTA_BB, "carteira": "10"} if provider != "off" else dict(CONTA_BB)
+    corpo = {"tenant_id": "t", "provider": provider, "account_config": conta,
+             "cobranca": COBRANCA}
+    if banco:
+        corpo["banco"] = banco
+    r = client.post("/cobranca", json=corpo)
+    assert r.status_code == 201 and "Location" in r.headers, r.text
+    caminho, _, query = r.headers["Location"].partition("?")
+    seguido = client.get(caminho, params=dict(p.split("=") for p in query.split("&")))
+    assert seguido.status_code == 200, f"Location {r.headers['Location']} -> {seguido.text[:160]}"
+
+
+def test_location_do_pix_tambem_carrega_o_banco(client):
+    """Mesmo `_location`, mesmo defeito — `/pix` e `/pix/lote` também."""
+    import inspect
+
+    from app.routers import pix
+    assert "banco" in inspect.signature(pix._location).parameters
+    fonte = inspect.getsource(pix)
+    assert fonte.count("body.provider, body.banco") >= 2, "alguma chamada ficou sem o banco"
+
+
+# ------------------------------------------------------------------------ pix
+#
+# O txid é do BACEN — `[a-zA-Z0-9]{26,35}` — e a mensagem da cobv já CITAVA a
+# regra sem aplicá-la: `txid="abc"`, txid com hífen e txid de 40 caracteres
+# chegavam ao banco e voltavam como `400` dele, traduzido em `422` com
+# `upstream`. Validar no schema recusa antes da ida à rede, com mensagem
+# própria, e vale para cob, cobv e itens de lote de uma vez — mesmo movimento
+# do `POST /bolepix` na 2.1.1.
+@pytest.fixture
+def _c6_sem_rede(monkeypatch):
+    monkeypatch.setenv("VAULT__e1__c6__client_id", "cid")
+    monkeypatch.setenv("VAULT__e1__c6__client_secret", "sec")
+    caminhos: list[str] = []
+    monkeypatch.setattr(
+        "app.clients.oauth_mtls.OAuthMtlsClient.request",
+        lambda self, method, path, json=None, params=None: (
+            caminhos.append(path),
+            {"txid": "X", "status": "ATIVA", "pixCopiaECola": "0", "loc": {"location": "x"}},
+        )[1])
+    return caminhos
+
+
+TXID_BACEN = "TX1234567890123456789012345"
+
+
+def _criar_pix(client, txid=None, vencimento=False):
+    pix = {"valor": "10.00", "descricao": "x"}
+    if txid:
+        pix["txid"] = txid
+    if vencimento:
+        pix.update(data_vencimento="2027-12-30",
+                   devedor={"nome": "J", "documento": "52998224725"})
+    return client.post("/pix", json={"tenant_id": "e1", "provider": "on", "banco": "c6",
+                                     "account_config": {"chave_pix": "c@e.com"}, "pix": pix})
+
+
+@pytest.mark.parametrize("txid", ["abc", "A" * 40, "TX-234567890123456789012345"])
+@pytest.mark.parametrize("vencimento", [False, True])
+def test_txid_fora_do_padrao_bacen_nao_chega_ao_banco(client, _c6_sem_rede, txid, vencimento):
+    r = _criar_pix(client, txid, vencimento)
+    assert r.status_code == 422, r.text
+    assert not _c6_sem_rede, f"foi ao banco em {_c6_sem_rede}"
+
+
+@pytest.mark.parametrize("vencimento", [False, True])
+def test_txid_valido_passa_e_vira_o_identificador(client, _c6_sem_rede, vencimento):
+    r = _criar_pix(client, TXID_BACEN, vencimento)
+    assert r.status_code == 201, r.text
+    alvo = "cobv" if vencimento else "cob"
+    assert _c6_sem_rede[-1].endswith(f"/{alvo}/{TXID_BACEN}")
+
+
+def test_cob_sem_txid_deixa_o_banco_gerar(client, _c6_sem_rede):
+    assert _criar_pix(client).status_code == 201
+    assert _c6_sem_rede[-1].endswith("/cob"), _c6_sem_rede
+
+
+def test_location_da_cobv_leva_a_cobv_e_nao_a_cob(client, _c6_sem_rede):
+    """`vencimento=true` no Location é o que separa consultar a cobv de
+    consultar uma cob que não existe."""
+    r = _criar_pix(client, TXID_BACEN, vencimento=True)
+    loc = r.headers["Location"]
+    assert "vencimento=true" in loc and "banco=c6" in loc
+    caminho, _, query = loc.partition("?")
+    _c6_sem_rede.clear()
+    seguido = client.get(caminho, params=dict(p.split("=") for p in query.split("&")))
+    assert seguido.status_code == 200, seguido.text
+    assert "/cobv/" in _c6_sem_rede[-1], _c6_sem_rede
+
+
+def test_dialeto_bacen_e_o_mesmo_nos_tres_bancos(client, monkeypatch):
+    """A tag promete "dialeto idêntico em todos os bancos" — só o path muda."""
+    corpos = {}
+    for banco in ("c6", "sicoob", "inter"):
+        monkeypatch.setenv(f"VAULT__e1__{banco}__client_id", "cid")
+        monkeypatch.setenv(f"VAULT__e1__{banco}__client_secret", "sec")
+        monkeypatch.setattr(
+            "app.clients.oauth_mtls.OAuthMtlsClient.request",
+            lambda self, method, path, json=None, params=None, _b=banco: (
+                corpos.__setitem__(_b, sorted(json or {})),
+                {"txid": "X", "status": "ATIVA", "loc": {"location": "x"}})[1])
+        r = client.post("/pix", json={"tenant_id": "e1", "provider": "on", "banco": banco,
+                                      "account_config": {"chave_pix": "c@e.com"},
+                                      "pix": {"valor": "10.00", "descricao": "x"}})
+        assert r.status_code == 201, (banco, r.text)
+    assert len(set(map(tuple, corpos.values()))) == 1, corpos
+
+
+# --- revisao de /api ---------------------------------------------------------------
+#
+# A superficie offline ja tinha sido varrida por 500 e por contrato de erro nas
+# revisoes anteriores. O que sobrou sao as duas bordas de ENTRADA: parametro
+# booleano em texto e arquivo enviado.
+
+@pytest.mark.parametrize("valor", ["1", "0", "yes", "on", "sim", "", "talvez"])
+def test_parametro_booleano_fora_do_enum_nao_e_false_silencioso(client, valor):
+    """A spec publicada declara `enum: ['true','false']` e o codigo aceitava so
+    `"true"`, tratando TODO o resto como `false`. `include_data=1` respondia 200
+    com o PDF BINARIO quando o chamador pediu JSON — o parametro era aceito,
+    ignorado, e a resposta mudava de tipo."""
+    r = client.get("/api/boleto", params={"bank": "banco_brasil",
+                                          "data": json.dumps(DADOS_BB),
+                                          "include_data": valor})
+    assert r.status_code == 400, r.text
+    assert "include_data" in str(r.json()["validation_errors"])
+
+
+@pytest.mark.parametrize("valor", ["true", "True", "TRUE", "false", "FALSE"])
+def test_o_enum_declarado_continua_valendo(client, valor):
+    r = client.get("/api/boleto", params={"bank": "banco_brasil",
+                                          "data": json.dumps(DADOS_BB),
+                                          "include_data": valor})
+    assert r.status_code == 200, r.text
+    json_esperado = valor.lower() == "true"
+    eh_json = r.headers["content-type"].startswith("application/json")
+    assert eh_json is json_esperado
+
+
+def test_pix_da_remessa_tambem_segue_o_enum(client):
+    r = client.post("/api/remessa", params={"bank": "banco_brasil", "type": "cnab400",
+                                            "pix": "1"},
+                    files={"data": ("d.json", json.dumps(DADOS_BB), "application/json")})
+    assert r.status_code == 400, r.text
+    assert "`pix`" in str(r.json()["validation_errors"])
+
+
+def test_somente_creditos_do_ofx_tambem_segue_o_enum(client):
+    r = client.post("/api/ofx/parse", files={"file": ("x.ofx", b"<OFX>", "text/plain")},
+                    data={"somente_creditos": "1"})
+    assert r.status_code == 400, r.text
+    assert "somente_creditos" in str(r.json()["validation_errors"])
+
+
+@pytest.mark.parametrize("rota,campo,params", [
+    ("/api/ofx/parse", "file", {}),
+    ("/api/retorno", "data", {"bank": "banco_brasil", "type": "cnab400"}),
+    ("/api/remessa", "data", {"bank": "banco_brasil", "type": "cnab400"}),
+    ("/api/boleto/multi", "data", {}),
+])
+def test_upload_acima_do_teto_responde_413_e_nao_derruba_o_processo(client, monkeypatch,
+                                                                    rota, campo, params):
+    """As quatro rotas faziam `await ler()` do arquivo INTEIRO para a memoria,
+    sem olhar o tamanho: um POST grande derruba o processo antes de qualquer
+    validacao. O teto vem antes da leitura util."""
+    from app.routers import offline
+
+    monkeypatch.setattr(offline, "UPLOAD_MAX", 1024)
+    r = client.post(rota, params=params,
+                    files={campo: ("g.bin", b"x" * 4096, "application/octet-stream")})
+    assert r.status_code == 413, r.text
+    assert r.json()["campo"] == campo and r.json()["recebidos"] == 4096
+
+
+@pytest.mark.parametrize("rota,campo,params", [
+    ("/api/retorno", "data", {"bank": "banco_brasil", "type": "cnab400"}),
+    ("/api/remessa", "data", {"bank": "banco_brasil", "type": "cnab400"}),
+])
+def test_arquivo_vazio_e_recusado_pelo_nome_do_campo(client, rota, campo, params):
+    r = client.post(rota, params=params, files={campo: ("v.txt", b"", "text/plain")})
+    assert r.status_code == 400, r.text
+    assert "vazio" in str(r.json()["validation_errors"])
+
+
+def test_erro_do_retorno_usa_a_chave_canonica(client):
+    """Esta rota era a unica com `details`; quem escreve um handler generico de
+    erro tinha de conhecer as duas. A antiga fica como alias."""
+    r = client.post("/api/retorno", params={"bank": "banco_brasil", "type": "cnab400"},
+                    files={"data": ("r.ret", b"lixo", "text/plain")})
+    assert r.status_code == 400
+    corpo = r.json()
+    assert corpo["validation_errors"] == corpo["details"]
+
+
+def test_erro_do_ofx_usa_a_chave_canonica(client):
+    """`erro` em portugues era o unico do tipo na superficie."""
+    r = client.post("/api/ofx/parse", files={"file": ("x.ofx", b"lixo", "text/plain")})
+    assert r.status_code == 400
+    corpo = r.json()
+    assert corpo["error"] == corpo["erro"]
+    assert corpo["validation_errors"]

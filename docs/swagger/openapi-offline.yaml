@@ -16,7 +16,7 @@ info:
 
     | | **Offline (esta doc)** | **Gateway REST** ([Swagger `/docs`](./index.html)) |
     |---|---|---|
-    | O que faz | GERA o documento (boleto/CNAB) localmente | REGISTRA a cobrança na API online do banco (C6, Sicoob) |
+    | O que faz | GERA o documento (boleto/CNAB) localmente | REGISTRA a cobrança na API online do banco (C6, Sicoob, Inter, Itaú) |
     | Boleto | Não registrado (o banco só conhece no pagamento) | **Registrado** (CIP, em tempo real) + Pix, Bolepix, webhooks |
     | Autenticação | **Nenhuma** (por design — não toca em banco nem segredo) | Token `bapi_` (`POST /credenciais`) |
     | Conciliação | Retorno CNAB / OFX (arquivos) | Webhooks + consultas online |
@@ -31,7 +31,7 @@ info:
     curl {base}/api/health                          # saúde do serviço
     curl -G {base}/api/boleto -o boleto.pdf \
       --data-urlencode 'bank=banco_brasil' --data-urlencode 'type=pdf' \
-      --data-urlencode 'data={"valor":150.0,"cedente":"Empresa","documento_cedente":"12345678000100","sacado":"Cliente","sacado_documento":"12345678901","agencia":"3073","conta_corrente":"12345678","convenio":"01234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+      --data-urlencode 'data={"valor":150.0,"cedente":"Empresa","documento_cedente":"11222333000181","sacado":"Cliente","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
     ```
 
     **Links:** [Repositório](https://github.com/Maxwbh/cobranca-api) ·
@@ -40,26 +40,41 @@ info:
 
     ## Funcionalidades
 
-    - **Boletos**: Geração de boletos em PDF, JPG, PNG ou TIF (18+ bancos)
+    - **Boletos**: Geração de boletos em **PDF** — 18 bancos, sem convênio
     - **Remessa**: Geração de arquivos CNAB 240 e 400
     - **Retorno**: Parsing de arquivos de retorno CNAB 240 e 400
     - **OFX**: Parsing de extratos bancários OFX v1 (SGML) e v2 (XML) com extração automática de nosso_numero
 
     ## Bancos Suportados
 
-    | Banco | Código | Boleto | CNAB 240 | CNAB 400 | PIX |
+    Os 18, como a engine responde hoje. `GET /api/bancos` devolve esta mesma
+    matriz por introspecção do código — se as duas discordarem, a resposta
+    manda.
+
+    | Banco | Código | Boleto | CNAB 240 | CNAB 400 | PIX na remessa |
     |-------|--------|--------|----------|----------|-----|
     | Banco do Brasil | 001 | ✅ | ✅ | ✅ | ✅ |
-    | Itaú | 341 | ✅ | ❌ | ✅ | ✅ |
-    | Bradesco | 237 | ✅ | ❌ | ✅ | ✅ |
-    | Caixa | 104 | ✅ | ✅ | ❌ | ✅ |
+    | Banco do Nordeste | 004 | ✅ | — | ✅ | — |
+    | Banestes | 021 | ✅ | — | — | — |
     | Santander | 033 | ✅ | ✅ | ✅ | ✅ |
-    | Sicoob | 756 | ✅ | ✅ (remessa) | ❌ (remessa) | ✅ |
-    | Sicredi | 748 | ✅ | ✅ | ❌ | ✅ |
-    | Banrisul | 041 | ✅ | ❌ | ✅ | — |
-    | Banco C6 | 336 | ✅ | ❌ | ✅ | ✅ |
+    | Banrisul | 041 | ✅ | — | ✅ | — |
+    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |
+    | Ailos | 085 | ✅ | ✅ | — | — |
+    | CrediSIS | 097 | ✅ | — | ✅ | — |
+    | Caixa | 104 | ✅ | ✅ | — | ✅ |
     | Unicred | 136 | ✅ | ✅ | ✅ | — |
-    | Ailos | 085 | ✅ | ✅ | ❌ | — |
+    | Bradesco | 237 | ✅ | — | ✅ | ✅ |
+    | Banco C6 | 336 | ✅ | — | ✅ | ✅ |
+    | Itaú | 341 | ✅ | — | ✅ | ✅ |
+    | HSBC | 399 | ✅ | — | — | — |
+    | Safra | 422 | ✅ | — | — | — |
+    | Citibank | 745 | ✅ | — | ✅ | — |
+    | Sicredi | 748 | ✅ | ✅ | — | — |
+    | Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |
+
+    Boleto em PDF vale para os 18. As outras três colunas são do **arquivo de
+    remessa**: banco sem CNAB aqui emite o boleto, mas não gera remessa por
+    esta superfície.
 
   version: 2.2.0
   contact:
@@ -111,7 +126,12 @@ paths:
       tags:
         - Health
       summary: Verificar status da API
-      description: Endpoint para health check da API
+      description: |
+        Sonda de disponibilidade da superfície offline. Responde sem tocar em
+        rede, banco ou disco: prova que **o processo está de pé e roteando**, e
+        só isso. Não verifica credencial, volume de artefatos nem engine — uma
+        sonda que falhasse por problema transitório reiniciaria o container em
+        laço, que é pior que o problema que ela detectaria.
       operationId: healthCheck
       responses:
         '200':
@@ -122,7 +142,7 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
               example:
                 status: OK
-                timestamp: '2026-05-28T01:42:48Z'
+                timestamp: '2026-08-19T05:32:47.446605+00:00'
 
   /api/info:
     get:
@@ -211,7 +231,7 @@ paths:
           schema:
             type: string
             format: json
-          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"12345678000100","sacado":"João da Silva","sacado_documento":"12345678900","agencia":"3073","conta_corrente":"12345678","convenio":"01234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
       responses:
         '200':
           description: Dados válidos
@@ -248,7 +268,7 @@ paths:
           schema:
             type: string
             format: json
-          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"12345678000100","sacado":"João da Silva","sacado_documento":"12345678900","agencia":"3073","conta_corrente":"12345678","convenio":"01234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
       responses:
         '200':
           description: Dados do boleto
@@ -322,7 +342,7 @@ paths:
           schema:
             type: string
             format: json
-          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"12345678000100","sacado":"João da Silva","sacado_documento":"12345678900","agencia":"3073","conta_corrente":"12345678","convenio":"01234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+          example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
         - name: include_data
           in: query
           required: false
@@ -363,42 +383,38 @@ paths:
             X-Nosso-Numero:
               schema:
                 type: string
-              description: Nosso número padronizado (valor cru, sem DV).
-              example: '000000123'
+              description: |
+                Nosso número como veio no payload — a API **não** completa com
+                zeros à esquerda; quem pede `123` recebe `123`. O preenchimento
+                aparece no formatado.
+              example: '123'
             X-Nosso-Numero-Formatado:
               schema:
                 type: string
-              description: Nosso número formatado (impresso no boleto, com DV).
-              example: '01234567000000123'
+              description: Nosso número formatado (impresso no boleto).
+              example: '12345670000000123'
             X-Nosso-Numero-DV:
               schema:
                 type: string
-              description: Dígito verificador do nosso número.
-              example: '9'
+              description: |
+                Dígito verificador do nosso número, quando o banco o calcula à
+                parte. Vem **vazio** nos bancos que já o embutem no formatado —
+                o Banco do Brasil é um deles.
+              example: ''
             X-Codigo-Barras:
               schema:
                 type: string
               description: Código de barras (44 dígitos).
-              example: '00196131200001500000000000123456700000012318'
+              example: '00198204100000150000000001234567000000012318'
             X-Linha-Digitavel:
               schema:
                 type: string
               description: Linha digitável formatada.
-              example: '00190.00009 00123.456709 00000.123182 6 13120000150000'
+              example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
           content:
+            # Só PDF: `jpg`/`png`/`tif` foram descontinuados na v2 e respondem
+            # 400 — declará-los aqui prometia um content-type que não existe.
             application/pdf:
-              schema:
-                type: string
-                format: binary
-            image/jpeg:
-              schema:
-                type: string
-                format: binary
-            image/png:
-              schema:
-                type: string
-                format: binary
-            image/tiff:
               schema:
                 type: string
                 format: binary
@@ -410,16 +426,18 @@ paths:
                   summary: Response com include_data=true
                   value:
                     bank: banco_brasil
-                    nosso_numero: '000000123'
-                    nosso_numero_formatado: '01234567000000123'
-                    nosso_numero_dv: '9'
-                    codigo_barras: '00196131200001500000000000123456700000012318'
-                    linha_digitavel: '00190.00009 00123.456709 00000.123182 6 13120000150000'
+                    nosso_numero: '123'
+                    nosso_numero_formatado: '12345670000000123'
+                    nosso_numero_dv: ''
+                    codigo_barras: '00198204100000150000000001234567000000012318'
+                    linha_digitavel: '00190.00009 01234.567004 00000.123182 8 20410000015000'
                     content_base64: 'JVBERi0xLjQK...'
                     content_type: application/pdf
                     filename: boleto-banco_brasil.pdf
         '400':
-          description: Erro de validação — corpo com `validation_errors` por campo
+          description: |
+            Erro de validação. `validation_errors` é sempre uma **lista plana**
+            de mensagens — nunca um objeto por campo.
           content:
             application/json:
               schema:
@@ -427,8 +445,8 @@ paths:
               example:
                 error: Dados do boleto inválidos
                 validation_errors:
-                  valor: ["Valor não pode ficar em branco"]
-                  convenio: ["Convenio deve ser menor ou igual a 8 dígitos."]
+                  - "convênio deve ter 4, 6 ou 7 dígitos"
+                  - "carteira '18' não suportada (use uma de: 104, 109, 112, 115, 175, 177, 188)"
                 hint: Verifique se todos os campos obrigatórios estão preenchidos
 
   /api/boleto/multi:
@@ -450,6 +468,38 @@ paths:
         **413**; para lotes maiores use processamento assíncrono
         (ver `docs/development/plano-jobs-lote.md`).
       operationId: generateMultipleBoletos
+      parameters:
+        # Query, não campo do formulário: o corpo multipart carrega SÓ o
+        # arquivo, como em /api/remessa e /api/retorno. Esta página já disse o
+        # contrário, e o efeito era silencioso — `include_data` mandado no
+        # formulário era ignorado e a resposta vinha binária.
+        - name: type
+          in: query
+          required: false
+          description: Formato de saída (só `pdf`; qualquer outro responde 400).
+          schema:
+            $ref: '#/components/schemas/OutputType'
+        - name: include_data
+          in: query
+          required: false
+          description: |
+            Se `true`, retorna JSON com os metadados de cada boleto + o PDF
+            combinado em base64. Caso contrário, retorna o binário + os
+            headers `X-Boletos-*`.
+          schema:
+            type: string
+            enum: ['true', 'false']
+            default: 'false'
+        - name: template
+          in: query
+          required: false
+          description: |
+            Modelo visual. Além de `moderno`/`classico`, esta rota aceita
+            `carne` (3 vias por A4) — que `GET /api/boleto` recusa.
+          schema:
+            type: string
+            enum: [moderno, classico, carne]
+            default: moderno
       requestBody:
         required: true
         content:
@@ -457,23 +507,15 @@ paths:
             schema:
               type: object
               required:
-                - type
                 - data
               properties:
-                type:
-                  $ref: '#/components/schemas/OutputType'
                 data:
                   type: string
                   format: binary
-                  description: Arquivo JSON com array de boletos (cada um com campo "bank")
-                include_data:
-                  type: string
-                  enum: ['true', 'false']
-                  default: 'false'
                   description: |
-                    Se `true`, retorna JSON com array de metadados de cada
-                    boleto + arquivo combinado em base64. Caso contrário,
-                    retorna o binário + headers `X-Boletos-Info`.
+                    Arquivo JSON com um **array** de boletos, cada um com o
+                    campo `bank`. Outra forma (objeto, texto, número) responde
+                    **400** dizendo o que chegou.
       responses:
         '200':
           description: |
@@ -483,16 +525,20 @@ paths:
             X-Boletos-Count:
               schema:
                 type: integer
-              description: Número total de boletos gerados.
-              example: 3
+              description: |
+                Boletos **gerados** — não o tamanho do lote enviado. Num lote
+                de 3 com 1 falha, vale 2 (e `X-Boletos-Failed` vale 1).
+              example: 2
             X-Boletos-Info:
               schema:
                 type: string
                 format: json
               description: |
-                Array JSON com metadados de cada boleto (bank, nosso_numero,
-                nosso_numero_formatado, nosso_numero_dv, codigo_barras, linha_digitavel).
-              example: '[{"bank":"banco_brasil","nosso_numero":"000000123","nosso_numero_formatado":"01234567000000123","nosso_numero_dv":"9","codigo_barras":"...","linha_digitavel":"..."}]'
+                Array JSON com o registro de cada boleto gerado: `item_id`,
+                `indice`, `bank`, `status`, `nosso_numero`,
+                `nosso_numero_formatado`, `nosso_numero_dv`, `codigo_barras` e
+                `linha_digitavel`.
+              example: '[{"item_id":"0","indice":0,"bank":"banco_brasil","status":"completed","nosso_numero":"123","nosso_numero_formatado":"12345670000000123","nosso_numero_dv":"","codigo_barras":"...","linha_digitavel":"..."}]'
             X-Boletos-Failed:
               schema:
                 type: integer
@@ -528,6 +574,12 @@ paths:
                 Com `LOTE_MAX_ITENS` no default (200) isso **nunca** dispara;
                 ajuste `HEADER_JSON_MAX_BYTES` (ex.: `6144`) se estiver atrás de
                 nginx (8 KB) ou ALB (16 KB).
+            X-Boletos-Errors-Truncado:
+              schema:
+                type: string
+                enum: ['true']
+              description: |
+                O mesmo que `X-Boletos-Info-Truncado`, para `X-Boletos-Errors`.
             X-Boletos-Detalhe:
               schema:
                 type: string
@@ -543,34 +595,54 @@ paths:
                 $ref: '#/components/schemas/MultiBoletoResponse'
               examples:
                 with_include_data:
-                  summary: Response com include_data=true
+                  summary: Response com include_data=true (lote de 3, 1 falha)
                   value:
-                    total: 2
+                    total: 3
+                    completed: 2
+                    failed: 1
+                    status: partially_completed
                     boletos:
-                      - bank: banco_brasil
-                        nosso_numero: '000000123'
-                        nosso_numero_formatado: '01234567000000123'
-                        nosso_numero_dv: '9'
-                        codigo_barras: '00196131200001500000000000123456700000012318'
-                        linha_digitavel: '00190.00009 00123...'
-                      - bank: sicoob
-                        nosso_numero: '0007890'
+                      - item_id: '0'
+                        indice: 0
+                        bank: banco_brasil
+                        status: completed
+                        nosso_numero: '123'
+                        nosso_numero_formatado: '12345670000000123'
+                        nosso_numero_dv: ''
+                        codigo_barras: '00198204100000150000000001234567000000012318'
+                        linha_digitavel: '00190.00009 01234.567004 00000.123182 8 20410000015000'
+                      - item_id: '1'
+                        indice: 1
+                        bank: sicoob
+                        status: completed
+                        nosso_numero: '7890'
                         nosso_numero_formatado: '00078900'
-                        nosso_numero_dv: '0'
-                        codigo_barras: '75693131200002500001432701022938500078900001'
-                        linha_digitavel: '75691.43271 01022.938503 00789.000016 3 13120000250000'
+                        nosso_numero_dv: ''
+                        codigo_barras: '75691204100000250001432701022938500078900001'
+                        linha_digitavel: '75691.43279 01022.938508 00789.000015 1 20410000025000'
+                    erros:
+                      - item_id: '2'
+                        indice: 2
+                        bank: itau
+                        status: failed
+                        errors:
+                          - "conta deve ter no máximo 5 dígitos"
                     content_base64: 'JVBERi0xLjQK...'
                     content_type: application/pdf
                     filename: boletos-multi.pdf
         '400':
-          description: Erro de validação — nenhum item do lote é válido
+          description: |
+            Nenhum item do lote é válido, `data` não é um array de objetos, ou
+            `type`/`template` fora dos valores aceitos.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '413':
           description: |
-            Lote acima do limite `LOTE_MAX_ITENS` (default **200**).
+            Lote acima do limite `LOTE_MAX_ITENS` (default **200**), ou arquivo
+            acima de `UPLOAD_MAX_BYTES` (default **10 MB**). O teto de bytes é
+            conferido ANTES de carregar o conteúdo.
             Para volumes maiores, use o processamento assíncrono
             (`POST /jobs/boletos`, no gateway).
           content:
@@ -586,6 +658,8 @@ paths:
                     example: 350
                   hint:
                     type: string
+        '422':
+          $ref: '#/components/responses/LoteDuplicado'
 
   /api/remessa:
     post:
@@ -670,7 +744,7 @@ paths:
                   data: |
                     {
                       "empresa_mae": "Empresa C6 LTDA",
-                      "documento_cedente": "33445566000177",
+                      "documento_cedente": "33445566000186",
                       "agencia": "0001",
                       "conta_corrente": "1234567",
                       "digito_conta": "0",
@@ -681,7 +755,7 @@ paths:
                         "data_vencimento": "2026/12/31",
                         "valor": 1500.00,
                         "nome_sacado": "Joao da Silva",
-                        "documento_sacado": "12345678900",
+                        "documento_sacado": "12345678909",
                         "endereco_sacado": "Rua Teste, 100",
                         "bairro_sacado": "Centro",
                         "cep_sacado": "01000000",
@@ -697,7 +771,7 @@ paths:
                   data: |
                     {
                       "empresa_mae": "Cooperativa Teste",
-                      "documento_cedente": "98765432000100",
+                      "documento_cedente": "98765432000198",
                       "agencia": "4327",
                       "conta_corrente": "417270",
                       "convenio": "229385",
@@ -729,6 +803,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: |
+            Arquivo acima de `UPLOAD_MAX_BYTES` (default **10 MB**). O teto é
+            conferido ANTES de carregar o conteúdo — sem ele, um envio grande
+            derrubava o processo por memória antes de qualquer validação.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
 
   /api/retorno:
     post:
@@ -774,6 +866,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: |
+            Arquivo acima de `UPLOAD_MAX_BYTES` (default **10 MB**). O teto é
+            conferido ANTES de carregar o conteúdo — sem ele, um envio grande
+            derrubava o processo por memória antes de qualquer validação.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
 
   /api/ofx/parse:
     post:
@@ -842,6 +952,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OfxError'
+        '413':
+          description: |
+            Arquivo acima de `UPLOAD_MAX_BYTES` (default **10 MB**). O teto é
+            conferido ANTES de carregar o conteúdo — sem ele, um envio grande
+            derrubava o processo por memória antes de qualquer validação.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
 
   /api/render/boleto:
     post:
@@ -875,7 +1003,7 @@ paths:
                     Modelo visual. O padrão `moderno` traz o logo do banco emissor
                     no cabeçalho.
       responses:
-        '201':
+        '200':
           description: Boleto renderizado
           content:
             application/json:
@@ -920,13 +1048,16 @@ paths:
                 boletos:
                   type: array
                   items: { type: object }
-                  description: Lista de boletos (cada um com seus dados)
+                  description: |
+                    Lista de boletos (cada um com seus dados). Outra forma —
+                    ou item que não seja objeto — responde **400** dizendo o
+                    que chegou.
                 template:
                   type: string
                   enum: [carne]
                   default: carne
       responses:
-        '201':
+        '200':
           description: Carnê renderizado
           content:
             application/json:
@@ -940,6 +1071,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: |
+            Lote acima do limite `LOTE_MAX_ITENS` (default **200**). O teto é o
+            mesmo de `/api/boleto/multi` — as duas rotas renderizam pelo mesmo
+            caminho, de forma síncrona.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: Lote acima do limite de 200 itens }
+                  recebidos: { type: integer, example: 350 }
+                  hint: { type: string }
+        '422':
+          $ref: '#/components/responses/LoteDuplicado'
 
   /api/render/fatura:
     post:
@@ -995,7 +1141,7 @@ paths:
                   type: object
                   description: Nível 2 — corpo declarativo (`titulo`, `blocos`), repassado ao engine.
       responses:
-        '201':
+        '200':
           description: Fatura renderizada
           content:
             application/json:
@@ -1042,7 +1188,7 @@ paths:
                   default: false
                   description: Segmento PIX (boleto híbrido)
       responses:
-        '201':
+        '200':
           description: Remessa gerada
           content:
             application/json:
@@ -1058,6 +1204,31 @@ paths:
                 $ref: '#/components/schemas/Error'
 
 components:
+  responses:
+    LoteDuplicado:
+      description: |
+        Dois itens com o mesmo identificador — o `item_id` sai de
+        `external_id`, `seu_numero` ou `numero_documento`. É o mesmo título
+        emitido duas vezes: o segundo sobrescreve o primeiro e some do lote
+        sem aviso, então o lote é recusado inteiro.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, example: Itens com identificador duplicado no lote }
+              hint: { type: string }
+              duplicados:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    item_id: { type: string, example: 'NF-1042' }
+                    indices:
+                      type: array
+                      items: { type: integer }
+                      example: [0, 3]
+
   schemas:
     BankCode:
       type: string
@@ -1105,11 +1276,22 @@ components:
       properties:
         status:
           type: string
+          enum: ['OK']
+          description: |
+            **Maiúsculo aqui.** O `GET /health` do gateway responde `"ok"`
+            minúsculo — são sondas de superfícies diferentes e os dois formatos
+            têm consumidor: este mantém o contrato da v1.x, e o do gateway é o
+            que o `examples/oracle/cobranca_api_pkg.sql` compara. Comparando
+            exato, use o valor da superfície que você chamou.
           example: OK
         timestamp:
           type: string
           format: date-time
-          example: '2026-05-28T01:42:48Z'
+          description: |
+            Instante da resposta em ISO 8601, com **offset `+00:00`** e
+            microssegundos — não o sufixo `Z`. É o que
+            `datetime.now(timezone.utc).isoformat()` produz.
+          example: '2026-08-19T05:32:47.446605+00:00'
 
     InfoResponse:
       type: object
@@ -1119,8 +1301,11 @@ components:
           example: Cobranca-API — Offline (pyCobranca)
         version:
           type: string
-          description: Versão da engine pyCobrança
-          example: '1.0.1'
+          description: |
+            Versão da **engine pyCobrança** — não a da API. A versão da API
+            está em `GET /api/metadata` (`api.version`), e as duas não andam
+            juntas.
+          example: '1.0.3'
         engine:
           type: string
           example: pycobranca
@@ -1222,12 +1407,35 @@ components:
       properties:
         total:
           type: integer
-          description: Número total de boletos gerados
+          description: Itens **recebidos** no lote (válidos + falhos).
+          example: 3
+        completed:
+          type: integer
+          description: Itens que viraram boleto.
           example: 2
+        failed:
+          type: integer
+          description: Itens recusados na validação.
+          example: 1
+        status:
+          type: string
+          enum: [completed, partially_completed]
+          description: |
+            `partially_completed` quando ao menos um item falhou. Lote sem
+            nenhum item válido não chega aqui — responde 400.
+          example: partially_completed
         boletos:
           type: array
+          description: Um registro por item gerado.
           items:
             $ref: '#/components/schemas/BoletoMetadata'
+        erros:
+          type: array
+          description: |
+            Um registro por item recusado — o lote não é cancelado por causa
+            deles. Mesmo conteúdo do header `X-Boletos-Errors`.
+          items:
+            $ref: '#/components/schemas/BoletoFalho'
         content_base64:
           type: string
           format: base64
@@ -1243,21 +1451,57 @@ components:
       type: object
       description: Metadados de um boleto no array `boletos` ou no header `X-Boletos-Info`
       properties:
+        item_id:
+          type: string
+          description: |
+            Identificador do item — sai de `external_id`, `seu_numero` ou
+            `numero_documento`; na falta dos três, do índice.
+          example: '0'
+        indice:
+          type: integer
+          description: Posição no lote enviado.
+          example: 0
+        status:
+          type: string
+          enum: [completed]
         bank:
           $ref: '#/components/schemas/BankCode'
         nosso_numero:
           type: string
-          example: '000000123'
+          example: '123'
         nosso_numero_formatado:
           type: string
-          example: '01234567000000123'
+          example: '12345670000000123'
         nosso_numero_dv:
           type: string
-          example: '9'
+          example: ''
         codigo_barras:
           type: string
         linha_digitavel:
           type: string
+
+    BoletoFalho:
+      type: object
+      description: |
+        Item recusado no lote, no array `erros` ou no header `X-Boletos-Errors`.
+      properties:
+        item_id:
+          type: string
+          example: '2'
+        indice:
+          type: integer
+          example: 2
+        bank:
+          type: string
+          example: itau
+        status:
+          type: string
+          enum: [failed]
+        errors:
+          type: array
+          items:
+            type: string
+          example: ["conta deve ter no máximo 5 dígitos"]
 
     BoletoData:
       type: object
@@ -1339,26 +1583,38 @@ components:
           type: string
         instrucao6:
           type: string
+        # Bolepix: quem liga o QR é a CHAVE. A engine monta o payload EMV e
+        # desenha o QR ela mesma — um EMV pronto não tem por onde entrar.
         emv:
           type: string
+          deprecated: true
           description: |
-            Payload EMV do PIX (para boleto híbrido). Quando enviado, o boleto
-            gera QR Code PIX embutido. Suportado por: Banco do Brasil, Bradesco,
-            Itaú, Sicoob, Caixa, Banco C6, Santander, Sicredi.
-          example: '00020126580014br.gov.bcb.pix...'
+            **Responde 400.** A engine nunca leu este campo: ele existia só no
+            schema, herdado da era Ruby, e o boleto saía sem QR com `200`. Use
+            `chave_pix`.
         pix_label:
           type: string
-          description: Texto exibido ao lado do QR Code no boleto híbrido
-          example: 'Escaneie para pagar via PIX'
+          deprecated: true
+          description: |
+            **Responde 400.** A legenda do QR é do modelo, não do payload.
         chave_pix:
           type: string
-          description: 'Chave PIX (CPF, CNPJ, email, telefone ou aleatoria). Suportado pela engine pyCobrança.'
-          example: '12345678900'
+          description: |
+            Chave PIX do beneficiário (CPF, CNPJ, e-mail, telefone ou
+            aleatória). **É o campo que gera o QR** no PDF.
+
+            Só nos sete bancos que a engine sabe fazer Bolepix — Banco do
+            Brasil, Bradesco, Caixa, Itaú, Santander, Sicoob e C6. Nos demais
+            responde `400` (`banco 041 (Banrisul) não suporta PIX`) em vez de
+            imprimir o boleto sem o QR pedido.
+          example: '11222333000181'
         tipo_chave_pix:
           type: string
-          description: 'Tipo da chave PIX.'
+          description: |
+            Aceito e **descartado** — a engine deduz o tipo do valor da chave.
+            Mantido porque não muda o resultado; não conte com ele voltando.
           enum: ['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']
-          example: 'cpf'
+          example: 'cnpj'
         txid:
           type: string
           description: 'Codigo de identificacao da transacao PIX.'
@@ -1404,8 +1660,16 @@ components:
             Tema visual — total de parcelas (selo "PARCELA n/N"). Suportado pela engine pyCobrança.
           example: 12
 
+    # Estes seis campos, e só eles. A página já prometeu `agencia_conta_boleto`,
+    # `numero_documento`, `valor_documento`, `data_vencimento`, `cedente`,
+    # `sacado` e `pix` — nenhum existe na resposta: quem os lia recebia
+    # `undefined` sem nenhum erro para investigar. O que a API devolve é o
+    # cálculo do boleto; o resto do payload o chamador já tem, porque foi ele
+    # quem mandou.
     BoletoResponse:
       type: object
+      required: [bank, nosso_numero, nosso_numero_formatado, nosso_numero_dv,
+                 codigo_barras, linha_digitavel]
       properties:
         bank:
           type: string
@@ -1413,69 +1677,52 @@ components:
         nosso_numero:
           type: string
           description: |
-            Nosso número padronizado com zeros (SEM carteira/convênio/DV).
-            É o valor de entrada formatado pela gem, sem composição de impressão.
-          example: '000000123'
+            O valor **como veio** no payload — a API não completa com zeros à
+            esquerda. O preenchimento aparece no formatado.
+          example: '123'
         nosso_numero_formatado:
           type: string
           description: |
             Nosso número IMPRESSO no boleto (com carteira, convênio e/ou DV,
             conforme regra do banco). Usar este campo para exibição e conciliação.
-          example: '01234567000000123'
+          example: '12345670000000123'
         nosso_numero_dv:
           type: string
-          description: Dígito verificador do nosso número (isolado)
-          example: '9'
+          description: |
+            Dígito verificador isolado, nos bancos que o calculam à parte.
+            **Vazio** quando o banco já o embute no formatado — é o caso do
+            Banco do Brasil, e não é erro.
+          example: ''
         codigo_barras:
           type: string
           description: Código de barras (44 dígitos)
-          example: '00191234567890123456789012345678901234567890'
+          example: '00198204100000150000000001234567000000012318'
         linha_digitavel:
           type: string
           description: Linha digitável formatada
-          example: '00191.23456 78901.234567 89012.345678 9 01234567890123'
-        agencia_conta_boleto:
-          type: string
-          description: Agência/conta formatados para impressão
-          example: '3073 / 12345678-0'
-        numero_documento:
-          type: string
-        valor_documento:
-          type: number
-          format: float
-        data_vencimento:
-          type: string
-        cedente:
-          type: string
-        sacado:
-          type: string
-        pix:
-          type: object
-          nullable: true
-          description: |
-            Dados do PIX híbrido (quando o campo `emv` foi fornecido na entrada).
-            Presente apenas em bancos com suporte a PIX.
-          properties:
-            emv:
-              type: string
-              description: Payload EMV do PIX (mesmo enviado na entrada)
-            qrcode_base64:
-              type: string
-              description: QR Code em base64 PNG (quando disponível)
+          example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
 
+    # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
+    # código de barras — é para isso que ele existe. O schema prometia
+    # exatamente `codigo_barras` e `linha_digitavel`, que a rota não devolve, e
+    # omitia `bank` e `nosso_numero_formatado`, que ela devolve.
     NossoNumeroResponse:
       type: object
+      required: [bank, nosso_numero, nosso_numero_formatado, nosso_numero_dv]
       properties:
+        bank:
+          type: string
+          example: banco_brasil
         nosso_numero:
           type: string
+          example: '123'
+        nosso_numero_formatado:
+          type: string
+          example: '12345670000000123'
         nosso_numero_dv:
           type: string
-        codigo_barras:
-          type: string
-        linha_digitavel:
-          type: string
-        agencia_conta_boleto:
-          type: string
+          description: Vazio nos bancos que embutem o DV no formatado.
+          example: ''
 
     ValidationSuccess:
       type: object
@@ -1715,18 +1962,29 @@ components:
 
     RetornoItem:
       type: object
+      description: |
+        **Campo sem valor no arquivo não vem na resposta** — a chave é omitida,
+        não vem `null`. `numero_documento` e `data_credito` são os que mais
+        faltam: em retorno de liquidação simples, nenhum dos dois costuma vir.
+
+        As **datas saem como o banco as escreveu**, sem conversão: `DDMMAA` no
+        CNAB 400 (`"150726"` = 15/07/2026) e `DDMMAAAA` no CNAB 240. Não é
+        ISO — converta antes de comparar com data do seu sistema.
       properties:
         nosso_numero:
           type: string
           description: Nosso número do título
         numero_documento:
           type: string
+          description: Seu número, quando o arquivo o traz.
         data_credito:
           type: string
-          description: Data do crédito (YYYY-MM-DD)
+          description: Data do crédito, no formato do layout (`DDMMAA` / `DDMMAAAA`).
+          example: '200726'
         data_ocorrencia:
           type: string
-          description: Data da ocorrência
+          description: Data da ocorrência, no formato do layout.
+          example: '150726'
         valor_titulo:
           type: number
           format: float
@@ -1764,8 +2022,8 @@ components:
           properties:
             agencia:
               type: string
-              description: Agência (bank_id do OFX)
-              example: '756'
+              description: Agência (BANKID do OFX)
+              example: '3044'
             numero:
               type: string
               description: Número da conta
@@ -1801,39 +2059,55 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OfxTransacao'
+        # `total_creditos`/`total_debitos` são SOMAS EM REAIS, não contagens —
+        # esta página já disse `integer` com exemplo `28`, e quem conciliava
+        # lia R$ 3.750,00 como "28 transações". `soma_creditos`,
+        # `soma_debitos` e `total_transacoes` nunca existiram na resposta.
         resumo:
           type: object
+          required: [total_creditos, total_debitos, quantidade]
           properties:
-            total_transacoes:
-              type: integer
-              example: 45
             total_creditos:
-              type: integer
-              example: 28
+              type: number
+              format: float
+              description: Soma dos créditos, em reais.
+              example: 3750.00
             total_debitos:
+              type: number
+              format: float
+              description: |
+                Soma dos débitos, em reais — sempre positiva. Com
+                `somente_creditos=true` vale `0`.
+              example: 530.50
+            quantidade:
               type: integer
-              example: 17
-            soma_creditos:
-              type: number
-              format: float
-              example: 85000.00
-            soma_debitos:
-              type: number
-              format: float
-              example: 69579.50
+              description: Transações no extrato, depois do filtro.
+              example: 4
 
     OfxTransacao:
       type: object
+      description: |
+        Seis campos, sempre estes. A página já prometeu `name`, `checknum` e
+        `refnum`, que a resposta não traz, e chamava o identificador de
+        `fitid` — ele vem em **`id`**, e é por ele que se deduplica ao
+        reprocessar o mesmo período.
+      required: [tipo, valor, data, memo, id, nosso_numero]
       properties:
-        fitid:
+        id:
           type: string
-          description: ID único da transação no OFX
+          nullable: true
+          description: |
+            FITID do arquivo — identificador único da transação no extrato.
+            `null` quando o arquivo não o traz.
           example: '202501150001'
         tipo:
           type: string
-          enum: [CREDIT, DEBIT]
-          description: Crédito ou débito
-          example: CREDIT
+          enum: [credito, debito]
+          description: |
+            Direção do lançamento, **normalizada** — não é o TRNTYPE cru do
+            arquivo. Sai do TRNTYPE e não do sinal, porque a engine devolve
+            `valor` sempre positivo.
+          example: credito
         data:
           type: string
           format: date
@@ -1841,35 +2115,33 @@ components:
         valor:
           type: number
           format: float
-          description: Valor absoluto (sempre positivo)
+          description: Valor absoluto (sempre positivo — a direção está em `tipo`)
           example: 1250.00
         memo:
           type: string
           description: Descrição da transação
           example: COBRANCA SICOOB 0000012345
-        name:
-          type: string
-          description: Nome do beneficiário/pagador
-        checknum:
-          type: string
-          description: Número do cheque (quando aplicável)
-        refnum:
-          type: string
-          description: Número de referência
         nosso_numero:
           type: string
           nullable: true
-          description: Nosso número extraído do memo via regex específica do banco
+          description: Nosso número extraído do memo com a regra do banco emissor
           example: '0000012345'
 
     OfxError:
       type: object
       required:
-        - erro
+        - error
       properties:
+        error:
+          type: string
+          description: |
+            Mensagem de erro. `error` é a chave canônica em toda a superfície;
+            esta rota respondia só `erro` (em português), que segue presente
+            como alias para não quebrar quem já lê por ele.
+          example: Arquivo OFX inválido
         erro:
           type: string
-          description: Mensagem de erro
+          description: Alias de `error` (compatibilidade).
           example: Arquivo OFX inválido
         validation_errors:
           type: array
@@ -1893,9 +2165,12 @@ components:
             type: string
         details:
           type: array
-          description: Detalhes do erro como lista (ex. `/api/retorno` — um item por problema).
+          description: |
+            Só em `/api/retorno`, que usa este nome no lugar de
+            `validation_errors` — um item por problema do arquivo.
           items:
             type: string
-        type:
+        hint:
           type: string
-          description: Tipo do erro (ex. ValidationError)
+          description: O que fazer, quando a rota tem o que sugerir.
+          example: Verifique se todos os campos obrigatórios estão preenchidos

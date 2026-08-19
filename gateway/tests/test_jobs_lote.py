@@ -127,7 +127,11 @@ def test_manifesto_com_hash_tamanho_e_expiracao(client):
     assert m["job_id"] == job_id and m["completed"] == 2 and m["failed"] == 0
     assert len(m["arquivos"]) == 2
     for a in m["arquivos"]:
-        assert len(a["sha256"]) == 64 and a["bytes"] > 1000 and a["href"].endswith(".pdf")
+        # o href leva o `tenant_id`: as rotas de download exigem, e o manifesto
+        # publicava o caminho sem ele -- segui-lo dava 422.
+        assert len(a["sha256"]) == 64 and a["bytes"] > 1000
+        assert a["href"].startswith(f"/jobs/boletos/{job_id}/artifacts/items/")
+        assert ".pdf?tenant_id=empresa1" in a["href"]
     assert m["expira_em"] and m["retencao_dias"] >= 1
     assert m["consolidado"]["nome"].endswith(".zip") and len(m["consolidado"]["sha256"]) == 64
     # nada de base64 no manifesto
@@ -139,8 +143,10 @@ def test_download_pdf_do_item_e_hash_confere(client):
     m = client.get(f"/jobs/boletos/{job_id}/artifacts",
                    params={"tenant_id": "empresa1"}).json()
     art = m["arquivos"][0]
-    r = client.get(art["href"], params={"tenant_id": "empresa1"})
-    assert r.status_code == 200
+    # SEM `params`: o teste segue o link como o manifesto o publica. Passar o
+    # tenant à mão era a compensação que escondia o defeito.
+    r = client.get(art["href"])
+    assert r.status_code == 200, f'{art["href"]} -> {r.status_code}'
     assert r.headers["content-type"] == "application/pdf"
     assert r.content[:4] == b"%PDF" and len(r.content) == art["bytes"]
     import hashlib
@@ -155,7 +161,7 @@ def test_zip_consolidado_tem_pdfs_manifesto_e_erros(client):
     job_id = _cria_job(client, [DADOS_BB, {"bank": "banco_brasil", "external_id": "RUIM"}])
     m = client.get(f"/jobs/boletos/{job_id}/artifacts",
                    params={"tenant_id": "empresa1"}).json()
-    r = client.get(m["consolidado"]["href"], params={"tenant_id": "empresa1"})
+    r = client.get(m["consolidado"]["href"])
     assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         nomes = z.namelist()
@@ -215,7 +221,8 @@ def test_webhook_de_conclusao_com_assinatura(client, monkeypatch):
     ev = push["evento"]
     assert ev["event"] == "job.boletos.partially_completed"
     assert ev["job_id"] == job_id and ev["completed"] == 1 and ev["failed"] == 1
-    assert ev["artifacts"]["arquivos"] == 1 and ev["artifacts"]["consolidado"].endswith(".zip")
+    assert ev["artifacts"]["arquivos"] == 1
+    assert ".zip?tenant_id=empresa1" in ev["artifacts"]["consolidado"]
     assert ev["duracao_ms"] >= 0
 
 
@@ -343,3 +350,118 @@ def test_job_sem_template_continua_moderno(client):
     a = _bytes_do_artefato(client, _um_job(client, None, "t6"), "t6")
     b = _bytes_do_artefato(client, _um_job(client, "moderno", "t7"), "t7")
     assert a == b
+
+
+# --- revisao de /jobs -------------------------------------------------------------
+#
+# A rota entrega LINKS (self, items, files, href do manifesto) em vez de base64,
+# que e o contrato da doc 12. O que se mede aqui e se esses links funcionam --
+# um link que responde 422 nao e um link, e nada acusava porque os testes
+# passavam o tenant_id a mao.
+
+def test_todo_link_do_corpo_e_seguivel_sem_remendo(client):
+    """`self`, `items` e `artifacts` sairam sem `tenant_id`, que as rotas de
+    consulta exigem: seguir o que a resposta oferecia dava 422. Mesmo defeito do
+    `Location` das rotas de criacao, aqui dentro do payload."""
+    criado = client.post("/jobs/boletos", json={
+        "tenant_id": "empresa1", "boletos": [{**DADOS_BB, "external_id": "LINK-1"}]}).json()
+
+    for campo in ("self", "items"):
+        r = client.get(criado[campo])
+        assert r.status_code == 200, f'{campo}={criado[campo]} -> {r.status_code} {r.text}'
+
+    job = client.get(criado["self"]).json()
+    for campo in ("items", "artifacts"):
+        r = client.get(job[campo])
+        assert r.status_code == 200, f'{campo}={job[campo]} -> {r.status_code} {r.text}'
+
+
+_TITULO_CNAB = {
+    "bank": "banco_brasil", "cnab_type": "cnab240",
+    "empresa_mae": "Empresa Teste LTDA", "documento_cedente": "11222333000181",
+    "agencia": "3073", "conta_corrente": "12345678", "digito_conta": "0",
+    "convenio": "1234567", "carteira": "18", "variacao_carteira": "017",
+    "sequencial_remessa": 1,
+    "pagamentos": [{
+        "nosso_numero": "123456789", "numero_documento": "DOC-1",
+        "data_vencimento": "2027-12-31", "valor": 1500.0,
+        "sacado": "Joao da Silva", "sacado_documento": "52998224725",
+        "sacado_endereco": "Rua Teste, 100", "sacado_bairro": "Centro",
+        "sacado_cidade": "Sao Paulo", "sacado_uf": "SP", "sacado_cep": "01000000",
+    }],
+}
+
+
+def test_links_do_job_de_remessa_tambem_sao_seguiveis(client):
+    criado = client.post("/jobs/cnab/remessas", json={
+        "tenant_id": "empresa1", "titulos": [_TITULO_CNAB]}).json()
+    assert client.get(criado["self"]).status_code == 200
+    assert client.get(criado["files"]).status_code == 200
+    job = client.get(criado["self"]).json()
+    assert client.get(job["files"]).status_code == 200
+
+
+@pytest.mark.parametrize("params", [
+    {"limite": 0}, {"limite": -1}, {"limite": 501}, {"offset": -5}])
+def test_paginacao_fora_da_faixa_e_recusada(client, params):
+    """`limite` tinha teto e nao tinha piso: `limite=-1` devolvia o lote INTEIRO
+    (paginacao desligada por acidente) e `limite=0`, nada."""
+    job_id = _cria_job(client, [DADOS_BB])
+    r = client.get(f"/jobs/boletos/{job_id}/items",
+                   params={"tenant_id": "empresa1", **params})
+    assert r.status_code == 422, r.text
+
+
+def test_filtro_de_status_inexistente_nao_finge_lista_vazia(client):
+    """`status=INVENTADO` respondia 200 com zero itens -- que se le como "nenhum
+    item nesse estado", e nao como "esse estado nao existe"."""
+    job_id = _cria_job(client, [DADOS_BB])
+    r = client.get(f"/jobs/boletos/{job_id}/items",
+                   params={"tenant_id": "empresa1", "status": "INVENTADO"})
+    assert r.status_code == 422, r.text
+    ok = client.get(f"/jobs/boletos/{job_id}/items",
+                    params={"tenant_id": "empresa1", "status": "completed"})
+    assert ok.status_code == 200 and ok.json()["total_retornado"] == 1
+
+
+def test_item_alem_do_teto_antigo_de_500_e_encontrado(client, monkeypatch):
+    """A busca por item varria `limite=500`. `JOB_MAX_ITENS` e env: com teto
+    maior, o item 600 EXISTIA e respondia 404 -- o pior tipo de 404, porque
+    afirma ausencia. O limite passa a ser o total do job."""
+    from app.core import job_store as js
+
+    job_id = _cria_job(client, [DADOS_BB])
+    chamadas = {}
+    original = js.SqliteJobStore.itens
+
+    def espiao(self, jid, status=None, limite=100, offset=0):
+        chamadas.setdefault("limite", limite)
+        return original(self, jid, status=status, limite=limite, offset=offset)
+
+    monkeypatch.setattr(js.SqliteJobStore, "itens", espiao)
+    item_id = client.get(f"/jobs/boletos/{job_id}/items",
+                         params={"tenant_id": "empresa1"}).json()["items"][0]["item_id"]
+    chamadas.clear()
+    r = client.get(f"/jobs/boletos/{job_id}/items/{item_id}", params={"tenant_id": "empresa1"})
+    assert r.status_code == 200, r.text
+    assert chamadas["limite"] != 500, "voltou a varrer com teto fixo"
+
+
+def test_410_de_artefato_expirado_esta_no_contrato(client):
+    """A rota levantava 410 e a spec nao declarava: o consumidor nao tinha como
+    distinguir "expirou" de "nunca existiu" sem tentar."""
+    spec = client.get("/openapi.json").json()["paths"]
+    for rota in ("/jobs/boletos/{job_id}/artifacts",
+                 "/jobs/boletos/{job_id}/artifacts/{nome}",
+                 "/jobs/boletos/{job_id}/artifacts/items/{nome}",
+                 "/jobs/cnab/remessas/{job_id}/files",
+                 "/jobs/cnab/remessas/{job_id}/files/{nome}"):
+        assert "410" in spec[rota]["get"]["responses"], rota
+
+
+def test_isolamento_por_tenant_continua_valendo(client):
+    """O `tenant_id` na query nao e enfeite: e o que separa os clientes."""
+    job_id = _cria_job(client, [DADOS_BB])
+    for rota in (f"/jobs/boletos/{job_id}", f"/jobs/boletos/{job_id}/items",
+                 f"/jobs/boletos/{job_id}/artifacts"):
+        assert client.get(rota, params={"tenant_id": "OUTRO"}).status_code == 404, rota

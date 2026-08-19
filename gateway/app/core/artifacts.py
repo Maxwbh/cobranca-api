@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+from urllib.parse import urlencode
 import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -32,6 +33,15 @@ def raiz() -> Path:
     return Path(os.environ.get("ARTIFACT_DIR", "/app/data/jobs"))
 
 
+def _href(caminho: str, tenant_id: str | None) -> str:
+    """Link que o consumidor consegue seguir.
+
+    As rotas de download exigem `tenant_id` (é o isolamento entre clientes), e o
+    manifesto publicava o caminho sem ele: seguir o `href` do zip dava `422`.
+    Mesmo defeito do `Location` das rotas de criação, só que dentro do corpo."""
+    return f"{caminho}?{urlencode({'tenant_id': tenant_id})}" if tenant_id else caminho
+
+
 def _slug(valor: str) -> str:
     limpo = _SEGURO.sub("_", str(valor))[:120]
     return limpo or "item"
@@ -45,7 +55,8 @@ def sha256(dados: bytes) -> str:
     return hashlib.sha256(dados).hexdigest()
 
 
-def salvar_item(job_id: str, item_id: str, pdf: bytes) -> dict[str, Any]:
+def salvar_item(job_id: str, item_id: str, pdf: bytes,
+                tenant_id: str | None = None) -> dict[str, Any]:
     """Grava o PDF do item e devolve os metadados do artefato."""
     destino = dir_job(job_id) / "items"
     destino.mkdir(parents=True, exist_ok=True)
@@ -57,7 +68,7 @@ def salvar_item(job_id: str, item_id: str, pdf: bytes) -> dict[str, Any]:
         "nome": nome,
         "bytes": len(pdf),
         "sha256": sha256(pdf),
-        "href": f"/jobs/boletos/{job_id}/artifacts/items/{nome}",
+        "href": _href(f"/jobs/boletos/{job_id}/artifacts/items/{nome}", tenant_id),
     }
 
 
@@ -68,6 +79,7 @@ def _expira_em(criado: datetime | None = None) -> str:
 
 def consolidar(job_id: str, job: dict[str, Any],
                itens: list[dict[str, Any]]) -> dict[str, Any]:
+    tenant_id = job.get("tenant_id")
     """Gera manifest.json, errors.json e o zip consolidado do job.
 
     O zip contém os PDFs + manifesto + relatório de erros (doc 12).
@@ -120,7 +132,7 @@ def consolidar(job_id: str, job: dict[str, Any],
     manifesto["consolidado"] = {
         "tipo": "zip", "nome": zip_nome, "bytes": len(conteudo_zip),
         "sha256": sha256(conteudo_zip),
-        "href": f"/jobs/boletos/{job_id}/artifacts/{zip_nome}",
+        "href": _href(f"/jobs/boletos/{job_id}/artifacts/{zip_nome}", tenant_id),
     }
     (base / "manifest.json").write_text(
         json.dumps(manifesto, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -157,7 +169,8 @@ def remover(job_id: str) -> None:
 
 
 # ------------------------------------------------------------------ CNAB (Fase 3)
-def salvar_remessa(job_id: str, sublote_id: str, conteudo: str) -> dict[str, Any]:
+def salvar_remessa(job_id: str, sublote_id: str, conteudo: str,
+                   tenant_id: str | None = None) -> dict[str, Any]:
     """Grava o arquivo CNAB de um sublote (imutável, para auditoria)."""
     destino = dir_job(job_id) / "files"
     destino.mkdir(parents=True, exist_ok=True)
@@ -168,13 +181,14 @@ def salvar_remessa(job_id: str, sublote_id: str, conteudo: str) -> dict[str, Any
     return {
         "tipo": "cnab", "nome": nome, "bytes": len(dados), "sha256": sha256(dados),
         "registros": len(linhas),
-        "href": f"/jobs/cnab/remessas/{job_id}/files/{nome}",
+        "href": _href(f"/jobs/cnab/remessas/{job_id}/files/{nome}", tenant_id),
     }
 
 
 def consolidar_remessas(job_id: str, job: dict[str, Any],
                         itens: list[dict[str, Any]]) -> dict[str, Any]:
     """Manifesto dos arquivos CNAB (um por sublote) + zip consolidado."""
+    tenant_id = job.get("tenant_id")
     base = dir_job(job_id)
     base.mkdir(parents=True, exist_ok=True)
     files_dir = base / "files"
@@ -219,7 +233,7 @@ def consolidar_remessas(job_id: str, job: dict[str, Any],
     manifesto["consolidado"] = {
         "tipo": "zip", "nome": zip_nome, "bytes": len(conteudo_zip),
         "sha256": sha256(conteudo_zip),
-        "href": f"/jobs/cnab/remessas/{job_id}/files/{zip_nome}",
+        "href": _href(f"/jobs/cnab/remessas/{job_id}/files/{zip_nome}", tenant_id),
     }
     (base / "manifest.json").write_text(
         json.dumps(manifesto, ensure_ascii=False, indent=2), encoding="utf-8")

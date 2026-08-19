@@ -37,10 +37,13 @@
   > `provider=on&banco=bradesco` → `422` (não há API REST do Bradesco aqui);
   > `provider=off&banco=inter` → `422` (a engine não tem o layout 077, e cair em
   > outro banco emitiria boleto registrado no lugar errado).
-- **Criação responde `201` com `Location`** — `POST /cobranca`, `/carne`,
-  `/pix` e `/checkout`. O `Location` já vem com `tenant_id` e `provider`, então
-  é seguível como está. `PUT /pix/lote/{id}` responde **`202`**: o banco
-  enfileira o lote, não o cria.
+- **Criação responde `201` com `Location`** — `POST /cobranca`, `/pix`,
+  `/checkout` e `/bolepix`. O `Location` já vem com `tenant_id`, `provider` e o
+  `banco`, então é seguível como está — sem os três, a rota de consulta responde
+  `422`. `PUT /pix/lote/{id}` responde **`202`** (o banco enfileira o lote, não o
+  cria) e também traz o header. `POST /carne` é a exceção: responde `201` **sem
+  `Location`**, porque o carnê não é recurso consultável — cada parcela volta no
+  corpo com o próprio id.
 - **Credenciais** (ordem de precedência):
   1. `Authorization: Bearer bapi_...` — token do `/credenciais` (recomendado);
   2. `credentials` no corpo (POSTs) ou header `X-Bank-Credentials`
@@ -280,6 +283,19 @@ curl -X POST http://localhost:8000/cobranca \
 #    "pix_copia_cola": null, "pdf_base64": null, "raw": {...}}
 ```
 
+> ⚠️ **`201` não quer dizer "deu certo" no caminho `off`.** Falha de validação
+> da engine volta como **`201` com `status: "erro"`** e os motivos em
+> `raw.validation_errors` — não como `4xx`:
+>
+> ```json
+> {"id": null, "status": "erro", "linha_digitavel": null,
+>  "raw": {"validation_errors": ["cedente é obrigatório"]}}
+> ```
+>
+> É o mesmo envelope do sucesso, e quem checa só o código HTTP dá o boleto por
+> emitido. **Cheque `status`**, sempre. (No caminho `on` o erro do banco vira
+> `4xx`/`5xx` de verdade — veja "Erro que veio do banco".)
+
 > **`registrado` não é `liquidado`.** O status normalizado tem seis valores —
 > `registrado | pendente | liquidado | baixado | expirado | erro` — e vale igual
 > nos três bancos. Duas traduções foram decisão de produto, não tradução literal:
@@ -321,8 +337,35 @@ Baixa/cancela. O verbo muda por banco e o gateway absorve: C6 `PUT
 
 ### `POST /carne`
 Registra N parcelas no provider e monta o carnê 3-vias A4 (PDF) na engine.
-Corpo: `{tenant_id, provider, account_config, bank, parcelas: [Cobranca...],
-credentials?}` → **`201`** com `{carne_pdf_base64, cobrancas: [...]}`.
+Corpo: `{tenant_id, provider, banco, account_config, parcelas: [Cobranca...],
+credentials?}` → **`201`** com `{carne_pdf_base64, cobrancas: [...]}`. Aceita
+`Authorization: Bearer bapi_...` como as demais.
+
+**Sem `Location`**: o carnê não é recurso consultável — é o PDF mais as N
+cobranças, e cada uma volta no corpo com o próprio id.
+
+**O `account_config` carrega os dois lados.** Com `provider=on` as parcelas são
+registradas pela API do banco e o PDF é desenhado pela engine — que precisa dos
+campos dela (`cedente`, `documento_cedente`, `carteira`, `convenio`,
+`conta_corrente`) **além** dos do banco. Faltando algum, a resposta é `422`
+dizendo qual, antes de registrar qualquer parcela.
+
+**Cada parcela precisa de identificador próprio** (`seu_numero` ou
+`nosso_numero`). Duas com o mesmo são o mesmo título duas vezes: uma sai impressa
+em duplicata e a outra some do bloco — nunca é cobrada. Responde `422`.
+
+**Teto de 200 parcelas** (`LOTE_MAX_ITENS`), o mesmo de `/api/render/carne` e
+`/api/boleto/multi` — acima disso, `413`.
+
+`bank` é redundante e **opcional**: o layout vem do `banco`. Se enviado e
+divergente, `422` — carnê com a marca de um banco e parcelas registradas em
+outro não é pagável. Banco sem layout na engine (Inter) também é `422`: não há
+como desenhar o carnê, e desenhá-lo como outro banco seria pior.
+
+**Nada é recusado depois do registro.** Tudo que dá para conferir — teto,
+duplicata, banco, dados de cada parcela — é conferido antes da primeira ida ao
+banco. Se ainda assim a montagem falhar, o `422` lista os ids das parcelas que
+já foram registradas e continuam válidas.
 
 ---
 
@@ -418,6 +461,16 @@ O `endereco` do pagador é **obrigatório** no Bolepix: o `/v2` do C6 exige
 `city`, `state` e `zip_code` (aliases `cidade`, `uf`, `cep`). Faltando qualquer
 um, a API responde **`422`** dizendo qual campo falta, sem chamar o banco.
 
+**A chave Pix também é obrigatória** (`bolepix.chave_pix` ou
+`account_config.chave_pix`). Sem ela o banco emite boleto **sem o segmento
+Pix** — um "Bolepix" que não é bolepix, e nada avisaria. Boleto puro é
+`POST /cobranca`, que existe em todos os bancos.
+
+O `external_reference_id` é conferido contra `^[A-Z0-9]{26}$` **antes** de ir ao
+banco, tanto no corpo quanto no caminho das consultas. **Omitido, é gerado
+aqui** — e volta em `id` e no header `Location`. É o único identificador de
+consulta do Bolepix: sem guardá-lo, o boleto não se acha mais.
+
 ### `GET /bolepix/{ext_ref}` · `GET /bolepix/{ext_ref}/pdf` · `DELETE /bolepix/{ext_ref}`
 Consulta, PDF (base64) e cancelamento (**409** enquanto a CIP processa).
 
@@ -431,8 +484,10 @@ Pix no mesmo link se quiser.
 
 **Nenhum dado de cartão passa por esta API.** `save_card` e checkout
 transparente **não existem no schema** — corpo com esses campos responde `422`
-e não chega ao banco. É decisão de produto, e o PAN ficar no domínio do banco
-mantém o escopo PCI-DSS lá.
+e não chega ao banco, tanto dentro de `checkout` quanto no nível de cima. É
+decisão de produto, e o PAN ficar no domínio do banco mantém o escopo PCI-DSS
+lá. O `422` de campo recusado **não devolve o valor enviado**: o nome do campo
+basta para corrigir, e devolver o resto sairia daqui para o log de quem chamou.
 
 ### `POST /checkout`
 
@@ -453,15 +508,18 @@ mantém o escopo PCI-DSS lá.
 
 | Campo | Default | Observação |
 |---|---|---|
+| `valor` | — | **maior que zero**; `0` e negativo respondem `422` daqui |
 | `tipo` | `credito` | `credito` \| `debito` |
 | `parcelas` | `1` | **teto** oferecido ao pagador — ele escolhe abaixo, salvo `parcelas_fixas`. Repassado ao banco como veio; ver "política de parcelamento" abaixo |
 | `juros_por` | `loja` | quem paga o juro: `loja` (BY_SELLER) ou `emissor`. Com `parcelas > 1` o campo é obrigatório — anulá-lo responde `422` daqui, não `400` do banco |
 | `pix` | `false` | oferece Pix no mesmo link; o QR é gerado pelo banco |
 | `expira_em` | 7 dias (banco) | ISO 8601 |
+| `redirect_url` | — | precisa começar com `http://` ou `https://`. Quem publica essa URL é o banco, na página dele, na frente de quem está digitando o cartão — esquema não navegável responde `422` |
 | `pagador` | — | se enviado, o endereço exige `street`, `number` (**numérico**), `city`, `state`, `zip_code` |
 
-Responde **201** com `{id, url, status, expira_em}`. A `url` é o que se manda
-ao cliente.
+Responde **201** com `{id, url, status, expira_em}` e o header `Location`
+apontando para `GET /checkout/{id}` já com `tenant_id`, `provider` e `banco`.
+A `url` do corpo é o que se manda ao cliente; o `Location` é para consultar.
 
 **Mande `Idempotency-Key` se houver botão humano na frente disto.** Sem a chave,
 duplo clique cria **dois links para a mesma venda** — e nada impede o pagador de
@@ -471,9 +529,11 @@ pagar os dois. Com a chave, o reenvio devolve o mesmo link sem tocar no banco:
 curl -X POST .../checkout -H 'Idempotency-Key: venda-42' -d @pedido.json
 ```
 
-A chave vale por tenant. Reusá-la com um `checkout` diferente responde `422` —
-uma chave identifica **uma** requisição, e devolver o link errado seria pior que
-recusar. Sem o header, o comportamento é o de sempre.
+A chave vale por tenant. Reusá-la com outro pedido responde `422` — uma chave
+identifica **uma** requisição, e devolver o link errado seria pior que recusar.
+Pedido aqui é o `checkout` **mais o destino** (`provider` e `banco`): a mesma
+chave apontada para outro banco é pedido novo, não reenvio. Sem o header, o
+comportamento é o de sempre.
 
 #### Política de parcelamento — de quem é cada parte
 
@@ -549,26 +609,66 @@ Hoje só o C6 oferece.
 ## 🏦 Extrato e configuração
 
 ### `GET /extrato?tenant_id=&start_date=&end_date=`
-Movimentações da conta PJ no período.
+Movimentações da conta PJ no período. **C6, Sicoob e Inter** — outro banco
+responde `422` apontando para o retorno CNAB ou o OFX, não `500`.
+
+**A resposta é crua do banco.** Os três shapes são diferentes de verdade
+(`transactions` no C6, `resultado.transacoes` no Sicoob, `transacoes` no Inter),
+e normalizá-los aqui inventaria um formato que nenhum deles tem — o Swagger traz
+um exemplo de cada. O que esta rota unifica é a **chamada**: mesmo par de datas,
+mesma autenticação, mesmo erro para quem não oferece.
+
+| Parâmetro | Observação |
+|---|---|
+| `start_date`, `end_date` | `YYYY-MM-DD`, conferidos aqui. `end_date` anterior a `start_date` é `422` — invertido o banco devolve lista vazia, que se lê como "não houve movimento" |
+| `numero_conta` | conta corrente, **usada pelo Sicoob**. Omitido vai `0` — que era o que a rota mandava sempre, por não ter onde receber o valor |
+| `banco=sicoob` | a API dele é **mensal**: as duas datas no mesmo mês, senão `422` com a regra dita. Limite do banco, não desta rota |
 
 ### `POST /config/webhook-banco`
 Registra no banco a URL que receberá notificações
-(`{tenant_id, provider, url, service: BANK_SLIP|CHECKOUT}`); `GET`/`DELETE`
-com `?service=` consultam/removem.
+(`{tenant_id, provider, banco, url, service: BANK_SLIP|CHECKOUT}`); `GET`/`DELETE`
+com `?service=` consultam/removem. **C6 e Inter** — outro banco responde `422`
+apontando para `/config/webhook-pix` ou para a consulta ativa.
+
+### `PUT /config/webhook-pix`
+Webhook BACEN **por chave**: o banco chama a URL quando um Pix cai naquela chave.
+Corpo `{tenant_id, provider, banco, chave, url, credentials?}`; `GET`/`DELETE`
+com `?chave=` consultam/removem. **C6, Sicoob e Inter** (dialeto BACEN).
+
+> **A `url` é conferida antes de ir ao banco.** Quem a chama é o **banco**, de
+> fora, pela internet pública — então ela precisa ser `https` e ter destino
+> alcançável. `http://localhost`, `10.x`, `169.254.169.254` e afins eram aceitos
+> com `200`, e o cadastro *parecia* feito: o cliente só descobria que não recebia
+> notificação quando um pagamento se perdia. `http://` é recusado por outro
+> motivo — o evento leva valor, pagador e id da cobrança no corpo.
+>
+> Em homologação com túnel local, `WEBHOOK_URL_PERMITE_LOCAL=1` libera os dois.
+
+As seis respostas são **cruas do banco** (confirmação no formato dele).
 
 ---
 
 ## 📊 Conciliação (C6 Pay)
 
 ### `GET /conciliacao/recebiveis` · `GET /conciliacao/transacoes`
-Query: `tenant_id`, `start_date`, `end_date` (máx. 60 dias), `provider=c6`,
-`page` (default 1), `size` (default 50, máx. 100).
+Query: `tenant_id`, `start_date`, `end_date`, `provider=on`, `banco=c6`,
+`page` (default 1, mínimo 1), `size` (default 50, de 1 a 100).
 
 ```bash
-curl "http://localhost:8000/conciliacao/recebiveis?tenant_id=empresa_123&start_date=2026-07-01&end_date=2026-07-31" \
+curl "http://localhost:8000/conciliacao/recebiveis?tenant_id=empresa_123&provider=on&banco=c6&start_date=2026-07-01&end_date=2026-07-31" \
   -H 'Authorization: Bearer bapi_kJx...'
 # 200 → {"page": 1, "last_page": 3, "total_items": 120, "items": [{...}]}
 ```
+
+**As datas são conferidas aqui, não pelo banco.** `YYYY-MM-DD`, janela de no
+máximo **60 dias** (limite do C6) e `end_date` não anterior a `start_date` —
+fora disso, `422` antes da ida à rede. O período invertido é o que mais importa
+recusar: o banco responde **lista vazia**, e quem chama lê isso como "não houve
+movimento no período".
+
+**Só o C6 oferece** (C6 Pay). Outro banco responde `422` dizendo isso — antes
+respondia `500`. Para o caminho offline, a conciliação é pelo arquivo de retorno
+(`POST /api/retorno`) ou pelo OFX (`POST /api/ofx/parse`).
 
 ---
 
@@ -597,8 +697,109 @@ Três campos do `WebhookEvent` que valem ler antes de integrar:
 A confirmação só acontece na rota **com tenant** — o cofre de credenciais é por
 tenant, e sem credencial não há como perguntar ao banco.
 
+**O `{banco}` é `c6`, `sicoob` ou `inter`, em minúsculas.** Qualquer outra coisa
+— incluindo `C6` — responde `422`, e não `200`. A diferença importa: `200` diz ao
+banco "recebi, pode parar de reentregar", então um slug errado na URL cadastrada
+transformava toda notificação em pagamento perdido em silêncio. O corpo também
+precisa ser um objeto JSON não vazio: `"texto"` e `[1,2,3]` davam `500`, e o
+banco reentregava em loop um payload que nunca ia funcionar.
+
 ### `GET /health`
 `{"status": "ok"}`.
+
+---
+
+## 🔁 Pix Automático (BACEN) — `on` apenas
+
+Débito recorrente autorizado **uma vez** pelo pagador. O dialeto é o do BACEN
+(`rec`, `solicrec`, `locrec`, `cobr`), igual em todo PSP, e o gateway o
+implementa uma vez só — para um banco novo custa o prefixo e a autenticação.
+
+Quem oferece: **C6, Sicoob e Inter**. O **Itaú não** — as rotas respondem `422`
+nomeando quem oferece. O que cada banco de fato respondeu está em
+[pix-automatico.md](../development/pix-automatico.md).
+
+| Método | Rota | Jornada |
+|---|---|---|
+| `POST` | `/pix-automatico/recorrencias` | cria a recorrência (`rec`) |
+| `GET` | `/pix-automatico/recorrencias` | lista do período (RFC3339) |
+| `GET` · `PATCH` | `/pix-automatico/recorrencias/{id_rec}` | consulta · altera/cancela (J4) |
+| `POST` | `/pix-automatico/solicitacoes` | pede autorização no app do pagador (J1) |
+| `GET` · `PATCH` | `/pix-automatico/solicitacoes/{id_solic}` | consulta · revisa/cancela |
+| `POST` | `/pix-automatico/locations` | location do QR de adesão (J2) |
+| `GET` | `/pix-automatico/locations/{loc_id}` | payload do QR |
+| `DELETE` | `/pix-automatico/locations/{loc_id}/recorrencia` | desvincula (invalida o QR) |
+| `PUT` | `/pix-automatico/cobrancas/{txid}` | agenda a cobrança do ciclo (J3) |
+| `GET` | `/pix-automatico/cobrancas` | lista do período |
+| `GET` · `PATCH` | `/pix-automatico/cobrancas/{txid}` | consulta · revisa/cancela |
+| `POST` | `/pix-automatico/cobrancas/{txid}/retentativa/{data}` | retentativa pós-vencimento |
+| `PUT` | `/pix-automatico/config/webhooks` | `webhookrec` e/ou `webhookcobr` |
+
+> **O agendamento do ciclo é seu, não da API.** A regra BACEN manda criar a
+> `cobr` **pelo menos 2 dias antes** do vencimento; este gateway é interface de
+> consumo (stateless) e não roda cron. Quem agenda é o produto que chama.
+>
+> A API recusa `data_vencimento` **no passado** — não existe agendar para
+> ontem. Os 2 dias de antecedência ficam como aviso e não como trava: não está
+> claro se o BACEN conta dia corrido ou útil, e travar errado impediria um
+> agendamento que o banco aceita.
+>
+> `valor_fixo` (`valorRec`) e `valor_minimo` (`valorMinimoRecebedor`) são
+> **mutuamente exclusivos** — mandar os dois, ou nenhum, é `422`.
+
+**Conferido antes de ir ao banco:** o `txid` da `cobr` segue o padrão BACEN
+(`^[a-zA-Z0-9]{26,35}$`, o mesmo da cob/cobv), `inicio`/`fim` das listagens
+precisam ser RFC3339 e não podem estar invertidos, a `{data}` da retentativa
+precisa ser data, e o `PATCH` precisa de ao menos um campo. A URL do
+`/config/webhooks` segue a mesma regra do `/config/webhook-*` — https e
+alcançável de fora, porque quem a chama é o banco.
+
+## 💸 Pix recebidos e devolução — `on` apenas
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/pix/recebidos?inicio=&fim=` | Pix creditados no período |
+| `GET` | `/pix/recebidos/{e2eid}` | um Pix pelo end-to-end id |
+| `PUT` | `/pix/recebidos/{e2eid}/devolucao/{id}` | solicita devolução |
+| `GET` | `/pix/recebidos/{e2eid}/devolucao/{id}` | status da devolução |
+
+## 📦 Jobs em lote (assíncrono)
+
+Para volume acima do que o síncrono aguenta. Responde **`202`** com `job_id`;
+os artefatos saem por **referência** (href + `sha256`), nunca em base64.
+Contrato e limites em [plano-jobs-lote.md](../development/plano-jobs-lote.md).
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` | `/jobs/boletos` | **202** + `job_id`; `Idempotency-Key` repetida devolve o mesmo |
+| `GET` | `/jobs/boletos/{job_id}` | estado, contadores e métricas |
+| `GET` | `/jobs/boletos/{job_id}/items` | itens paginados (`limite` 1–500, `offset`≥0, filtro `status`: `pending`\|`completed`\|`failed`) |
+| `GET` | `/jobs/boletos/{job_id}/items/{item_id}` | um item, com resultado ou `errors` |
+| `GET` | `/jobs/boletos/{job_id}/artifacts` | manifesto (nome, bytes, `sha256`, href, `expira_em`) |
+| `GET` | `/jobs/boletos/{job_id}/artifacts/items/{nome}` | PDF de um item |
+| `GET` | `/jobs/boletos/{job_id}/artifacts/{nome}` | zip · `manifest.json` · `errors.json` |
+| `POST` | `/jobs/cnab/remessas` | **202** + sublotes determinísticos |
+| `GET` | `/jobs/cnab/remessas/{job_id}` | estado e sublotes |
+| `GET` | `/jobs/cnab/remessas/{job_id}/files` | manifesto: 1 arquivo por sublote |
+| `GET` | `/jobs/cnab/remessas/{job_id}/files/{nome}` | download do `.rem`, do zip ou do manifesto |
+
+> Item inválido **não derruba o lote**: o job termina `partially_completed` e os
+> demais artefatos ficam disponíveis.
+
+**Todo link da resposta é seguível como está.** `self`, `items`, `artifacts`,
+`files` e os `href` do manifesto já vêm com `tenant_id` — as rotas de consulta e
+download exigem, porque é ele que separa os clientes, e o link sem ele respondia
+`422`. Basta seguir o que a resposta oferece, sem remontar URL.
+
+As rotas de artefato respondem **`410`** quando a retenção vence
+(`retencao_dias` no manifesto) — diferente do `404` de "nunca existiu".
+
+## 🔔 Configuração de webhook no banco
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `POST` · `GET` · `DELETE` | `/config/webhook-banco` | webhook de boleto (C6, Inter) |
+| `PUT` · `GET` · `DELETE` | `/config/webhook-pix` | webhook Pix **por chave** (BACEN) |
 
 ---
 
