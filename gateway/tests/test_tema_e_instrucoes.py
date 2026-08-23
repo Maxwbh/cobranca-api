@@ -61,8 +61,27 @@ def test_selo_de_parcela_sai_no_papel():
 
 
 def test_sem_campo_de_tema_o_boleto_nao_ganha_faixa():
-    """Nao ligar a faixa por engano em quem nunca pediu tema."""
+    """Nao ligar a faixa por engano em quem nunca pediu tema.
+
+    `cedente` e obrigatorio em todo boleto e alimenta o nome na faixa -- mas
+    quem LIGA a faixa sao os campos de tema, nunca ele sozinho.
+    """
     assert pycob.tema_do_payload(BASE) is None
+    assert pycob.tema_do_payload({"cedente": "Empresa Teste LTDA"}) is None
+
+
+def test_nome_da_empresa_na_faixa_vem_do_cedente():
+    """O contrato nao tem campo para o nome da empresa na faixa, entao a engine
+    o herda de `logo_empresa` -- e a faixa saia com o mesmo texto duas vezes,
+    no selo e ao lado dele. O beneficiario ja esta no payload."""
+    tema = pycob.tema_do_payload({**BASE, "logo_empresa": "EXEMPLO"})
+    assert tema["logo_texto"] == "EXEMPLO"
+    assert tema["empresa"] == BASE["cedente"] != "EXEMPLO"
+
+
+def test_o_nome_do_beneficiario_sai_no_papel():
+    texto = _texto(pycob.pdf_boleto(BANCO, {**BASE, "logo_empresa": "EXEMPLO"}))
+    assert BASE["cedente"] in texto
 
 
 def test_cor_sem_cerquilha_e_a_forma_documentada_e_precisa_funcionar():

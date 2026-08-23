@@ -495,7 +495,21 @@ def tema_do_payload(data: dict[str, Any], *, modelo: str | None = None
         saneado["cor_marca"] = _cor_tema(data["cor_marca"])
     if data.get("logo_empresa") not in (None, ""):
         saneado["logo_empresa"] = _logo_texto(str(data["logo_empresa"]))
-    return tema_de_api(saneado)
+    tema = tema_de_api(saneado)
+    if tema is None:
+        return None
+
+    # O contrato não tem campo para o NOME da empresa na faixa, então a engine
+    # o herda de `logo_empresa` — e a faixa saía com o mesmo texto duas vezes,
+    # no selo e ao lado dele. O nome do beneficiário já está no payload, é
+    # obrigatório, e é o que uma faixa de marca mostra ao lado do logo.
+    #
+    # `cedente` sozinho NÃO liga a faixa: quem a liga são os campos de tema, e
+    # `pedidos` acima só olha para eles.
+    cedente = str(data.get("cedente") or "").strip()
+    if cedente:
+        tema["empresa"] = cedente
+    return tema
 
 
 def _cor_tema(valor: Any) -> str:

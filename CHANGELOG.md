@@ -59,8 +59,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `cor_marca`, `marca_dagua`, `rodape_contato`, `parcela_atual` e
   `total_parcelas` eram aceitos e descartados: o boleto saía sem marca, com
   `200`. `logo_empresa` é o **texto** da marca (não caminho de arquivo) e
-  `cor_marca` aceita `RRGGBB` com ou sem `#`. Só no modelo `moderno` e na
-  fatura — pedir no `classico` ou no carnê agora responde `400`.
+  `cor_marca` aceita `RRGGBB` com ou sem `#`, e o nome ao lado do selo é o
+  `cedente`. Só no modelo `moderno` e na fatura — pedir no `classico` ou no
+  carnê agora responde `400`.
 - ⚠️ **`instrucao1`..`instrucao6` passam a ser impressas.** Estavam
   documentadas e nenhuma chegava ao boleto. Viram o bloco `instrucoes`, em
   ordem; enviar as duas formas no mesmo payload responde `400`.
