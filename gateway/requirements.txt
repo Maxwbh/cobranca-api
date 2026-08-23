@@ -14,7 +14,7 @@ psycopg[binary]>=3.1
 # Fixado no COMMIT, não na branch: `@hml` seria referência móvel e mataria a
 # reprodutibilidade do build, que é a razão de não usarmos `git@main` aqui.
 # Publicada a versão, isto volta a ser `pycobranca>=1.1.0,<2` do PyPI.
-pycobranca @ git+https://github.com/Maxwbh/pyCobranca@49f0dbf3765191fd6375fad1f469d49ff7925519
+pycobranca @ git+https://github.com/Maxwbh/pyCobranca@e307595eedd853837486a24d7399c428dce88c07
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
 pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)
