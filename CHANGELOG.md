@@ -16,7 +16,31 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- ⚠️ **A faixa de marca do boleto passa a sair no papel.** `logo_empresa`,
+  `cor_marca`, `marca_dagua`, `rodape_contato`, `parcela_atual` e
+  `total_parcelas` eram aceitos e descartados: o boleto saía sem marca, com
+  `200`. `logo_empresa` é o **texto** da marca (não caminho de arquivo) e
+  `cor_marca` aceita `RRGGBB` com ou sem `#`. Só no modelo `moderno` e na
+  fatura — pedir no `classico` ou no carnê agora responde `400`.
+- ⚠️ **`instrucao1`..`instrucao6` passam a ser impressas.** Estavam
+  documentadas e nenhuma chegava ao boleto. Viram o bloco `instrucoes`, em
+  ordem; enviar as duas formas no mesmo payload responde `400`.
+- ⚠️ **O limite de instruções agora é medido na engine, por modelo.** Era fixo
+  em 7 linhas × 100 caracteres. A moldura muda de tamanho conforme o modelo e
+  conforme haja Bolepix (com o QR ao lado ela encolhe ~¼), então texto que
+  passava do limite real era truncado sem erro. Linha ou coluna a mais é
+  recusada, com o número exato na mensagem.
+- `fonte_ttf` responde **`400`**: nunca houve suporte, nem aqui nem na engine.
+
 ### Adicionado
+- **Nove campos específicos de banco no `BoletoData`**: `data_documento`,
+  `digito_conta`, `digito_agencia`, `digito_convenio`, `variacao`,
+  `incremento`, `portfolio`, `posto` e `byte_idt`. Já eram aceitos e não
+  estavam documentados — no Citibank, sem `portfolio`, o código de barras sai
+  com o campo livre zerado, válido em estrutura e errado no destino.
+- `instrucoes` e `demonstrativo` documentados no `BoletoData`: são os campos
+  que a engine realmente desenha.
 - `GET /bancos` anuncia mais três capacidades, que **discriminam**:
   `pix_consulta` (o Itaú não tem `GET /pix/{txid}`), `conciliacao_transacoes`
   (só o C6) e `webhook_entrada` (sem ela, `POST /webhooks/{banco}` não entende

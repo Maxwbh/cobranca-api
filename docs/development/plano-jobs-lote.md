@@ -3,9 +3,14 @@
 > **Status:** implementado — lote síncrono resiliente, `/jobs/boletos`,
 > artefatos em disco, `/jobs/cnab/remessas` com sublotes, webhook de conclusão e
 > métricas. Falta a **Fase 5** (worker externo), no fim desta página.
-> **Origem:** contrato [pyCobrança doc 12 — Processamento em Lote e Assíncrono](https://github.com/Maxwbh/pyCobranca/blob/main/docs/12-processamento-lote.md),
+> **Origem:** contrato [pyCobrança doc 12 — Processamento em Lote e Assíncrono](https://github.com/Maxwbh/pyCobranca/blob/455f60ce356db9e6ba8212653ee0d146cebaed62/docs/12-processamento-lote.md),
 > que atribui **toda a orquestração assíncrona ao serviço REST** (esta API);
 > a engine permanece de domínio puro (sem HTTP, fila ou storage).
+> A pyCobrança removeu essa página — a orquestração nunca foi dela, e o que
+> sobrou virou [19 — Integração](https://github.com/Maxwbh/pyCobranca/blob/main/docs/19-integracao.md)
+> e [20 — Superfície pública](https://github.com/Maxwbh/pyCobranca/blob/main/docs/20-superficie-publica.md).
+> O link acima é permanente (aponta para o commit em que a página existia), e
+> **este documento passa a ser a referência do contrato** para esta API.
 >
 > Este documento já foi o plano de entrega, com uma seção por fase. As fases
 > viraram código e o relato delas saiu: o que fica é o **contrato** e a

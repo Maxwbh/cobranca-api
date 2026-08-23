@@ -11,6 +11,7 @@ import re
 import tempfile
 from contextlib import contextmanager
 from datetime import date
+from functools import lru_cache
 from typing import Any
 
 from pycobranca import __version__ as PYCOBRANCA_VERSION
@@ -110,22 +111,164 @@ _CAMPOS_DATA = {"data_vencimento", "data_documento", "data_processamento"}
 # com `\n`. Normalizar aqui é o que torna as duas formas equivalentes.
 _CAMPOS_MULTILINHA = {"instrucoes", "demonstrativo"}
 
-# Medidos no PDF gerado pela engine: a caixa de instruções tem 404pt de largura
-# e comporta exatamente 7 linhas — **idêntico com e sem PIX**. O QR do Bolepix
-# não encolhe a área de instruções (conferido gerando as duas variantes).
-#
-# Exceder cada limite falha de um jeito diferente, e nenhum dos dois avisa:
-# linha comprida ATRAVESSA a coluna de Desconto/Mora/Valor cobrado, deixando as
-# duas ilegíveis; linha além da sétima simplesmente NÃO é desenhada.
+# A engine DESENHA um número limitado de linhas de instrução e, do que desenha,
+# só imprime o que couber na largura da moldura. Os dois limites falham calados:
+# linha além da última simplesmente NÃO é desenhada, e linha comprida sai
+# truncada (ou, em versões anteriores, atravessando a coluna de Desconto/Mora/
+# Valor cobrado). Nos dois casos: `200`, PDF bonito, cláusula perdida.
 #
 # O gateway NÃO reformata o texto — quebrar linha por conta própria mudaria o
 # conteúdo de um documento de cobrança. Ele mede e recusa; reescrever é do
 # cliente, que sabe onde a frase pode ser cortada.
-LARGURA_INSTRUCAO = 100
-MAX_LINHAS_INSTRUCAO = 7
+#
+# Largura de recuo quando a engine instalada não corta — versões antigas deixam
+# o texto atravessar a coluna de valores em vez de truncar, e aí não há corte
+# para medir. Calibrada em MAIÚSCULAS, que é como quase toda instrução de boleto
+# chega; o limite real da engine é em PONTOS, então uma linha inteira de "M"
+# cabe menos e uma de "l" cabe mais. É proxy, e assumido como tal: serve para
+# recusar o exagero cedo, com mensagem, em vez de descobrir no papel.
+LARGURA_INSTRUCAO = 69
+
+#: Piso usado quando a medição na engine não pode ser feita (render indisponível
+#: na instalação). É o menor valor já observado em qualquer modelo — recusar de
+#: menos é pior que recusar demais, mas nunca vale a pena aceitar de mais.
+_LINHAS_INSTRUCAO_PISO = 6
+
+#: Teto: a sonda conta o que a engine DESENHA, e desenhar não é caber. Há versão
+#: em que o clássico não corta — a 12ª linha sai impressa POR BAIXO da moldura,
+#: em cima do bloco do sacado. Nenhum layout medido comporta mais de 8 linhas
+#: dentro da própria moldura, então é aqui que a contagem para.
+#:
+#: Os dois lados são necessários: a sonda pega a moldura que ENCOLHEU (foi o que
+#: passou despercebido antes), o teto pega a engine que desenha sem cortar.
+_LINHAS_INSTRUCAO_TETO = 8
+
+#: Marcador improvável de aparecer no resto do boleto, para a contagem da sonda
+#: não confundir a instrução com outro texto da página.
+_MARCA_SONDA = "ZQXJINSTR"
+_SONDA_LINHAS = 12
+
+#: Instrução real, em maiúsculas, para sondar a largura. Um texto de verdade —
+#: com espaço, dígito e "%" — mede o que o cliente vai mandar; uma fileira de
+#: "M" mediria o pior caso teórico e recusaria o uso normal.
+_SONDA_PROSA = "APOS O VENCIMENTO COBRAR MULTA DE 2% E JUROS DE 1% AO MES PRO RATA DIE"
+
+#: Reticências que a engine usa ao cortar. É por elas que a sonda de largura
+#: reconhece o corte.
+_RETICENCIAS = "…"
+
+#: Teto da busca binária de largura. Acima disto nenhuma moldura de boleto A4
+#: chega, e o carnê — que não corta — sairia procurando para sempre.
+_SONDA_LARGURA_MAX = 160
 
 
-def _linhas(valor: Any, campo: str) -> Any:
+def _sonda_pdf(modelo: str, instrucoes: list[str], tem_pix: bool) -> str:
+    """Renderiza um boleto de sonda e devolve o texto do PDF.
+
+    Levanta se a engine não conseguir desenhar — quem chama decide o recuo.
+    """
+    import io as _io
+
+    from pypdf import PdfReader
+
+    dados = {"nosso_numero": "12345678", "valor": 100, "cedente": "SONDA",
+             "cedente_documento": "11.222.333/0001-81", "sacado": "SONDA",
+             "sacado_documento": "529.982.247-25", "carteira": "109",
+             "agencia": "0057", "conta": "12345",
+             "data_vencimento": date(2030, 1, 10), "instrucoes": instrucoes}
+    if tem_pix:
+        dados["pix_chave"] = "11222333000181"
+    contexto = Bancos.find("341")(**dados).contexto_render()
+    pdf = (render_carne_pdf({"parcelas": [contexto]}) if modelo == "carne"
+           else render_boleto_pdf(contexto, modelo=modelo))
+    return "".join(p.extract_text() for p in PdfReader(_io.BytesIO(pdf)).pages)
+
+
+@lru_cache(maxsize=None)
+def largura_de_instrucao(modelo: str, tem_pix: bool) -> int:
+    """Maior linha que **este** layout imprime inteira, medido na engine.
+
+    Não é um número só: a moldura de instruções do moderno encolhe cerca de um
+    quarto quando há Bolepix, para abrir espaço ao QR. Uma constante única
+    aceitaria no boleto com PIX uma linha que só cabe no boleto sem — e o texto
+    excedente sai truncado, com `200`.
+
+    Busca binária pelo ponto em que a engine passa a cortar. Engine que não
+    corta (o texto atravessa a coluna de valores em vez de truncar) não dá o que
+    medir: aí vale `LARGURA_INSTRUCAO`.
+    """
+    def corta(n: int) -> bool:
+        linha = (_SONDA_PROSA * (n // len(_SONDA_PROSA) + 1))[:n]
+        return _RETICENCIAS in _sonda_pdf(modelo, [linha], tem_pix)
+
+    try:
+        if not corta(_SONDA_LARGURA_MAX):
+            return LARGURA_INSTRUCAO  # engine não corta: nada a medir
+        baixo, alto = 1, _SONDA_LARGURA_MAX
+        while baixo < alto:
+            meio = (baixo + alto + 1) // 2
+            if corta(meio):
+                alto = meio - 1
+            else:
+                baixo = meio
+        return baixo
+    except Exception:  # noqa: BLE001 — sonda é diagnóstico; nunca derruba requisição
+        return LARGURA_INSTRUCAO
+
+
+@lru_cache(maxsize=None)
+def linhas_de_instrucao(modelo: str, tem_pix: bool) -> int:
+    """Quantas linhas de instrução **este** modelo desenha, medido na engine.
+
+    Era uma constante — 7, com o comentário afirmando ser "idêntico com e sem
+    PIX". Valia para a versão em que foi medida. A moldura de instruções muda de
+    altura conforme o modelo e conforme haja Bolepix, e quando a engine mexeu no
+    layout a constante ficou para trás **sem nada acusar**: o gateway seguiu
+    aceitando uma linha a mais do que o modelo imprimia, que é exatamente a
+    perda silenciosa que esta guarda existe para impedir.
+
+    Medir na própria engine é o que torna a guarda imune a isso. Custa um render
+    por combinação (`modelo` × `tem_pix`), uma vez por processo.
+
+    `modelo="carne"` mede o layout de 3 vias por A4, que tem moldura própria.
+    """
+    try:
+        texto = _sonda_pdf(modelo, [f"{_MARCA_SONDA}{i}" for i in range(_SONDA_LINHAS)],
+                           tem_pix)
+    except Exception:  # noqa: BLE001 — sonda é diagnóstico; nunca derruba requisição
+        return _LINHAS_INSTRUCAO_PISO
+    desenhadas = sum(1 for i in range(_SONDA_LINHAS) if f"{_MARCA_SONDA}{i}" in texto)
+    if not desenhadas:
+        return _LINHAS_INSTRUCAO_PISO
+    return min(desenhadas, _LINHAS_INSTRUCAO_TETO)
+
+
+def _limite_de_linhas(modelo: str | None, tem_pix: bool) -> tuple[int, str]:
+    """(linhas aceitas, de onde vem o limite) para o modelo que vai desenhar.
+
+    `modelo=None` é o caminho sem render — `validar`, `dados_boleto` — onde
+    ainda não se sabe qual layout o cliente vai pedir. Ali vale o teto do modelo
+    mais generoso: recusar por antecipação um texto que o clássico imprime
+    inteiro seria inventar um erro que o render não teria.
+    """
+    if modelo is None:
+        cabem = max(linhas_de_instrucao(m, p)
+                    for m in MODELOS_BOLETO for p in (False, True))
+        return cabem, "o modelo mais generoso"
+    return linhas_de_instrucao(modelo, tem_pix), f"o modelo '{modelo}'"
+
+
+def _limite_de_largura(modelo: str | None, tem_pix: bool) -> tuple[int, str]:
+    """(caracteres por linha, de onde vem o limite). Mesma regra do `None`."""
+    if modelo is None:
+        cabe = max(largura_de_instrucao(m, p)
+                   for m in MODELOS_BOLETO for p in (False, True))
+        return cabe, "o modelo mais generoso"
+    return largura_de_instrucao(modelo, tem_pix), f"o modelo '{modelo}'"
+
+
+def _linhas(valor: Any, campo: str, modelo: str | None = None,
+            tem_pix: bool = False) -> Any:
     """Campo multilinha: string vira lista de linhas e os tamanhos são validados.
 
     A separação por `\\n` não é reformatação — é adaptação de tipo. JSON não tem
@@ -143,16 +286,19 @@ def _linhas(valor: Any, campo: str) -> Any:
     else:
         return valor
 
+    cabem, origem = _limite_de_linhas(modelo, tem_pix)
+    largura, origem_largura = _limite_de_largura(modelo, tem_pix)
     erros: list[str] = []
-    if len(linhas) > MAX_LINHAS_INSTRUCAO:
-        erros.append(f"{campo}: {len(linhas)} linhas, máximo {MAX_LINHAS_INSTRUCAO}"
-                     f" (a partir da {MAX_LINHAS_INSTRUCAO + 1}ª a engine não imprime)")
+    if len(linhas) > cabem:
+        erros.append(f"{campo}: {len(linhas)} linhas, máximo {cabem} em {origem}"
+                     f" (a partir da {cabem + 1}ª a engine não imprime)")
     compridas = [(i + 1, len(linha)) for i, linha in enumerate(linhas)
-                 if len(linha) > LARGURA_INSTRUCAO]
+                 if len(linha) > largura]
     if compridas:
         detalhe = ", ".join(f"linha {n} com {c}" for n, c in compridas)
-        erros.append(f"{campo}: máximo {LARGURA_INSTRUCAO} caracteres por linha"
-                     f" ({detalhe}) — texto mais longo invade a coluna de valores")
+        erros.append(f"{campo}: máximo {largura} caracteres por linha em"
+                     f" {origem_largura} ({detalhe}) — texto mais longo é"
+                     " truncado pela engine")
     if erros:
         raise DadosInvalidos(erros)
     return linhas
@@ -171,26 +317,163 @@ _CAMPOS_SEM_CONSUMIDOR = {
     "pix_label": "o rótulo do QR é do modelo, não do payload",
 }
 
+#: `fonte_ttf` estava documentado como "Suportado pela engine pyCobrança" e não
+#: existe consumidor nenhum — nem aqui, nem lá (a pyCobrança o lista entre os
+#: campos que ignora na construção). Recusar é o que evita a terceira temporada
+#: do mesmo enredo: campo anunciado, aceito, descartado, `200`.
+_CAMPO_SEM_SUPORTE = {
+    "fonte_ttf": "a engine desenha o PDF com as fontes-padrão do PDF (Helvetica);"
+                 " não há como injetar TTF pelo payload",
+}
 
-def construir_boleto(bank: str, data: dict[str, Any]):
-    """Constrói a instância do banco a partir do payload do contrato REST."""
-    mortos = sorted(c for c in _CAMPOS_SEM_CONSUMIDOR if (data or {}).get(c))
+#: Instruções numeradas do contrato REST -> a lista que a engine desenha.
+#:
+#: `instrucao1`..`instrucao6` estavam na doc, e NENHUMA chegava ao boleto: não
+#: são campos do construtor, então caíam no descarte de campo desconhecido. Quem
+#: seguia a documentação recebia `200` e um boleto SEM instrução alguma. Quem
+#: mandava `instrucoes` — que a doc não citava — é que via o texto impresso.
+_INSTRUCOES_NUMERADAS = tuple(f"instrucao{n}" for n in range(1, 7))
+
+
+def _instrucoes_do_payload(data: dict[str, Any]) -> Any:
+    """Junta `instrucao1..6` numa lista, na ordem, ou devolve `instrucoes`.
+
+    Mandar as duas formas é ambíguo e uma delas seria descartada em silêncio —
+    de novo. Recusa nomeando o conflito.
+    """
+    numeradas = [(c, data[c]) for c in _INSTRUCOES_NUMERADAS
+                 if str(data.get(c) or "").strip()]
+    if numeradas and data.get("instrucoes"):
+        raise DadosInvalidos(
+            [f"`instrucoes` e {', '.join(f'`{c}`' for c, _ in numeradas)} no mesmo"
+             " payload: as duas formas escrevem o mesmo bloco e uma seria"
+             " descartada. Use só `instrucoes` (lista ou texto com quebras)"])
+    if numeradas:
+        return [str(v).rstrip() for _, v in numeradas]
+    return data.get("instrucoes")
+
+
+#: `campo do contrato REST` -> `chave do bloco tema` do contexto de render. Os
+#: mesmos quatro pares que a pyCobrança expõe em `contracts.TEMA_DO_CONTRATO`;
+#: quando a versão instalada trouxer a constante, ela substitui esta cópia.
+_TEMA_DO_CONTRATO = {
+    "cor_marca": "cor",
+    "logo_empresa": "logo_texto",
+    "marca_dagua": "marca_dagua",
+    "rodape_contato": "rodape",
+}
+
+#: Modelos que desenham a faixa de marca. Medido: `classico` e o carnê ignoram o
+#: bloco `tema` por completo; a fatura desenha porque monta o boleto moderno.
+MODELOS_COM_TEMA = ("moderno",)
+
+
+def tema_do_payload(data: dict[str, Any], *, modelo: str | None = None
+                    ) -> dict[str, Any] | None:
+    """Bloco `tema` do contexto de render, a partir do payload do contrato.
+
+    Os sete campos de tema estavam documentados como "Suportado pela engine
+    pyCobrança" e **nenhum** chegava ao PDF: não são campos do construtor do
+    banco, e o gateway nunca montava o bloco que o renderizador de fato lê. O
+    boleto saía idêntico ao de um payload sem tema nenhum, com `200`.
+
+    O renderizador usa outro vocabulário (`cor_marca` × `cor`, `rodape_contato`
+    × `rodape`…), que é o que `_TEMA_DO_CONTRATO` traduz. `empresa` não tem
+    campo próprio no contrato: herda de `logo_empresa`.
+    """
+    pedidos = {c for c in (*_TEMA_DO_CONTRATO, "parcela_atual", "total_parcelas")
+               if data.get(c) not in (None, "")}
+    if not pedidos:
+        return None
+    if modelo is not None and modelo not in MODELOS_COM_TEMA:
+        raise DadosInvalidos(
+            [f"o modelo '{modelo}' não desenha faixa de marca, então"
+             f" {', '.join(f'`{c}`' for c in sorted(pedidos))} não teria efeito."
+             f" Use um destes: {', '.join(MODELOS_COM_TEMA)}"])
+
+    tema: dict[str, Any] = {}
+    for origem, destino in _TEMA_DO_CONTRATO.items():
+        valor = data.get(origem)
+        if valor in (None, ""):
+            continue
+        tema[destino] = _cor_tema(valor) if origem == "cor_marca" else str(valor)
+    if "logo_texto" in tema:
+        tema["logo_texto"] = _logo_texto(tema["logo_texto"])
+        tema.setdefault("empresa", tema["logo_texto"])
+    atual, total = data.get("parcela_atual"), data.get("total_parcelas")
+    if atual and total:
+        tema["parcela_texto"] = f"Parcela {atual}/{total}"
+    return {"habilitado": True, **tema} if tema else None
+
+
+def _cor_tema(valor: Any) -> str:
+    """`RRGGBB` ou `#RRGGBB` -> o `#RRGGBB` que o renderizador espera.
+
+    A doc mandava enviar "sem `#`" e dava `006B3F` de exemplo — que é justamente
+    a forma com que o reportlab levanta `ValueError` lá no fundo do render. Com
+    o tema ligado, o exemplo da própria documentação viraria **500**.
+    """
+    cor = str(valor).strip().lstrip("#")
+    if not re.fullmatch(r"[0-9A-Fa-f]{6}", cor):
+        raise DadosInvalidos(
+            [f"`cor_marca`: {valor!r} não é uma cor hexadecimal RRGGBB"
+             " (ex.: '006B3F' ou '#006B3F')"])
+    return f"#{cor}"
+
+
+def _logo_texto(valor: str) -> str:
+    """`logo_empresa` é o TEXTO da marca desenhado na faixa, não um arquivo.
+
+    A doc dizia "Path de arquivo (PNG/JPG) acessível ao servidor" e dava
+    `/assets/logo.png`. A engine desenha o valor como texto: ligar o tema sem
+    esta checagem faria a faixa de marca do boleto sair escrita
+    "/assets/logo.png". O logo do BANCO continua vindo empacotado na engine.
+    """
+    if "/" in valor or "\\" in valor or valor.lower().endswith(
+            (".png", ".jpg", ".jpeg", ".svg", ".gif")):
+        raise DadosInvalidos(
+            [f"`logo_empresa`: {valor!r} parece um caminho de arquivo. O campo é o"
+             " TEXTO da marca desenhado na faixa (ex.: 'LAGOA REAL') — a engine"
+             " não lê arquivo do servidor"])
+    return valor
+
+
+def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = None):
+    """Constrói a instância do banco a partir do payload do contrato REST.
+
+    `modelo` é o layout que vai desenhar, quando já se sabe: só ele diz quantas
+    linhas de instrução cabem. Sem ele vale o teto do modelo mais generoso.
+    """
+    data = dict(data or {})
+    mortos = sorted(c for c in _CAMPOS_SEM_CONSUMIDOR if data.get(c))
     if mortos:
         raise DadosInvalidos(
             [f"`{c}` não gera QR Pix — {_CAMPOS_SEM_CONSUMIDOR[c]}. Para o Bolepix,"
              " envie `chave_pix` (e `txid`, se quiser rastrear): a engine monta"
              " o EMV e desenha o QR" for c in mortos])
+    sem_suporte = sorted(c for c in _CAMPO_SEM_SUPORTE if data.get(c))
+    if sem_suporte:
+        raise DadosInvalidos([f"`{c}` não tem efeito — {_CAMPO_SEM_SUPORTE[c]}"
+                              for c in sem_suporte])
+
+    instrucoes = _instrucoes_do_payload(data)
+    for numerada in _INSTRUCOES_NUMERADAS:
+        data.pop(numerada, None)
+    if instrucoes is not None:
+        data["instrucoes"] = instrucoes
+
     klass = _classe_banco(bank)
     aceitos = set(inspect.signature(klass.__init__).parameters) - {"self"}
+    tem_pix = bool(data.get("chave_pix"))
     kwargs: dict[str, Any] = {}
-    for chave, valor in (data or {}).items():
+    for chave, valor in data.items():
         destino = _MAPA_CAMPOS.get(chave, chave)
         if destino not in aceitos or valor in (None, ""):
             continue
         if chave in _CAMPOS_DATA:
             kwargs[destino] = _para_date(valor)
         elif chave in _CAMPOS_MULTILINHA:
-            kwargs[destino] = _linhas(valor, chave)
+            kwargs[destino] = _linhas(valor, chave, modelo, tem_pix)
         else:
             kwargs[destino] = valor
     try:
@@ -254,13 +537,21 @@ def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> by
     if template not in MODELOS_BOLETO:
         raise DadosInvalidos([f"template '{template}' inválido"
                               f" (use: {', '.join(MODELOS_BOLETO)})"])
-    boleto = construir_boleto(bank, data)
+    boleto = construir_boleto(bank, data, modelo=template)
+    tema = tema_do_payload(data, modelo=template)
     try:
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
     with erro_do_banco():
-        return render_boleto_pdf(boleto.contexto_render(), modelo=template)
+        return render_boleto_pdf(_com_tema(boleto.contexto_render(), tema),
+                                 modelo=template)
+
+
+def _com_tema(contexto: dict[str, Any], tema: dict[str, Any] | None
+              ) -> dict[str, Any]:
+    """Enxerta o bloco `tema` no contexto de render, quando há."""
+    return {**contexto, "tema": tema} if tema else contexto
 
 
 def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = None) -> bytes:
@@ -271,13 +562,16 @@ def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = N
     blocos declarativos). O nível 3 (`fatura.desenhar`, callback Python) não é
     expressável por JSON e fica fora da superfície REST.
     """
-    boleto = construir_boleto(bank, data)
+    # A fatura desenha o boleto MODERNO abaixo do corpo — medido: a faixa de
+    # marca sai na fatura exatamente como sai no boleto moderno.
+    boleto = construir_boleto(bank, data, modelo="moderno")
+    tema = tema_do_payload(data, modelo="moderno")
     try:
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
     with erro_do_banco():
-        contexto = boleto.contexto_render()
+        contexto = _com_tema(boleto.contexto_render(), tema)
         if corpo:
             contexto = {**contexto, **corpo}
         return render_fatura_pdf(contexto)
@@ -329,6 +623,11 @@ def pdf_multi(
 
     template ``carne`` = 3 vias/A4; senão 1 boleto por página.
     """
+    # `carne` não é modelo de boleto: é o layout de 3 vias/A4, e ele ignora o
+    # bloco `tema` (medido). Nos demais, o modelo do lote é o que desenha cada
+    # via — e é ele quem diz quantas linhas de instrução cabem.
+    modelo_do_lote = template if template in MODELOS_BOLETO or template == "carne" \
+        else "moderno"
     contextos: list[Any] = []
     itens: list[dict[str, Any]] = []
     for indice, item in enumerate(boletos):
@@ -336,9 +635,10 @@ def pdf_multi(
         data = {k: v for k, v in item.items() if k not in ("bank", "banco")}
         iid = item_id(item, indice)
         try:
-            boleto = construir_boleto(bank, data)
+            boleto = construir_boleto(bank, data, modelo=modelo_do_lote)
             boleto.validar()
             info = dados_boleto(bank, data)
+            tema = tema_do_payload(data, modelo=modelo_do_lote)
         except (DadosInvalidos, BoletoInvalido) as e:
             erros = _erros(e)
             if not tolerante:
@@ -346,7 +646,7 @@ def pdf_multi(
             itens.append({"item_id": iid, "indice": indice, "bank": bank,
                           "status": "failed", "errors": erros})
             continue
-        contextos.append(boleto.contexto_render())
+        contextos.append(_com_tema(boleto.contexto_render(), tema))
         itens.append({"item_id": iid, "indice": indice, "bank": bank,
                       "status": "completed", **info})
 

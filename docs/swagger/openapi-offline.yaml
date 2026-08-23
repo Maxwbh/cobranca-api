@@ -366,10 +366,11 @@ paths:
             `classico` também está disponível nesta rota. O template `carne`
             (3 vias por A4) vale em `/api/boleto/multi` e `/api/render/carne`.
 
-            O tema visual opcional é aplicado a partir dos campos passados em
+            A faixa de marca opcional é montada a partir dos campos passados em
             `data` (ver schema `BoletoData`: `logo_empresa`, `cor_marca`,
-            `marca_dagua`, `rodape_contato`, `fonte_ttf`, `parcela_atual`,
-            `total_parcelas`).
+            `marca_dagua`, `rodape_contato`, `parcela_atual`, `total_parcelas`)
+            e **só existe no `moderno`** — pedi-la com `classico` responde `400`
+            em vez de devolver um boleto sem marca alguma.
           schema:
             type: string
             enum: [moderno, classico]
@@ -1505,9 +1506,14 @@ components:
 
     BoletoData:
       type: object
+      description: |
+        Dados do título. `agencia` e `conta_corrente` **não** são obrigatórios
+        para todo banco: o Santander identifica o cedente pelo convênio e a
+        Caixa pelo código do beneficiário, sem conta no campo livre. Exigi-los
+        no schema tornava esses dois inexprimíveis. A obrigatoriedade real é
+        **por banco** e sai de `validar()` na engine, com o nome do campo que
+        faltou.
       required:
-        - agencia
-        - conta_corrente
         - nosso_numero
         - valor
         - cedente
@@ -1556,6 +1562,56 @@ components:
           type: string
           description: Código da carteira
           example: '18'
+        # Campos que entram no CAMPO LIVRE do código de barras ou que o banco
+        # exige por regra própria. Omitir um deles no banco que o usa não dá
+        # erro: monta um código de barras **diferente**, estruturalmente válido
+        # e com destino errado. No Citibank, sem `portfolio`, as três posições
+        # saem zeradas e o DV geral muda junto.
+        data_documento:
+          type: string
+          description: |
+            Data de emissão do título (`AAAA-MM-DD`). Obrigatória no **Sicredi**,
+            que tira dela o ano do nosso número.
+          example: '2027-09-10'
+        digito_conta:
+          type: string
+          description: |
+            DV da conta, quando o banco o exige à parte. Obrigatório em
+            **Unicred**, **Banco do Nordeste**, **Banestes** e **Safra**.
+          example: '7'
+        digito_agencia:
+          type: string
+          description: DV da agência. Obrigatório no **Safra**.
+          example: '2'
+        digito_convenio:
+          type: string
+          description: DV do convênio, usado na impressão pelo **Banrisul**.
+          example: '40'
+        variacao:
+          type: string
+          description: Variação da carteira (**Banestes**, **Sicoob**).
+          example: '01'
+        incremento:
+          type: string
+          description: |
+            Incremento de 3 posições do campo livre. Obrigatório no **BRB**.
+          example: '000'
+        portfolio:
+          type: string
+          description: |
+            Portfólio de 3 posições do campo livre (**Citibank**). Sem ele o
+            código de barras sai com as três posições zeradas — válido em
+            estrutura, errado no destino, e sem erro.
+          example: '123'
+        posto:
+          type: string
+          description: Posto da cooperativa (**Sicredi**).
+          example: '09'
+        byte_idt:
+          type: string
+          description: |
+            Byte identificador do nosso número. Obrigatório no **Sicredi**.
+          example: '2'
         data_vencimento:
           type: string
           description: Data de vencimento (YYYY/MM/DD)
@@ -1568,21 +1624,53 @@ components:
           type: string
           description: Endereço completo do sacado
           example: 'Rua Teste, 100, Centro, São Paulo, SP'
+        instrucoes:
+          description: |
+            Bloco de instruções do beneficiário — **é este o campo que a engine
+            desenha**. Aceita lista de linhas ou um texto único com quebras
+            (`\n`); as duas formas produzem o mesmo PDF.
+
+            Quantas linhas cabem e que largura cada uma comporta **depende do
+            modelo** e de haver Bolepix: a moldura do `moderno` encolhe cerca de
+            um quarto com o QR ao lado. O gateway mede o limite na própria
+            engine e **recusa** o excedente, com o número exato na mensagem —
+            reescrever o texto de um documento de cobrança é do cliente, que
+            sabe onde a frase pode ser cortada.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example:
+            - Não receber após o vencimento
+            - Após o vencimento, multa de 2% e juros de 1% ao mês
+        demonstrativo:
+          type: string
+          description: |
+            Texto do demonstrativo, com as mesmas regras de `instrucoes`
+            (lista ou texto com quebras, medido e recusado se não couber).
         instrucao1:
           type: string
-          description: Primeira linha de instrução
+          description: |
+            Primeira linha do bloco de instruções. `instrucao1`..`instrucao6`
+            são juntadas em ordem e viram `instrucoes`; enviar as duas formas no
+            mesmo payload responde `400`, porque uma delas seria descartada.
           example: Não receber após o vencimento
         instrucao2:
           type: string
-          description: Segunda linha de instrução
+          description: Segunda linha do bloco de instruções.
         instrucao3:
           type: string
+          description: Terceira linha do bloco de instruções.
         instrucao4:
           type: string
+          description: Quarta linha do bloco de instruções.
         instrucao5:
           type: string
+          description: Quinta linha do bloco de instruções.
         instrucao6:
           type: string
+          description: Sexta linha do bloco de instruções.
         # Bolepix: quem liga o QR é a CHAVE. A engine monta o payload EMV e
         # desenha o QR ela mesma — um EMV pronto não tem por onde entrar.
         emv:
@@ -1619,45 +1707,62 @@ components:
           type: string
           description: 'Codigo de identificacao da transacao PIX.'
           example: 'TX20260528001'
+        # Faixa de marca. Os campos abaixo só existem no modelo `moderno` — e na
+        # `fatura`, que monta o boleto moderno abaixo do corpo. O `classico` e o
+        # `carne` não desenham a faixa: pedi-la neles responde 400 em vez de
+        # devolver 200 com um boleto sem marca alguma.
         logo_empresa:
           type: string
           description: |
-            Tema visual — logo da empresa cedente.
-            Path de arquivo (PNG/JPG) acessível ao servidor. Suportado pela engine pyCobrança.
-          example: '/assets/logo.png'
+            Faixa de marca — **texto** da marca do cedente, desenhado na faixa
+            (não é caminho de arquivo: a engine não lê arquivo do servidor).
+            Preenche também o nome da empresa quando este não vier.
+
+            Só no modelo `moderno` e na fatura.
+          example: 'LAGOA REAL'
         cor_marca:
           type: string
           description: |
-            Tema visual — cor da marca em hexadecimal RRGGBB (sem `#`). O contraste
-            do texto é calculado automaticamente. Suportado pela engine pyCobrança.
+            Faixa de marca — cor em hexadecimal `RRGGBB`, com ou sem `#`. O
+            contraste do texto é calculado automaticamente.
+
+            Só no modelo `moderno` e na fatura.
+          pattern: '^#?[0-9A-Fa-f]{6}$'
           example: '006B3F'
         marca_dagua:
           type: string
           description: |
-            Tema visual — texto da marca d'água diagonal antifraude (até 60 chars),
-            posicionada fora das zonas do código de barras/QR. Suportado pela engine pyCobrança.
+            Faixa de marca — texto da marca d'água diagonal antifraude,
+            posicionada fora das zonas do código de barras/QR.
+
+            Só no modelo `moderno` e na fatura.
           example: 'CÓPIA - SEM VALOR FISCAL'
         rodape_contato:
           type: string
           description: |
-            Tema visual — rodapé com contato da empresa (até 120 chars). Suportado pela engine pyCobrança.
+            Faixa de marca — rodapé com o contato da empresa.
+
+            Só no modelo `moderno` e na fatura.
           example: 'Empresa Lagoa Real • (71) 3333-0000'
         fonte_ttf:
           type: string
+          deprecated: true
           description: |
-            Tema visual — path de fonte TTF para suporte UTF-8 completo no PDF
-            (detecção automática de variantes bold/italic). Suportado pela engine pyCobrança.
-          example: '/assets/fonts/Roboto.ttf'
+            **Responde 400.** Nunca houve suporte — nem aqui, nem na engine, que
+            lista o campo entre os que ignora. O PDF é desenhado com as fontes
+            padrão do formato (Helvetica), que já cobrem acentuação.
         parcela_atual:
           type: integer
           description: |
-            Tema visual — número da parcela atual (selo "PARCELA n/N"). Útil no
-            template `carne`. Suportado pela engine pyCobrança.
+            Faixa de marca — número da parcela, no selo "Parcela n/N". Precisa
+            vir junto de `total_parcelas`.
+
+            Só no modelo `moderno` e na fatura: o carnê **não** desenha a faixa.
           example: 1
         total_parcelas:
           type: integer
           description: |
-            Tema visual — total de parcelas (selo "PARCELA n/N"). Suportado pela engine pyCobrança.
+            Faixa de marca — total de parcelas, no selo "Parcela n/N".
           example: 12
 
     # Estes seis campos, e só eles. A página já prometeu `agencia_conta_boleto`,
