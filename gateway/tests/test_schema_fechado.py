@@ -122,6 +122,34 @@ def test_account_config_nao_e_contrato_fechado():
     pycob.construir_boleto(BANCO, d)  # nao levanta
 
 
+def test_carne_filtra_o_blob_mesmo_sem_bank_dentro_dele(client):
+    """O /carne resolve o banco pelo `provider`/`banco` e nao o repete no blob.
+
+    Sem o banco, o filtro do `account_config` desligava -- e o blob chegava cru
+    na fronteira estrita, entao o chamador levava 400 por uma chave do proprio
+    blob. E' exatamente a acusacao que o filtro existe para evitar. Achado
+    executando o corpo que o Swagger preenche em POST /carne, onde
+    `account_config` vem com o `additionalProp1` de exemplo.
+    """
+    corpo = {
+        "tenant_id": "empresa1", "provider": "off", "banco": BANCO,
+        "account_config": {"agencia": "3073", "conta_corrente": "12345678",
+                           "convenio": "1234567", "carteira": "18",
+                           "cedente": "Empresa Teste LTDA",
+                           "documento_cedente": "11222333000181",
+                           # chave que nao e do titulo: veio do outro lado do blob
+                           "additionalProp1": "string"},
+        "parcelas": [
+            {"valor": "150.00", "vencimento": "2027-12-30", "nosso_numero": str(700 + i),
+             "seu_numero": f"P-{i}",
+             "pagador": {"nome": "Joao", "documento": "52998224725"}}
+            for i in range(2)],
+    }
+    r = client.post("/carne", json=corpo)
+    assert r.status_code == 201, r.text
+    assert len(r.json()["cobrancas"]) == 2
+
+
 def test_blob_com_as_duas_grafias_prefere_a_do_contrato():
     """O mesmo `account_config` carrega os dois lados: no C6 `conta` e a conta
     do REST, na engine e o que o contrato chama de `conta_corrente`."""

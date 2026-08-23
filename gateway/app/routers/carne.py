@@ -41,7 +41,7 @@ def gerar_carne(body: CarneIn, authorization: str | None = _AUTH_HEADER,
     _caminho, banco = resolver_caminho(body.provider, body.banco, body.account_config)
     slug = _slug_do_carne(banco, body.bank)
 
-    previa = [_to_engine_payload(p, body.account_config) for p in body.parcelas]
+    previa = [_to_engine_payload(p, body.account_config, slug) for p in body.parcelas]
     _recusar_lote_grande(previa)
     _recusar_duplicados(previa)
     _recusar_dados_invalidos(slug, previa)

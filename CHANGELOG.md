@@ -37,6 +37,15 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   temporário em disco.
 
 ### Corrigido
+- **Credencial incompleta responde `424`, não `500`.** Os providers online liam
+  `credentials["client_id"]` direto: credencial presente sem a chave levantava
+  `KeyError` cru, que escapava dos handlers. Sete rotas Pix e de webhook
+  respondiam erro de servidor por um dado que faltava no cadastro do chamador.
+  O `424` agora diz **qual** chave falta.
+- **`POST /carne` não recusa mais por chave do `account_config`.** O carnê
+  resolve o banco pelo `provider`/`banco` e não o repete no blob; sem o banco, o
+  filtro do `account_config` desligava e o blob chegava cru na fronteira
+  estrita.
 - **`txid` longo no Bolepix responde `400`, não `500`.** O `txid` do Bolepix vai
   dentro do BR Code e aceita até 25 alfanuméricos; o do Pix cob/cobv exige de 26
   a 35 — copiar um para o outro derrubava a requisição com erro de servidor. O

@@ -227,7 +227,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -264,7 +266,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -338,7 +342,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -525,9 +531,10 @@ paths:
                   type: string
                   format: binary
                   description: |
-                    Arquivo JSON com um **array** de boletos, cada um com o
-                    campo `bank`. Outra forma (objeto, texto, número) responde
-                    **400** dizendo o que chegou.
+                    Arquivo JSON com um **array** de boletos — cada item tem os
+                    campos do schema `BoletoData` mais o `bank`. Outra forma
+                    (objeto, texto, número) responde **400** dizendo o que
+                    chegou; identificador repetido responde **422**.
       responses:
         '200':
           description: |
@@ -1005,8 +1012,11 @@ paths:
                   type: string
                   example: itau
                 data:
-                  type: object
-                  description: Dados do boleto (mesmos campos de /api/boleto)
+                  allOf:
+                    - $ref: '#/components/schemas/BoletoData'
+                  description: |
+                    Dados do título. Campo fora deste schema responde `400`
+                    nomeando o campo e sugerindo o parecido.
                 template:
                   type: string
                   enum: [moderno, classico]
@@ -1014,6 +1024,32 @@ paths:
                   description: >-
                     Modelo visual. O padrão `moderno` traz o logo do banco emissor
                     no cabeçalho.
+            example:
+              bank: banco_brasil
+              template: moderno
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.50
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                  - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                  - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                desconto_abatimento: 150.00
+                mora_multa: 8.00
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: '1B4F8A'
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
       responses:
         '200':
           description: Boleto renderizado
@@ -1066,15 +1102,93 @@ paths:
                   example: itau
                 boletos:
                   type: array
-                  items: { type: object }
                   description: |
-                    Lista de boletos (cada um com seus dados). Outra forma —
-                    ou item que não seja objeto — responde **400** dizendo o
-                    que chegou.
+                    Uma parcela por item. Outra forma — ou item que não seja
+                    objeto — responde **400** dizendo o que chegou. Duas
+                    parcelas com o mesmo identificador respondem **422**: o
+                    `item_id` sai de `external_id`, `seu_numero` ou
+                    `numero_documento`, e no carnê a repetida sairia impressa
+                    em duplicata enquanto a sobrescrita nunca seria cobrada.
+                  items:
+                    allOf:
+                      - $ref: '#/components/schemas/BoletoData'
+                      - type: object
+                        properties:
+                          bank:
+                            type: string
+                            description: Banco desta parcela; cai no `bank` da raiz.
+                            example: itau
+                          external_id:
+                            type: string
+                            description: Identificador da parcela dentro do lote.
+                            example: 'CTR-2027-0042/1'
+                          seu_numero:
+                            type: string
+                            description: Idem `external_id`, na grafia do CNAB.
                 template:
                   type: string
                   enum: [carne]
                   default: carne
+            example:
+              bank: banco_brasil
+              boletos:
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1050'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 1 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/1
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1051'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-10-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 2 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/2
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1052'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-11-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 3 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/3
       responses:
         '200':
           description: Carnê renderizado
@@ -1164,8 +1278,11 @@ paths:
                   type: string
                   example: itau
                 data:
-                  type: object
-                  description: Dados do boleto (mesmos campos de /api/boleto), incluindo o `valor`.
+                  allOf:
+                    - $ref: '#/components/schemas/BoletoData'
+                  description: |
+                    Dados do título que vai abaixo do corpo da fatura, incluindo
+                    o `valor` — a API não soma os itens.
                 itens:
                   type: array
                   description: Nível 1 — linhas da fatura (repassadas ao engine).
@@ -1179,6 +1296,35 @@ paths:
                 fatura:
                   type: object
                   description: Nível 2 — corpo declarativo (`titulo`, `blocos`), repassado ao engine.
+            example:
+              bank: banco_brasil
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: 1B4F8A
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
+              itens:
+              - descricao: Mensalidade — setembro/2027
+                quantidade: 1
+                valor_unitario: 1279.5
       responses:
         '200':
           description: Fatura renderizada
@@ -1226,12 +1372,43 @@ paths:
                   type: string
                   enum: [cnab400, cnab240]
                 data:
-                  type: object
-                  description: Dados da remessa e pagamentos
+                  allOf:
+                    - $ref: '#/components/schemas/RemessaRequest'
+                  description: |
+                    Cabeçalho da remessa e a lista de `pagamentos`. Campo de
+                    pagamento fora do schema responde `400` com a dica do nome
+                    certo — encargo não tem apelido, porque a semântica muda
+                    por layout.
                 pix:
                   type: boolean
                   default: false
                   description: Segmento PIX (boleto híbrido)
+            example:
+              bank: banco_brasil
+              type: cnab240
+              pix: false
+              data:
+                empresa_mae: Empresa Teste LTDA
+                documento_cedente: '11222333000181'
+                agencia: '3073'
+                conta_corrente: '12345678'
+                digito_conta: '0'
+                convenio: '1234567'
+                carteira: '18'
+                variacao_carteira: '017'
+                sequencial_remessa: 1
+                pagamentos:
+                - nosso_numero: '123456789'
+                  numero_documento: DOC-2026-001
+                  data_vencimento: '2027-12-31'
+                  valor: 1500.0
+                  sacado: Joao da Silva
+                  sacado_documento: '52998224725'
+                  sacado_endereco: Rua Teste, 100
+                  sacado_bairro: Centro
+                  sacado_cidade: Sao Paulo
+                  sacado_uf: SP
+                  sacado_cep: '01000000'
       responses:
         '200':
           description: Remessa gerada

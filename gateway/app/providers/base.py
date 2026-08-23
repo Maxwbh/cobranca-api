@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from app.core.vault import CredentialNotFound
 from app.schemas import Cobranca, CobrancaOut, ConciliacaoOut, PixCobranca, PixCobrancaOut, WebhookEvent
 
 
@@ -11,6 +12,25 @@ class BankProvider(ABC):
     def __init__(self, *, account_config: dict[str, Any], credentials: dict[str, Any]) -> None:
         self.account_config = account_config
         self.credentials = credentials  # do cofre; em memória, não persiste
+
+    def credencial(self, chave: str) -> str:
+        """Credencial obrigatória, ou `424` dizendo qual falta.
+
+        Os providers liam `self.credentials["client_id"]` direto, e credencial
+        **incompleta** — presente, sem a chave — levantava `KeyError` cru, que
+        escapava dos handlers e virava **500**. Credencial **ausente** já tinha
+        o 424 de `CredentialNotFound`; a diferença entre os dois casos era o
+        chamador receber "erro do servidor" por um dado que faltava no cadastro
+        dele, sem nada dizer qual.
+
+        Não loga nem devolve o valor de credencial nenhuma — só o **nome** da
+        chave que falta.
+        """
+        valor = (self.credentials or {}).get(chave)
+        if not valor:
+            raise CredentialNotFound(
+                f"credencial '{chave}' ausente para este tenant/banco")
+        return str(valor)
 
     @abstractmethod
     def registrar(self, cobranca: Cobranca) -> CobrancaOut: ...

@@ -53,7 +53,8 @@ class PyCobrancaProvider(BankProvider):
 
 
 
-def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any]) -> dict[str, Any]:
+def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any],
+                       bank: str | None = None) -> dict[str, Any]:
     """Monta o `data` da engine a partir da cobrança e do `account_config`.
 
     O `account_config` é **blob por provider**, por decisão de projeto: um
@@ -74,12 +75,13 @@ def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any]) -> di
         "sacado": pagador.nome,
         "sacado_documento": pagador.documento,
         "sacado_endereco": _endereco_do_sacado(pagador.endereco or {}),
-        **_do_account_config(account_config),
+        **_do_account_config(account_config, bank),
     }
     return {k: v for k, v in dados.items() if v not in (None, "")}
 
 
-def _do_account_config(account_config: dict[str, Any]) -> dict[str, Any]:
+def _do_account_config(account_config: dict[str, Any],
+                       bank: str | None = None) -> dict[str, Any]:
     """As chaves do blob que este banco entende.
 
     O mesmo blob costuma carregar OS DOIS lados — o que a API do banco precisa
@@ -88,9 +90,13 @@ def _do_account_config(account_config: dict[str, Any]) -> dict[str, Any]:
     que o contrato chama de `conta_corrente`. Quando as duas grafias aparecem,
     vale a do **contrato**: é a que foi escrita para a engine.
     """
-    bank = account_config.get("bank", "")
+    # O `bank` vem de quem chama quando o caminho já o resolveu — é o caso do
+    # /carne, que sabe o banco pelo `provider`/`banco` e não o repete no blob.
+    # Sem isto o filtro desligava justamente ali, e o `account_config`
+    # chegava cru na fronteira estrita: o chamador levava 400 por uma chave do
+    # blob, que é a acusação que este filtro existe para evitar.
     try:
-        aceitos = pycob.campos_aceitos(bank)
+        aceitos = pycob.campos_aceitos(bank or account_config.get("bank", ""))
     except pycob.DadosInvalidos:
         aceitos = None
     dados = {k: v for k, v in account_config.items()
