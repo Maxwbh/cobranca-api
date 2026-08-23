@@ -227,7 +227,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -264,7 +266,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -338,7 +342,9 @@ paths:
         - name: data
           in: query
           required: true
-          description: Dados do boleto em JSON (URL-encoded)
+          description: |
+            Dados do título em JSON, URL-encoded — os campos do schema
+            `BoletoData`. Campo fora dele responde `400` nomeando o campo.
           schema:
             type: string
             format: json
@@ -366,10 +372,11 @@ paths:
             `classico` também está disponível nesta rota. O template `carne`
             (3 vias por A4) vale em `/api/boleto/multi` e `/api/render/carne`.
 
-            O tema visual opcional é aplicado a partir dos campos passados em
+            A faixa de marca opcional é montada a partir dos campos passados em
             `data` (ver schema `BoletoData`: `logo_empresa`, `cor_marca`,
-            `marca_dagua`, `rodape_contato`, `fonte_ttf`, `parcela_atual`,
-            `total_parcelas`).
+            `marca_dagua`, `rodape_contato`, `parcela_atual`, `total_parcelas`)
+            e **só existe no `moderno`** — pedi-la com `classico` responde `400`
+            em vez de devolver um boleto sem marca alguma.
           schema:
             type: string
             enum: [moderno, classico]
@@ -411,6 +418,17 @@ paths:
                 type: string
               description: Linha digitável formatada.
               example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
+            X-Pix-Copia-Cola:
+              schema:
+                type: string
+              description: |
+                BR Code (EMV) do Bolepix — **só aparece quando o payload traz
+                `chave_pix`**. O corpo desta resposta é o PDF, então este é o
+                único caminho por onde o copia-e-cola sai: sem ele o QR vai
+                impresso e não há o texto para exibir ao lado, que é como paga
+                quem está no celular (não dá para escanear a própria tela).
+                ASCII por especificação do BR Code.
+              example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
           content:
             # Só PDF: `jpg`/`png`/`tif` foram descontinuados na v2 e respondem
             # 400 — declará-los aqui prometia um content-type que não existe.
@@ -513,9 +531,10 @@ paths:
                   type: string
                   format: binary
                   description: |
-                    Arquivo JSON com um **array** de boletos, cada um com o
-                    campo `bank`. Outra forma (objeto, texto, número) responde
-                    **400** dizendo o que chegou.
+                    Arquivo JSON com um **array** de boletos — cada item tem os
+                    campos do schema `BoletoData` mais o `bank`. Outra forma
+                    (objeto, texto, número) responde **400** dizendo o que
+                    chegou; identificador repetido responde **422**.
       responses:
         '200':
           description: |
@@ -993,8 +1012,11 @@ paths:
                   type: string
                   example: itau
                 data:
-                  type: object
-                  description: Dados do boleto (mesmos campos de /api/boleto)
+                  allOf:
+                    - $ref: '#/components/schemas/BoletoData'
+                  description: |
+                    Dados do título. Campo fora deste schema responde `400`
+                    nomeando o campo e sugerindo o parecido.
                 template:
                   type: string
                   enum: [moderno, classico]
@@ -1002,6 +1024,32 @@ paths:
                   description: >-
                     Modelo visual. O padrão `moderno` traz o logo do banco emissor
                     no cabeçalho.
+            example:
+              bank: banco_brasil
+              template: moderno
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.50
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                  - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                  - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                desconto_abatimento: 150.00
+                mora_multa: 8.00
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: '1B4F8A'
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
       responses:
         '200':
           description: Boleto renderizado
@@ -1013,6 +1061,13 @@ paths:
                   nosso_numero: { type: string, example: '00000001' }
                   linha_digitavel: { type: string }
                   codigo_barras: { type: string }
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: |
+                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
+                      `null` quando não. Sem ele o QR sai no PDF e a integração
+                      não tem o texto para exibir ao lado.
                   pdf_base64: { type: string, description: PDF em base64 }
         '400':
           description: Dados do boleto inválidos
@@ -1047,15 +1102,93 @@ paths:
                   example: itau
                 boletos:
                   type: array
-                  items: { type: object }
                   description: |
-                    Lista de boletos (cada um com seus dados). Outra forma —
-                    ou item que não seja objeto — responde **400** dizendo o
-                    que chegou.
+                    Uma parcela por item. Outra forma — ou item que não seja
+                    objeto — responde **400** dizendo o que chegou. Duas
+                    parcelas com o mesmo identificador respondem **422**: o
+                    `item_id` sai de `external_id`, `seu_numero` ou
+                    `numero_documento`, e no carnê a repetida sairia impressa
+                    em duplicata enquanto a sobrescrita nunca seria cobrada.
+                  items:
+                    allOf:
+                      - $ref: '#/components/schemas/BoletoData'
+                      - type: object
+                        properties:
+                          bank:
+                            type: string
+                            description: Banco desta parcela; cai no `bank` da raiz.
+                            example: itau
+                          external_id:
+                            type: string
+                            description: Identificador da parcela dentro do lote.
+                            example: 'CTR-2027-0042/1'
+                          seu_numero:
+                            type: string
+                            description: Idem `external_id`, na grafia do CNAB.
                 template:
                   type: string
                   enum: [carne]
                   default: carne
+            example:
+              bank: banco_brasil
+              boletos:
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1050'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 1 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/1
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1051'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-10-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 2 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/2
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1052'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-11-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 3 de 3 do contrato CTR-2027-0042.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/3
       responses:
         '200':
           description: Carnê renderizado
@@ -1063,8 +1196,28 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [pdf_base64, itens]
                 properties:
                   pdf_base64: { type: string, description: PDF do carnê em base64 }
+                  itens:
+                    type: array
+                    description: |
+                      Uma entrada **por parcela**, na ordem em que foram
+                      enviadas. É com `linha_digitavel` e `nosso_numero` que se
+                      registra a cobrança e se concilia o pagamento depois — o
+                      PDF sozinho não fecha a integração. `item_id` vem de
+                      `external_id`, `seu_numero` ou `numero_documento` e é o
+                      que liga a parcela impressa ao registro do cliente.
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/BoletoResponse'
+                        - type: object
+                          properties:
+                            item_id: { type: string, example: 'CTR-00' }
+                            indice: { type: integer, example: 0 }
+                            status:
+                              type: string
+                              enum: [completed]
         '400':
           description: Falha ao gerar carnê
           content:
@@ -1125,8 +1278,11 @@ paths:
                   type: string
                   example: itau
                 data:
-                  type: object
-                  description: Dados do boleto (mesmos campos de /api/boleto), incluindo o `valor`.
+                  allOf:
+                    - $ref: '#/components/schemas/BoletoData'
+                  description: |
+                    Dados do título que vai abaixo do corpo da fatura, incluindo
+                    o `valor` — a API não soma os itens.
                 itens:
                   type: array
                   description: Nível 1 — linhas da fatura (repassadas ao engine).
@@ -1140,6 +1296,35 @@ paths:
                 fatura:
                   type: object
                   description: Nível 2 — corpo declarativo (`titulo`, `blocos`), repassado ao engine.
+            example:
+              bank: banco_brasil
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                desconto_abatimento: 150.0
+                mora_multa: 8.0
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: 1B4F8A
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
+              itens:
+              - descricao: Mensalidade — setembro/2027
+                quantidade: 1
+                valor_unitario: 1279.5
       responses:
         '200':
           description: Fatura renderizada
@@ -1151,6 +1336,12 @@ paths:
                   nosso_numero: { type: string, example: '00000001' }
                   linha_digitavel: { type: string }
                   codigo_barras: { type: string }
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: |
+                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
+                      `null` quando não.
                   pdf_base64: { type: string, description: PDF (fatura + boleto) em base64 }
         '400':
           description: Dados do boleto inválidos, ou `fatura.desenhar` (nível 3) enviado via REST
@@ -1181,12 +1372,43 @@ paths:
                   type: string
                   enum: [cnab400, cnab240]
                 data:
-                  type: object
-                  description: Dados da remessa e pagamentos
+                  allOf:
+                    - $ref: '#/components/schemas/RemessaRequest'
+                  description: |
+                    Cabeçalho da remessa e a lista de `pagamentos`. Campo de
+                    pagamento fora do schema responde `400` com a dica do nome
+                    certo — encargo não tem apelido, porque a semântica muda
+                    por layout.
                 pix:
                   type: boolean
                   default: false
                   description: Segmento PIX (boleto híbrido)
+            example:
+              bank: banco_brasil
+              type: cnab240
+              pix: false
+              data:
+                empresa_mae: Empresa Teste LTDA
+                documento_cedente: '11222333000181'
+                agencia: '3073'
+                conta_corrente: '12345678'
+                digito_conta: '0'
+                convenio: '1234567'
+                carteira: '18'
+                variacao_carteira: '017'
+                sequencial_remessa: 1
+                pagamentos:
+                - nosso_numero: '123456789'
+                  numero_documento: DOC-2026-001
+                  data_vencimento: '2027-12-31'
+                  valor: 1500.0
+                  sacado: Joao da Silva
+                  sacado_documento: '52998224725'
+                  sacado_endereco: Rua Teste, 100
+                  sacado_bairro: Centro
+                  sacado_cidade: Sao Paulo
+                  sacado_uf: SP
+                  sacado_cep: '01000000'
       responses:
         '200':
           description: Remessa gerada
@@ -1505,9 +1727,14 @@ components:
 
     BoletoData:
       type: object
+      description: |
+        Dados do título. `agencia` e `conta_corrente` **não** são obrigatórios
+        para todo banco: o Santander identifica o cedente pelo convênio e a
+        Caixa pelo código do beneficiário, sem conta no campo livre. Exigi-los
+        no schema tornava esses dois inexprimíveis. A obrigatoriedade real é
+        **por banco** e sai de `validar()` na engine, com o nome do campo que
+        faltou.
       required:
-        - agencia
-        - conta_corrente
         - nosso_numero
         - valor
         - cedente
@@ -1556,6 +1783,82 @@ components:
           type: string
           description: Código da carteira
           example: '18'
+        # Campos que entram no CAMPO LIVRE do código de barras ou que o banco
+        # exige por regra própria. Omitir um deles no banco que o usa não dá
+        # erro: monta um código de barras **diferente**, estruturalmente válido
+        # e com destino errado. No Citibank, sem `portfolio`, as três posições
+        # saem zeradas e o DV geral muda junto.
+        data_documento:
+          type: string
+          description: |
+            Data de emissão do título (`AAAA-MM-DD`). Obrigatória no **Sicredi**,
+            que tira dela o ano do nosso número.
+          example: '2027-09-10'
+        digito_conta:
+          type: string
+          description: |
+            DV da conta, quando o banco o exige à parte. Obrigatório em
+            **Unicred**, **Banco do Nordeste**, **Banestes** e **Safra**.
+          example: '7'
+        digito_agencia:
+          type: string
+          description: DV da agência. Obrigatório no **Safra**.
+          example: '2'
+        digito_convenio:
+          type: string
+          description: DV do convênio, usado na impressão pelo **Banrisul**.
+          example: '40'
+        variacao:
+          type: string
+          description: Variação da carteira (**Banestes**, **Sicoob**).
+          example: '01'
+        incremento:
+          type: string
+          description: |
+            Incremento de 3 posições do campo livre. Obrigatório no **BRB**.
+          example: '000'
+        portfolio:
+          type: string
+          description: |
+            Portfólio de 3 posições do campo livre (**Citibank**). Sem ele o
+            código de barras sai com as três posições zeradas — válido em
+            estrutura, errado no destino, e sem erro.
+          example: '123'
+        posto:
+          type: string
+          description: Posto da cooperativa (**Sicredi**).
+          example: '09'
+        byte_idt:
+          type: string
+          description: |
+            Byte identificador do nosso número. Obrigatório no **Sicredi**.
+          example: '2'
+        # Faixa FEBRABAN, impressa no rodapé da ficha de compensação. Em branco
+        # por padrão, e de propósito: no boleto comum quem preenche essa faixa é
+        # o caixa, no ato do pagamento. Informe quando o valor já é conhecido na
+        # emissão — desconto por pontualidade, abatimento negociado, ou boleto
+        # reemitido com a mora já apurada.
+        desconto_abatimento:
+          type: number
+          description: '`(-) Desconto / Abatimento` — deduz do valor cobrado.'
+          example: 50.00
+        outras_deducoes:
+          type: number
+          description: '`(-) Outras deduções` — deduz do valor cobrado.'
+        mora_multa:
+          type: number
+          description: '`(+) Mora / Multa` — acresce ao valor cobrado.'
+          example: 8.00
+        outros_acrescimos:
+          type: number
+          description: '`(+) Outros acréscimos` — acresce ao valor cobrado.'
+        valor_cobrado:
+          type: number
+          description: |
+            `(=) Valor cobrado`. Omitido, é somado a partir dos quatro campos
+            acima e do `valor`; informado, sobrepõe o cálculo. Sem nenhum dos
+            cinco, a faixa inteira sai **em branco** — e não zerada.
+          example: 108.00
         data_vencimento:
           type: string
           description: Data de vencimento (YYYY/MM/DD)
@@ -1568,21 +1871,53 @@ components:
           type: string
           description: Endereço completo do sacado
           example: 'Rua Teste, 100, Centro, São Paulo, SP'
+        instrucoes:
+          description: |
+            Bloco de instruções do beneficiário — **é este o campo que a engine
+            desenha**. Aceita lista de linhas ou um texto único com quebras
+            (`\n`); as duas formas produzem o mesmo PDF.
+
+            Quantas linhas cabem e que largura cada uma comporta **depende do
+            modelo** e de haver Bolepix: a moldura do `moderno` encolhe cerca de
+            um quarto com o QR ao lado. O gateway mede o limite na própria
+            engine e **recusa** o excedente, com o número exato na mensagem —
+            reescrever o texto de um documento de cobrança é do cliente, que
+            sabe onde a frase pode ser cortada.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example:
+            - Não receber após o vencimento
+            - Após o vencimento, multa de 2% e juros de 1% ao mês
+        demonstrativo:
+          type: string
+          description: |
+            Texto do demonstrativo, com as mesmas regras de `instrucoes`
+            (lista ou texto com quebras, medido e recusado se não couber).
         instrucao1:
           type: string
-          description: Primeira linha de instrução
+          description: |
+            Primeira linha do bloco de instruções. `instrucao1`..`instrucao6`
+            são juntadas em ordem e viram `instrucoes`; enviar as duas formas no
+            mesmo payload responde `400`, porque uma delas seria descartada.
           example: Não receber após o vencimento
         instrucao2:
           type: string
-          description: Segunda linha de instrução
+          description: Segunda linha do bloco de instruções.
         instrucao3:
           type: string
+          description: Terceira linha do bloco de instruções.
         instrucao4:
           type: string
+          description: Quarta linha do bloco de instruções.
         instrucao5:
           type: string
+          description: Quinta linha do bloco de instruções.
         instrucao6:
           type: string
+          description: Sexta linha do bloco de instruções.
         # Bolepix: quem liga o QR é a CHAVE. A engine monta o payload EMV e
         # desenha o QR ela mesma — um EMV pronto não tem por onde entrar.
         emv:
@@ -1617,47 +1952,73 @@ components:
           example: 'cnpj'
         txid:
           type: string
-          description: 'Codigo de identificacao da transacao PIX.'
-          example: 'TX20260528001'
+          maxLength: 25
+          pattern: '^[A-Za-z0-9]{1,25}$'
+          description: |
+            Identificador da transação Pix, gravado **dentro do BR Code** do
+            Bolepix. Até 25 alfanuméricos.
+
+            ⚠️ **Não é o mesmo `txid` do Pix cob/cobv**, que o BACEN define com
+            26 a 35 caracteres — e que o gateway exige nesse tamanho nas rotas
+            `/pix/*`. Os dois limites não se sobrepõem: copiar o txid de uma
+            cobrança Pix para cá responde `400` explicando a diferença.
+          example: 'PEDIDO000000000042'
+        # Faixa de marca. Os campos abaixo só existem no modelo `moderno` — e na
+        # `fatura`, que monta o boleto moderno abaixo do corpo. O `classico` e o
+        # `carne` não desenham a faixa: pedi-la neles responde 400 em vez de
+        # devolver 200 com um boleto sem marca alguma.
         logo_empresa:
           type: string
           description: |
-            Tema visual — logo da empresa cedente.
-            Path de arquivo (PNG/JPG) acessível ao servidor. Suportado pela engine pyCobrança.
-          example: '/assets/logo.png'
+            Faixa de marca — **texto** da marca do cedente, desenhado na faixa
+            (não é caminho de arquivo: a engine não lê arquivo do servidor).
+            Preenche também o nome da empresa quando este não vier.
+
+            Só no modelo `moderno` e na fatura.
+          example: 'LAGOA REAL'
         cor_marca:
           type: string
           description: |
-            Tema visual — cor da marca em hexadecimal RRGGBB (sem `#`). O contraste
-            do texto é calculado automaticamente. Suportado pela engine pyCobrança.
+            Faixa de marca — cor em hexadecimal `RRGGBB`, com ou sem `#`. O
+            contraste do texto é calculado automaticamente.
+
+            Só no modelo `moderno` e na fatura.
+          pattern: '^#?[0-9A-Fa-f]{6}$'
           example: '006B3F'
         marca_dagua:
           type: string
           description: |
-            Tema visual — texto da marca d'água diagonal antifraude (até 60 chars),
-            posicionada fora das zonas do código de barras/QR. Suportado pela engine pyCobrança.
+            Faixa de marca — texto da marca d'água diagonal antifraude,
+            posicionada fora das zonas do código de barras/QR.
+
+            Só no modelo `moderno` e na fatura.
           example: 'CÓPIA - SEM VALOR FISCAL'
         rodape_contato:
           type: string
           description: |
-            Tema visual — rodapé com contato da empresa (até 120 chars). Suportado pela engine pyCobrança.
+            Faixa de marca — rodapé com o contato da empresa.
+
+            Só no modelo `moderno` e na fatura.
           example: 'Empresa Lagoa Real • (71) 3333-0000'
         fonte_ttf:
           type: string
+          deprecated: true
           description: |
-            Tema visual — path de fonte TTF para suporte UTF-8 completo no PDF
-            (detecção automática de variantes bold/italic). Suportado pela engine pyCobrança.
-          example: '/assets/fonts/Roboto.ttf'
+            **Responde 400.** Nunca houve suporte — nem aqui, nem na engine, que
+            lista o campo entre os que ignora. O PDF é desenhado com as fontes
+            padrão do formato (Helvetica), que já cobrem acentuação.
         parcela_atual:
           type: integer
           description: |
-            Tema visual — número da parcela atual (selo "PARCELA n/N"). Útil no
-            template `carne`. Suportado pela engine pyCobrança.
+            Faixa de marca — número da parcela, no selo "Parcela n/N". Precisa
+            vir junto de `total_parcelas`.
+
+            Só no modelo `moderno` e na fatura: o carnê **não** desenha a faixa.
           example: 1
         total_parcelas:
           type: integer
           description: |
-            Tema visual — total de parcelas (selo "PARCELA n/N"). Suportado pela engine pyCobrança.
+            Faixa de marca — total de parcelas, no selo "Parcela n/N".
           example: 12
 
     # Estes seis campos, e só eles. A página já prometeu `agencia_conta_boleto`,
@@ -1701,6 +2062,33 @@ components:
           type: string
           description: Linha digitável formatada
           example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
+        pix_copia_cola:
+          type: string
+          nullable: true
+          description: |
+            BR Code (EMV) do Bolepix, montado pela engine a partir de
+            `chave_pix`. **`null` quando o payload não traz chave** — boleto sem
+            QR não tem copia-e-cola, e a API não inventa um.
+
+            É o mesmo campo que `POST /cobranca` devolve no caminho `on`
+            (C6, Inter, Sicoob). Sem ele, um Bolepix só é pagável por quem
+            consegue apontar a câmera para outra tela.
+          example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
+        totalizadores:
+          type: object
+          description: |
+            A faixa FEBRABAN **como foi impressa**, já formatada em reais. Os
+            cinco campos vêm sempre; string vazia é campo em branco no papel,
+            que é o padrão do boleto comum. `valor_cobrado` traz a soma quando
+            o emissor informou algum dos outros e não o total.
+          additionalProperties:
+            type: string
+          example:
+            desconto_abatimento: '50,00'
+            outras_deducoes: ''
+            mora_multa: '8,00'
+            outros_acrescimos: ''
+            valor_cobrado: '108,00'
 
     # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
     # código de barras — é para isso que ele existe. O schema prometia

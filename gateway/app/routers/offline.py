@@ -330,13 +330,20 @@ _TEMPLATES_LOTE = ("carne", *sorted(pycob.MODELOS_BOLETO))
 
 
 def _headers_boleto(d: dict[str, Any]) -> dict[str, str]:
-    return {
+    cabecalhos = {
         "X-Nosso-Numero": d["nosso_numero"],
         "X-Nosso-Numero-Formatado": d["nosso_numero_formatado"],
         "X-Nosso-Numero-DV": d["nosso_numero_dv"],
         "X-Codigo-Barras": d["codigo_barras"],
         "X-Linha-Digitavel": d["linha_digitavel"],
     }
+    # O corpo desta resposta é o PDF, então o copia-e-cola do Bolepix só tem
+    # este caminho para sair — sem ele o QR sai impresso e a integração não tem
+    # o texto para exibir ao lado. O BR Code é ASCII por especificação (a
+    # engine já normaliza o nome do beneficiário), então cabe em header.
+    if d.get("pix_copia_cola"):
+        cabecalhos["X-Pix-Copia-Cola"] = d["pix_copia_cola"]
+    return cabecalhos
 
 
 @router.get("/api/boleto", include_in_schema=False)
@@ -352,8 +359,7 @@ def boleto(bank: str, data: str, type: str = "pdf",
     try:
         detalhar = _bool_param("include_data", include_data)
         valores = _data_param(data)
-        info = pycob.dados_boleto(bank, valores)
-        pdf = pycob.pdf_boleto(bank, valores, template)
+        pdf, info = pycob.emitir_boleto(bank, valores, template)
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
     if detalhar:
@@ -534,12 +540,13 @@ async def render_boleto(body: dict) -> Any:
         # `template` nao era nem declarado aqui: o irmao GET /api/boleto aceita,
         # entao quem migrava de um para o outro perdia a escolha do modelo em
         # silencio. Os dois caminhos passam a se comportar igual.
-        info = pycob.dados_boleto(bank, valores)
-        pdf = pycob.pdf_boleto(bank, valores, body.get("template", "moderno"))
+        pdf, info = pycob.emitir_boleto(bank, valores, body.get("template", "moderno"))
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
     return {"nosso_numero": info["nosso_numero"], "linha_digitavel": info["linha_digitavel"],
-            "codigo_barras": info["codigo_barras"], "pdf_base64": base64.b64encode(pdf).decode()}
+            "codigo_barras": info["codigo_barras"],
+            "pix_copia_cola": info["pix_copia_cola"],
+            "pdf_base64": base64.b64encode(pdf).decode()}
 
 
 @router.post("/api/render/carne", include_in_schema=False)
@@ -574,11 +581,16 @@ async def render_carne(body: dict) -> Any:
             "duplicados": repetidos})
 
     try:
-        pdf, _ = pycob.pdf_multi(boletos, template="carne")
+        pdf, parcelas = pycob.pdf_multi(boletos, template="carne")
     except pycob.DadosInvalidos as e:
         return JSONResponse(status_code=400, content={"error": "Falha ao gerar carnê",
                                                        "validation_errors": e.erros})
-    return {"pdf_base64": base64.b64encode(pdf).decode()}
+    # `itens` era calculado e jogado fora: a rota devolvia só o PDF. Quem gera
+    # um carnê precisa da linha digitável e do nosso número de CADA parcela —
+    # é com eles que se registra a cobrança e se concilia o pagamento depois.
+    # Sem isso, o cliente tinha de refazer a conta por fora, ou pedir parcela
+    # por parcela em /api/boleto/data.
+    return {"pdf_base64": base64.b64encode(pdf).decode(), "itens": parcelas}
 
 
 @router.post("/api/render/fatura", include_in_schema=False)
@@ -611,13 +623,14 @@ async def render_fatura(body: dict) -> Any:
             corpo["fatura"] = _objeto(fatura_body, "fatura")
 
         bank, data = body.get("bank", ""), _objeto(body.get("data") or {}, "data")
-        info = pycob.dados_boleto(bank, data)
-        pdf = pycob.pdf_fatura(bank, data, corpo or None)
+        pdf, info = pycob.emitir_fatura(bank, data, corpo or None)
     except pycob.DadosInvalidos as e:
         return _erro_validacao(e)
 
     return {"nosso_numero": info["nosso_numero"], "linha_digitavel": info["linha_digitavel"],
-            "codigo_barras": info["codigo_barras"], "pdf_base64": base64.b64encode(pdf).decode()}
+            "codigo_barras": info["codigo_barras"],
+            "pix_copia_cola": info["pix_copia_cola"],
+            "pdf_base64": base64.b64encode(pdf).decode()}
 
 
 @router.post("/api/render/remessa", include_in_schema=False)

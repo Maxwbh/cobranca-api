@@ -16,7 +16,85 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Alterado
+- ⚠️ **Campo desconhecido em `data` responde `400`.** Era descartado em
+  silêncio: `numero_docmento` produzia um boleto sem número de documento, com
+  `200`, e nada na resposta acusava a falta. O erro nomeia o campo e sugere o
+  parecido. `account_config` continua sendo blob por provider — lá o que não se
+  aplica ao banco é ignorado, como sempre foi. `BOLETO_ACEITA_CAMPO_DESCONHECIDO=1`
+  devolve o comportamento antigo; sai na 3.0.0.
+- ⚠️ **A mesma conta escrita nas duas grafias responde `400`.**
+  `conta_corrente` e `conta` são o mesmo campo: com valores diferentes, a ordem
+  do dicionário decidia qual ia para o boleto.
+- ⚠️ **Engine `pyCobrança` atualizada — o boleto `moderno` tem desenho novo.**
+  Chips de Vencimento/Valor/Nosso Número com mais contraste, faixa de marca,
+  grade alinhada e linha de corte contínua. Junto vêm correções de layout que
+  produziam PDF válido em bytes e errado no papel: texto longo saindo da
+  página, primeiro dígito da linha digitável cortado no `classico`, nome do
+  banco por cima do código-DV e encargo por cima do rótulo.
+- Retorno CNAB é lido direto dos bytes do upload: o arquivo do banco — que traz
+  nome, documento e valor de cada pagador — não passa mais por arquivo
+  temporário em disco.
+
+### Corrigido
+- **Credencial incompleta responde `424`, não `500`.** Os providers online liam
+  `credentials["client_id"]` direto: credencial presente sem a chave levantava
+  `KeyError` cru, que escapava dos handlers. Sete rotas Pix e de webhook
+  respondiam erro de servidor por um dado que faltava no cadastro do chamador.
+  O `424` agora diz **qual** chave falta.
+- **`POST /carne` não recusa mais por chave do `account_config`.** O carnê
+  resolve o banco pelo `provider`/`banco` e não o repete no blob; sem o banco, o
+  filtro do `account_config` desligava e o blob chegava cru na fronteira
+  estrita.
+- **`txid` longo no Bolepix responde `400`, não `500`.** O `txid` do Bolepix vai
+  dentro do BR Code e aceita até 25 alfanuméricos; o do Pix cob/cobv exige de 26
+  a 35 — copiar um para o outro derrubava a requisição com erro de servidor. O
+  campo ganhou limite e explicação no schema.
+- ⚠️ **O endereço do pagador chega inteiro ao boleto.** Bairro, cidade, UF e
+  CEP eram enviados como campos próprios que o título **não tem**: o construtor
+  descartava os quatro, um a um, em silêncio. O boleto saía com rua e número e
+  mais nada. Agora vão na linha de endereço, como um boleto de verdade imprime.
+- **`pix_copia_cola` passa a vir no caminho offline.** O campo já existia em
+  `POST /cobranca` e era preenchido por C6, Inter e Sicoob; com `provider=off`
+  voltava `null` mesmo com o QR Bolepix impresso no PDF. Agora sai também em
+  `POST /api/render/boleto`, `/api/render/fatura`, `GET /api/boleto/data` e no
+  header `X-Pix-Copia-Cola` do PDF binário. `null` continua quando o payload
+  não traz `chave_pix`.
+- **`POST /api/render/carne` devolve `itens`** — uma entrada por parcela, com
+  `nosso_numero`, `linha_digitavel`, `codigo_barras` e `item_id`. Eram
+  calculados e descartados: só o PDF voltava, e quem gerava um carnê não tinha
+  como registrar nem conciliar as parcelas sem refazer a conta por fora.
+- ⚠️ **A faixa de marca do boleto passa a sair no papel.** `logo_empresa`,
+  `cor_marca`, `marca_dagua`, `rodape_contato`, `parcela_atual` e
+  `total_parcelas` eram aceitos e descartados: o boleto saía sem marca, com
+  `200`. `logo_empresa` é o **texto** da marca (não caminho de arquivo) e
+  `cor_marca` aceita `RRGGBB` com ou sem `#`, e o nome ao lado do selo é o
+  `cedente`. Só no modelo `moderno` e na fatura — pedir no `classico` ou no
+  carnê agora responde `400`.
+- ⚠️ **`instrucao1`..`instrucao6` passam a ser impressas.** Estavam
+  documentadas e nenhuma chegava ao boleto. Viram o bloco `instrucoes`, em
+  ordem; enviar as duas formas no mesmo payload responde `400`.
+- ⚠️ **O limite de instruções agora é medido na engine, por modelo.** Era fixo
+  em 7 linhas × 100 caracteres. A moldura muda de tamanho conforme o modelo e
+  conforme haja Bolepix (com o QR ao lado ela encolhe ~¼), então texto que
+  passava do limite real era truncado sem erro. Linha ou coluna a mais é
+  recusada, com o número exato na mensagem.
+- `fonte_ttf` responde **`400`**: nunca houve suporte, nem aqui nem na engine.
+
 ### Adicionado
+- **Faixa de totalizadores FEBRABAN**: `desconto_abatimento`,
+  `outras_deducoes`, `mora_multa`, `outros_acrescimos` e `valor_cobrado` entram
+  no `BoletoData` e **saem impressos**. O total é somado quando não informado.
+  Sem nenhum dos cinco a faixa segue em branco, que é o padrão do boleto comum
+  — quem a preenche é o caixa, no ato do pagamento. As respostas trazem
+  `totalizadores` com os cinco já formatados.
+- **Nove campos específicos de banco no `BoletoData`**: `data_documento`,
+  `digito_conta`, `digito_agencia`, `digito_convenio`, `variacao`,
+  `incremento`, `portfolio`, `posto` e `byte_idt`. Já eram aceitos e não
+  estavam documentados — no Citibank, sem `portfolio`, o código de barras sai
+  com o campo livre zerado, válido em estrutura e errado no destino.
+- `instrucoes` e `demonstrativo` documentados no `BoletoData`: são os campos
+  que a engine realmente desenha.
 - `GET /bancos` anuncia mais três capacidades, que **discriminam**:
   `pix_consulta` (o Itaú não tem `GET /pix/{txid}`), `conciliacao_transacoes`
   (só o C6) e `webhook_entrada` (sem ela, `POST /webhooks/{banco}` não entende

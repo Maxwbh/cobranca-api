@@ -5,7 +5,16 @@ httpx>=0.27
 pydantic>=2.13.4
 cryptography>=42.0
 psycopg[binary]>=3.1
-pycobranca>=1.0.2,<2  # engine offline (100% Python) — PyPI, não git@main: build reprodutível
+# Engine offline (100% Python). A `hml` desta API e a `hml` da pyCobrança saem
+# JUNTAS, e esta versão traz mudança de contrato que o gateway já consome:
+# `boleto_de_api`/`tema_de_api`, `emite_boleto`, os cinco totalizadores
+# FEBRABAN, `Retorno.ler(bytes)` e a hierarquia de erros fechada. Apontar para
+# a 1.0.3 do PyPI deixaria a API prometendo o que a engine instalada não faz.
+#
+# Fixado no COMMIT, não na branch: `@hml` seria referência móvel e mataria a
+# reprodutibilidade do build, que é a razão de não usarmos `git@main` aqui.
+# Publicada a versão, isto volta a ser `pycobranca>=1.1.0,<2` do PyPI.
+pycobranca @ git+https://github.com/Maxwbh/pyCobranca@e307595eedd853837486a24d7399c428dce88c07
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
 pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)

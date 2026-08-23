@@ -56,12 +56,12 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
         return OAuthMtlsClient(
             base_url=SICOOB_BASE,
             auth_url=SICOOB_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),
             scopes=self.credentials.get("scopes", SICOOB_SCOPES),
-            default_headers={"client_id": self.credentials["client_id"]},  # Sicoob exige
+            default_headers={"client_id": self.credencial("client_id")},  # Sicoob exige
             static_token=self.credentials.get("access_token", ""),  # sandbox: token do portal
         )
 

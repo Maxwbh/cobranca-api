@@ -90,7 +90,7 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
         return OAuthMtlsClient(
             base_url=C6_BASE,
             auth_url=C6_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),

@@ -523,12 +523,12 @@ def test_template_invalido_responde_400(client):
 # PDF: inspecionar o conteudo renderizado exigiria um leitor de PDF, que nao
 # tem por que virar dependencia do produto.
 INSTRUCOES_6 = (
-    "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\n"
-    "Conceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\n"
-    "Nao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\n"
-    "Havendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\n"
-    "Duvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\n"
-    "Pagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "Apos o vencimento, multa de 2% e juros de 1% ao mes.\n"
+    "Desconto de R$ 50,00 ate 5 dias antes do vencimento.\n"
+    "Nao receber apos 30 dias; decorrido o prazo, protestar.\n"
+    "Prevalece o contrato n. CTR-2026-0417 em caso de duvida.\n"
+    "Duvidas: financeiro, (11) 3679-2380, dias uteis 9h-18h.\n"
+    "Pagavel em qualquer banco ate a data de vencimento."
 )
 
 
@@ -565,17 +565,18 @@ def test_linha_longa_e_recusada_e_nao_reformatada():
 
 
 def test_instrucoes_que_nao_cabem_sao_recusadas_em_vez_de_sumir():
-    # A engine simplesmente NAO desenha a partir da oitava linha. Em documento
+    # A engine simplesmente NAO desenha da ultima linha em diante. Em documento
     # de cobranca, perder clausula em silencio e pior que recusar.
+    cabem = pycob.linhas_de_instrucao("moderno", False)
     with pytest.raises(pycob.DadosInvalidos) as exc:
         pycob.pdf_boleto("banco_brasil",
                          {**DADOS_BB, "instrucoes": "\n".join(["ok"] * 20)})
-    assert "máximo 7" in exc.value.erros[0]
+    assert f"máximo {cabem} em o modelo 'moderno'" in exc.value.erros[0]
 
 
 def test_instrucoes_no_limite_continuam_aceitas():
-    no_limite = "\n".join(f"Linha {i + 1} de instrucao do beneficiario"
-                          for i in range(pycob.MAX_LINHAS_INSTRUCAO))
+    no_limite = "\n".join(f"Linha {i + 1} de instrucao"
+                          for i in range(pycob.linhas_de_instrucao("moderno", False)))
     pdf = pycob.pdf_boleto("banco_brasil", {**DADOS_BB, "instrucoes": no_limite})
     assert pdf[:4] == b"%PDF"
 
