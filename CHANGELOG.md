@@ -37,6 +37,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   temporário em disco.
 
 ### Corrigido
+- **`txid` longo no Bolepix responde `400`, não `500`.** O `txid` do Bolepix vai
+  dentro do BR Code e aceita até 25 alfanuméricos; o do Pix cob/cobv exige de 26
+  a 35 — copiar um para o outro derrubava a requisição com erro de servidor. O
+  campo ganhou limite e explicação no schema.
 - ⚠️ **O endereço do pagador chega inteiro ao boleto.** Bairro, cidade, UF e
   CEP eram enviados como campos próprios que o título **não tem**: o construtor
   descartava os quatro, um a um, em silêncio. O boleto saía com rua e número e

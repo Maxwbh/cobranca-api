@@ -105,6 +105,28 @@ def test_pdf_binario_leva_o_copia_e_cola_no_header(client):
     assert emv.isascii(), "header nao-ASCII quebraria clientes HTTP"
 
 
+def test_txid_longo_no_bolepix_responde_400_e_nao_500():
+    """Dois campos chamados `txid`, com limites incompativeis.
+
+    O do Bolepix vai DENTRO do BR Code estatico e aceita ate 25 alfanumericos;
+    o do Pix cob/cobv exige de 26 a 35 -- e o proprio schema desta API cobra
+    esse minimo na outra rota. Copiar um para o outro e o caminho natural de
+    quem usa as duas, e devolvia 500: `PixInvalido` nao e `BoletoInvalido` e
+    escapava dos handlers, entao o erro do chamador virava erro do servidor.
+    """
+    longo = "PEDIDO2027000000000000004242"  # 28 — valido como txid de cob
+    assert len(longo) > 25
+    with pytest.raises(pycob.DadosInvalidos) as exc:
+        pycob.emitir_boleto(BANCO, {**COM_PIX, "txid": longo})
+    msg = "; ".join(exc.value.erros)
+    assert "25" in msg and "26 a 35" in msg
+
+
+def test_txid_dentro_do_limite_do_bolepix_e_aceito():
+    _pdf, info = pycob.emitir_boleto(BANCO, {**COM_PIX, "txid": "PEDIDO000000000042"})
+    assert "PEDIDO000000000042" in info["pix_copia_cola"]
+
+
 def test_sem_pix_o_header_nao_aparece(client):
     r = client.get("/api/boleto", params={"bank": BANCO, "type": "pdf",
                                           "data": json.dumps(BASE)})

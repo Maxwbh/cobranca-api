@@ -21,6 +21,7 @@ from pycobranca.contracts import (NOMES_DO_CONTRATO, SLUG_POR_CODIGO,
                                   TEMA_DO_CONTRATO, tema_de_api)
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
                                    OFXInvalido, PyCobrancaError, RetornoInvalido)
+from pycobranca.pix import PixInvalido
 from pycobranca.render import (emite_boleto, render_boleto_pdf, render_carne_pdf,
                                render_fatura_pdf)
 from pycobranca.render.marcas import logo_do_banco
@@ -60,6 +61,15 @@ def erro_do_banco():
         yield
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
+    except PixInvalido as e:
+        # O `txid` do Bolepix e o do Pix cob/cobv têm o MESMO nome e limites
+        # incompatíveis: o BR Code estático aceita até 25 alfanuméricos, e o
+        # txid do BACEN exige de 26 a 35. Copiar um para o outro é o caminho
+        # natural de quem usa as duas rotas — e devolvia 500, porque
+        # `PixInvalido` não é `BoletoInvalido` e escapava dos handlers.
+        raise DadosInvalidos([f"{e}. No Bolepix o `txid` vai dentro do BR Code e"
+                              " aceita até 25 alfanuméricos — é outro campo que o"
+                              " `txid` do Pix cob/cobv, que exige de 26 a 35"]) from e
 
 
 def _erros(e: Exception) -> list[str]:

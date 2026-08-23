@@ -1775,8 +1775,17 @@ components:
           example: 'cnpj'
         txid:
           type: string
-          description: 'Codigo de identificacao da transacao PIX.'
-          example: 'TX20260528001'
+          maxLength: 25
+          pattern: '^[A-Za-z0-9]{1,25}$'
+          description: |
+            Identificador da transação Pix, gravado **dentro do BR Code** do
+            Bolepix. Até 25 alfanuméricos.
+
+            ⚠️ **Não é o mesmo `txid` do Pix cob/cobv**, que o BACEN define com
+            26 a 35 caracteres — e que o gateway exige nesse tamanho nas rotas
+            `/pix/*`. Os dois limites não se sobrepõem: copiar o txid de uma
+            cobrança Pix para cá responde `400` explicando a diferença.
+          example: 'PEDIDO000000000042'
         # Faixa de marca. Os campos abaixo só existem no modelo `moderno` — e na
         # `fatura`, que monta o boleto moderno abaixo do corpo. O `classico` e o
         # `carne` não desenham a faixa: pedi-la neles responde 400 em vez de
