@@ -21,8 +21,11 @@ class PyCobrancaProvider(BankProvider):
         bank = self.account_config.get("bank", "")
         dados = _to_engine_payload(cobranca, self.account_config)
         try:
-            info = pycob.dados_boleto(bank, dados)
-            pdf = pycob.pdf_boleto(bank, dados)
+            # Uma montagem só. Eram duas — `dados_boleto` e `pdf_boleto` —, o
+            # que além de custar o dobro deixava o PDF e o JSON saindo de
+            # objetos diferentes, sem nada garantindo que descreviam o mesmo
+            # boleto.
+            pdf, info = pycob.emitir_boleto(bank, dados)
         except pycob.DadosInvalidos as e:
             return CobrancaOut(status=Status.erro, raw={"validation_errors": e.erros})
         return CobrancaOut(
@@ -30,6 +33,11 @@ class PyCobrancaProvider(BankProvider):
             status=Status.registrado,
             linha_digitavel=info["linha_digitavel"],
             codigo_barras=info["codigo_barras"],
+            # O caminho ON preenche isto em C6, Inter e Sicoob; o OFF devolvia
+            # `null` mesmo emitindo o QR no PDF. Quem integra via ver o Bolepix
+            # impresso e nao ter o texto para pôr ao lado dele — e pagador de
+            # celular nao escaneia a propria tela.
+            pix_copia_cola=info.get("pix_copia_cola"),
             pdf_base64=base64.b64encode(pdf).decode(),
             raw=info,
         )

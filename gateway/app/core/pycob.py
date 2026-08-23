@@ -495,21 +495,32 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
 
 
 def validar(bank: str, data: dict[str, Any]) -> None:
-    boleto = construir_boleto(bank, data)
+    _construido_e_validado(bank, data)
+
+
+def _construido_e_validado(bank: str, data: dict[str, Any],
+                           modelo: str | None = None):
+    """Monta o título e passa pelo `validar()` do banco. Ponto único."""
+    boleto = construir_boleto(bank, data, modelo=modelo)
     try:
         boleto.validar()
     except BoletoInvalido as e:
         raise DadosInvalidos(_erros(e)) from e
+    return boleto
 
 
-def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
-    """Campos calculados do boleto — contrato: SEMPRE os 3 campos de nosso_numero."""
-    boleto = construir_boleto(bank, data)
-    try:
-        boleto.validar()
-    except BoletoInvalido as e:
-        raise DadosInvalidos(_erros(e)) from e
+def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
+                     ) -> dict[str, Any]:
+    """Campos CALCULADOS do título, a partir de um boleto já montado.
+
+    Só o que a API calcula entra: valor e vencimento não voltam porque o
+    chamador acabou de mandá-los. `pix_copia_cola` volta porque **não** foi
+    mandado — a engine monta o EMV a partir da chave, e sem ele quem integra vê
+    o QR no PDF e não tem o texto para pôr ao lado, que é como um pagador de
+    celular paga (não dá para escanear a própria tela).
+    """
     with erro_do_banco():
+        contexto = contexto if contexto is not None else boleto.contexto_render()
         formatado = boleto.nosso_numero_formatado()
         dv = getattr(boleto, "nosso_numero_dv", None)
         if callable(dv):
@@ -517,14 +528,44 @@ def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
         if dv is None:
             m = re.search(r"-(\w+)$", formatado)
             dv = m.group(1) if m else ""
+        pix = contexto.get("pix") or {}
         return {
             "bank": bank,
             "nosso_numero": str(boleto.nosso_numero),
             "nosso_numero_formatado": formatado,
             "nosso_numero_dv": str(dv),
-            "codigo_barras": boleto.codigo_barras,
-            "linha_digitavel": boleto.linha_digitavel,
+            "codigo_barras": contexto.get("codigo_barras") or boleto.codigo_barras,
+            "linha_digitavel": contexto.get("linha_digitavel") or boleto.linha_digitavel,
+            "pix_copia_cola": pix.get("copia_cola") if pix.get("habilitado") else None,
         }
+
+
+def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
+    """Campos calculados do boleto — contrato: SEMPRE os 3 campos de nosso_numero."""
+    return _dados_do_boleto(bank, _construido_e_validado(bank, data))
+
+
+def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
+                  ) -> tuple[bytes, dict[str, Any]]:
+    """PDF **e** dados calculados, de uma montagem só.
+
+    Quem precisa dos dois chamava `dados_boleto` e `pdf_boleto` em seguida: duas
+    construções do título e quatro `validar()` para um boleto — 36 ms onde 8
+    bastam, e, pior, dois objetos diferentes servindo de fonte para o papel e
+    para o JSON. Nada garantia que descreviam o mesmo boleto.
+
+    É a forma que a pyCobrança passou a oferecer como `render.emite_boleto`;
+    quando a versão instalada trouxer, esta função vira uma casca em cima dela.
+    """
+    if template not in MODELOS_BOLETO:
+        raise DadosInvalidos([f"template '{template}' inválido"
+                              f" (use: {', '.join(MODELOS_BOLETO)})"])
+    boleto = _construido_e_validado(bank, data, modelo=template)
+    tema = tema_do_payload(data, modelo=template)
+    with erro_do_banco():
+        contexto = boleto.contexto_render()
+        pdf = render_boleto_pdf(_com_tema(contexto, tema), modelo=template)
+    return pdf, _dados_do_boleto(bank, boleto, contexto)
 
 
 def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> bytes:
@@ -534,18 +575,7 @@ def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> by
     sem erro e nunca chegava aqui, então `classico` — que a engine sempre
     ofereceu — era inalcançável pela API.
     """
-    if template not in MODELOS_BOLETO:
-        raise DadosInvalidos([f"template '{template}' inválido"
-                              f" (use: {', '.join(MODELOS_BOLETO)})"])
-    boleto = construir_boleto(bank, data, modelo=template)
-    tema = tema_do_payload(data, modelo=template)
-    try:
-        boleto.validar()
-    except BoletoInvalido as e:
-        raise DadosInvalidos(_erros(e)) from e
-    with erro_do_banco():
-        return render_boleto_pdf(_com_tema(boleto.contexto_render(), tema),
-                                 modelo=template)
+    return emitir_boleto(bank, data, template)[0]
 
 
 def _com_tema(contexto: dict[str, Any], tema: dict[str, Any] | None
@@ -562,19 +592,23 @@ def pdf_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = N
     blocos declarativos). O nível 3 (`fatura.desenhar`, callback Python) não é
     expressável por JSON e fica fora da superfície REST.
     """
+    return emitir_fatura(bank, data, corpo)[0]
+
+
+def emitir_fatura(bank: str, data: dict[str, Any], corpo: dict[str, Any] | None = None
+                  ) -> tuple[bytes, dict[str, Any]]:
+    """PDF da fatura **e** os dados do boleto embutido, de uma montagem só."""
     # A fatura desenha o boleto MODERNO abaixo do corpo — medido: a faixa de
     # marca sai na fatura exatamente como sai no boleto moderno.
-    boleto = construir_boleto(bank, data, modelo="moderno")
+    boleto = _construido_e_validado(bank, data, modelo="moderno")
     tema = tema_do_payload(data, modelo="moderno")
-    try:
-        boleto.validar()
-    except BoletoInvalido as e:
-        raise DadosInvalidos(_erros(e)) from e
     with erro_do_banco():
-        contexto = _com_tema(boleto.contexto_render(), tema)
+        contexto = boleto.contexto_render()
+        desenho = _com_tema(contexto, tema)
         if corpo:
-            contexto = {**contexto, **corpo}
-        return render_fatura_pdf(contexto)
+            desenho = {**desenho, **corpo}
+        pdf = render_fatura_pdf(desenho)
+    return pdf, _dados_do_boleto(bank, boleto, contexto)
 
 
 def item_id(item: dict[str, Any], indice: int) -> str:
@@ -635,10 +669,12 @@ def pdf_multi(
         data = {k: v for k, v in item.items() if k not in ("bank", "banco")}
         iid = item_id(item, indice)
         try:
-            boleto = construir_boleto(bank, data, modelo=modelo_do_lote)
-            boleto.validar()
-            info = dados_boleto(bank, data)
+            # Uma construção por item. Eram três — `construir_boleto`,
+            # `validar` e o `dados_boleto`, que montava tudo de novo.
+            boleto = _construido_e_validado(bank, data, modelo=modelo_do_lote)
             tema = tema_do_payload(data, modelo=modelo_do_lote)
+            contexto = boleto.contexto_render()
+            info = _dados_do_boleto(bank, boleto, contexto)
         except (DadosInvalidos, BoletoInvalido) as e:
             erros = _erros(e)
             if not tolerante:
@@ -646,7 +682,7 @@ def pdf_multi(
             itens.append({"item_id": iid, "indice": indice, "bank": bank,
                           "status": "failed", "errors": erros})
             continue
-        contextos.append(_com_tema(boleto.contexto_render(), tema))
+        contextos.append(_com_tema(contexto, tema))
         itens.append({"item_id": iid, "indice": indice, "bank": bank,
                       "status": "completed", **info})
 

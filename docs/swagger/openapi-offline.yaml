@@ -412,6 +412,17 @@ paths:
                 type: string
               description: Linha digitável formatada.
               example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
+            X-Pix-Copia-Cola:
+              schema:
+                type: string
+              description: |
+                BR Code (EMV) do Bolepix — **só aparece quando o payload traz
+                `chave_pix`**. O corpo desta resposta é o PDF, então este é o
+                único caminho por onde o copia-e-cola sai: sem ele o QR vai
+                impresso e não há o texto para exibir ao lado, que é como paga
+                quem está no celular (não dá para escanear a própria tela).
+                ASCII por especificação do BR Code.
+              example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
           content:
             # Só PDF: `jpg`/`png`/`tif` foram descontinuados na v2 e respondem
             # 400 — declará-los aqui prometia um content-type que não existe.
@@ -1014,6 +1025,13 @@ paths:
                   nosso_numero: { type: string, example: '00000001' }
                   linha_digitavel: { type: string }
                   codigo_barras: { type: string }
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: |
+                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
+                      `null` quando não. Sem ele o QR sai no PDF e a integração
+                      não tem o texto para exibir ao lado.
                   pdf_base64: { type: string, description: PDF em base64 }
         '400':
           description: Dados do boleto inválidos
@@ -1064,8 +1082,28 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [pdf_base64, itens]
                 properties:
                   pdf_base64: { type: string, description: PDF do carnê em base64 }
+                  itens:
+                    type: array
+                    description: |
+                      Uma entrada **por parcela**, na ordem em que foram
+                      enviadas. É com `linha_digitavel` e `nosso_numero` que se
+                      registra a cobrança e se concilia o pagamento depois — o
+                      PDF sozinho não fecha a integração. `item_id` vem de
+                      `external_id`, `seu_numero` ou `numero_documento` e é o
+                      que liga a parcela impressa ao registro do cliente.
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/BoletoResponse'
+                        - type: object
+                          properties:
+                            item_id: { type: string, example: 'CTR-00' }
+                            indice: { type: integer, example: 0 }
+                            status:
+                              type: string
+                              enum: [completed]
         '400':
           description: Falha ao gerar carnê
           content:
@@ -1152,6 +1190,12 @@ paths:
                   nosso_numero: { type: string, example: '00000001' }
                   linha_digitavel: { type: string }
                   codigo_barras: { type: string }
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: |
+                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
+                      `null` quando não.
                   pdf_base64: { type: string, description: PDF (fatura + boleto) em base64 }
         '400':
           description: Dados do boleto inválidos, ou `fatura.desenhar` (nível 3) enviado via REST
@@ -1806,6 +1850,18 @@ components:
           type: string
           description: Linha digitável formatada
           example: '00190.00009 01234.567004 00000.123182 8 20410000015000'
+        pix_copia_cola:
+          type: string
+          nullable: true
+          description: |
+            BR Code (EMV) do Bolepix, montado pela engine a partir de
+            `chave_pix`. **`null` quando o payload não traz chave** — boleto sem
+            QR não tem copia-e-cola, e a API não inventa um.
+
+            É o mesmo campo que `POST /cobranca` devolve no caminho `on`
+            (C6, Inter, Sicoob). Sem ele, um Bolepix só é pagável por quem
+            consegue apontar a câmera para outra tela.
+          example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
 
     # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
     # código de barras — é para isso que ele existe. O schema prometia

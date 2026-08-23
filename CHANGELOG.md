@@ -17,6 +17,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Corrigido
+- **`pix_copia_cola` passa a vir no caminho offline.** O campo já existia em
+  `POST /cobranca` e era preenchido por C6, Inter e Sicoob; com `provider=off`
+  voltava `null` mesmo com o QR Bolepix impresso no PDF. Agora sai também em
+  `POST /api/render/boleto`, `/api/render/fatura`, `GET /api/boleto/data` e no
+  header `X-Pix-Copia-Cola` do PDF binário. `null` continua quando o payload
+  não traz `chave_pix`.
+- **`POST /api/render/carne` devolve `itens`** — uma entrada por parcela, com
+  `nosso_numero`, `linha_digitavel`, `codigo_barras` e `item_id`. Eram
+  calculados e descartados: só o PDF voltava, e quem gerava um carnê não tinha
+  como registrar nem conciliar as parcelas sem refazer a conta por fora.
 - ⚠️ **A faixa de marca do boleto passa a sair no papel.** `logo_empresa`,
   `cor_marca`, `marca_dagua`, `rodape_contato`, `parcela_atual` e
   `total_parcelas` eram aceitos e descartados: o boleto saía sem marca, com
