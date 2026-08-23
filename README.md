@@ -267,6 +267,37 @@ Exemplos **reais gerados pela API** (engine pyCobrança, Python puro), um por ba
   </sub>
 </p>
 
+### Dois modelos e a faixa de marca
+
+O `template` escolhe o desenho, e **os dois saem da mesma chamada** — só muda o
+parâmetro. A faixa de marca é opcional e existe só no `moderno`: pedi-la no
+`classico` responde `400` em vez de devolver um boleto sem marca nenhuma.
+
+<p align="center">
+  <img src="./docs/assets/boletos/modelo-moderno.png" width="32%" alt="Boleto no modelo moderno: chips de vencimento, valor e nosso número, QR do Bolepix e faixa de totalizadores preenchida" />
+  <img src="./docs/assets/boletos/modelo-classico.png" width="32%" alt="Boleto no modelo clássico, layout tradicional da ficha de compensação" />
+  <img src="./docs/assets/boletos/faixa-de-marca.png" width="32%" alt="Boleto moderno com faixa de marca: selo, nome do beneficiário, marca d'água e rodapé de contato" />
+</p>
+
+<p align="center">
+  <sub>
+    <code>template=moderno</code> (padrão) · <code>template=classico</code> ·
+    <strong>faixa de marca</strong> (<code>logo_empresa</code>, <code>cor_marca</code>,
+    <code>marca_dagua</code>, <code>rodape_contato</code>)
+  </sub>
+</p>
+
+A **faixa de totalizadores** (FEBRABAN) sai preenchida quando o valor já é
+conhecido na emissão — `desconto_abatimento`, `outras_deducoes`, `mora_multa`,
+`outros_acrescimos` — e o `(=) Valor cobrado` é somado. Sem nenhum deles a faixa
+fica em branco, que é o padrão do boleto comum: quem a preenche é o caixa, no
+ato do pagamento.
+
+> As imagens acima são geradas por
+> [`scripts/gerar-boletos-exemplo.py`](./scripts/gerar-boletos-exemplo.py), que
+> passa pelo mesmo caminho da API. Refazer é um comando —
+> `PYTHONPATH=gateway python scripts/gerar-boletos-exemplo.py`.
+
 > 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
 > [demo ao vivo](https://cobranca-api-sq67.onrender.com/api/docs) — instância de
 > demonstração no plano gratuito do Render. A URL vem do nome do serviço e **não é
@@ -317,6 +348,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 - **Lote assíncrono** — `POST /jobs/boletos` e `/jobs/cnab/remessas`: 202 + `job_id`, falha por item isolada, artefatos com `sha256` e webhook de conclusão
 - **Credenciais zero-knowledge** — token `bapi_`; o servidor não decifra sem ele
 - **Carnê 3-vias** — N parcelas em PDF A4
+- **Dois modelos de boleto** — `moderno` (padrão) e `classico`, mesma chamada; faixa de marca opcional (logo, cor, marca d'água, rodapé) e faixa de totalizadores FEBRABAN com o valor cobrado somado
 - **Swagger UI** — interativo em `/docs` (gateway) e `/api/docs` (offline)
 - **Docker ready** — imagem única, deploy em 1 minuto no Render, Railway ou qualquer cloud
 
@@ -491,11 +523,11 @@ Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/c
 | Componente | Tecnologia |
 |-----------|-----------|
 | API | Python 3.12 · FastAPI · Uvicorn |
-| Engine offline | [pyCobrança](https://github.com/Maxwbh/pyCobranca) 1.0.2 (Python puro) |
+| Engine offline | [pyCobrança](https://github.com/Maxwbh/pyCobranca) (Python puro) — boleto, CNAB, OFX e Pix EMV |
 | PDF | ReportLab (via pyCobrança) — sem GhostScript |
-| Providers online | C6 Bank · Sicoob · Banco Inter (OAuth2 + mTLS) |
-| OFX | `ofxparse` |
-| Testes | pytest · 387 testes + regressão Postman (128 requests, cobertura de endpoint verificada no build) |
+| Providers online | C6 Bank · Sicoob · Banco Inter · Itaú (OAuth2 + mTLS) |
+| OFX | pyCobrança (v1 SGML e v2 XML) — sem dependência externa |
+| Testes | pytest · 864 testes + regressão Postman (133 requests, cobertura de endpoint verificada no build) |
 | Docs | OpenAPI 3.0/3.1 · Swagger UI |
 | Container | Docker · python:3.12-slim |
 
