@@ -5,16 +5,19 @@ httpx>=0.27
 pydantic>=2.13.4
 cryptography>=42.0
 psycopg[binary]>=3.1
-# Engine offline (100% Python). A `hml` desta API e a `hml` da pyCobrança saem
-# JUNTAS, e esta versão traz mudança de contrato que o gateway já consome:
-# `boleto_de_api`/`tema_de_api`, `emite_boleto`, os cinco totalizadores
-# FEBRABAN, `Retorno.ler(bytes)` e a hierarquia de erros fechada. Apontar para
-# a 1.0.3 do PyPI deixaria a API prometendo o que a engine instalada não faz.
+# Engine offline (100% Python). A 1.1.0 traz a mudança de contrato que o
+# gateway já consome: `boleto_de_api`/`tema_de_api`, `emite_boleto`, os cinco
+# totalizadores FEBRABAN, `Retorno.ler(bytes)` e a hierarquia de erros fechada.
+# Apontar para a 1.0.3 deixaria a API prometendo o que a engine não faz.
 #
-# Fixado no COMMIT, não na branch: `@hml` seria referência móvel e mataria a
-# reprodutibilidade do build, que é a razão de não usarmos `git@main` aqui.
-# Publicada a versão, isto volta a ser `pycobranca>=1.1.0,<2` do PyPI.
-pycobranca @ git+https://github.com/Maxwbh/pyCobranca@e307595eedd853837486a24d7399c428dce88c07
+# ⚠️ A **1.1.0 não está no PyPI** — o release saiu no GitHub (tag `v1.1.0`) e a
+# publicação no índice não aconteceu; lá a última é a 1.0.3. Por isso o pin é
+# git, no COMMIT da tag e não numa branch: `@main`/`@hml` seriam referência
+# móvel e matariam a reprodutibilidade do build.
+#
+# Publicada no índice, isto vira `pycobranca>=1.1.0,<2` — uma linha, sem mais
+# nada a mudar.
+pycobranca @ git+https://github.com/Maxwbh/pyCobranca@8f6770c5e34cfa67014afaf9dae2e7aab3df27e3
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
 pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)

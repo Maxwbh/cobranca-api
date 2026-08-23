@@ -1527,7 +1527,7 @@ components:
             Versão da **engine pyCobrança** — não a da API. A versão da API
             está em `GET /api/metadata` (`api.version`), e as duas não andam
             juntas.
-          example: '1.0.3'
+          example: '1.1.0'
         engine:
           type: string
           example: pycobranca
