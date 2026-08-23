@@ -17,6 +17,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Alterado
+- ⚠️ **A faixa FEBRABAN do boleto responde `400`.** `desconto_abatimento`,
+  `outras_deducoes`, `mora_multa`, `outros_acrescimos` e `valor_cobrado` não
+  são aceitos: desconto, multa e juros dependem da **data do pagamento**, e
+  quem preenche essa faixa é o caixa, no ato. A **regra** vai em `instrucoes`
+  (texto impresso no boleto) e os **valores** vão na remessa CNAB
+  (`POST /api/remessa`) — é o arquivo que o banco processa para calcular na
+  data em que o título for pago. O erro aponta os dois caminhos.
 - ⚠️ **Campo desconhecido em `data` responde `400`.** Era descartado em
   silêncio: `numero_docmento` produzia um boleto sem número de documento, com
   `200`, e nada na resposta acusava a falta. O erro nomeia o campo e sugere o
@@ -82,12 +89,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - `fonte_ttf` responde **`400`**: nunca houve suporte, nem aqui nem na engine.
 
 ### Adicionado
-- **Faixa de totalizadores FEBRABAN**: `desconto_abatimento`,
-  `outras_deducoes`, `mora_multa`, `outros_acrescimos` e `valor_cobrado` entram
-  no `BoletoData` e **saem impressos**. O total é somado quando não informado.
-  Sem nenhum dos cinco a faixa segue em branco, que é o padrão do boleto comum
-  — quem a preenche é o caixa, no ato do pagamento. As respostas trazem
-  `totalizadores` com os cinco já formatados.
 - **Nove campos específicos de banco no `BoletoData`**: `data_documento`,
   `digito_conta`, `digito_agencia`, `digito_convenio`, `variacao`,
   `incremento`, `portfolio`, `posto` e `byte_idt`. Já eram aceitos e não

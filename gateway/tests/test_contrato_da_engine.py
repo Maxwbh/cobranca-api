@@ -21,10 +21,17 @@ from app.core import pycob
 
 SPEC = pathlib.Path(__file__).resolve().parents[2] / "docs" / "openapi.yaml"
 
-#: Campos do contrato da engine que NAO pertencem ao `data` de um boleto:
+#: Campos do contrato da engine que NAO pertencem ao `data` de um boleto.
+#:
 #: `itens` e `fatura` sao o corpo da fatura e entram na raiz de
 #: `POST /api/render/fatura`, nao dentro de `data`.
-FORA_DO_BOLETO = {"itens", "fatura"}
+#:
+#: Os cinco da faixa FEBRABAN a engine sabe desenhar, e o produto nao expoe:
+#: desconto, multa e juros dependem da DATA DO PAGAMENTO, entao quem preenche a
+#: faixa e o caixa, no ato. A regra impressa vai em `instrucoes` e os parametros
+#: vao na remessa CNAB, que e o arquivo que o banco processa. Enviar um dos
+#: cinco no boleto responde 400 — coberto por `test_schema_fechado.py`.
+FORA_DO_BOLETO = {"itens", "fatura", *TOTALIZADORES}
 
 
 def _documentados() -> set[str]:
@@ -60,9 +67,6 @@ def test_todo_campo_documentado_e_aceito_de_fato():
         f"documentados e recusados como desconhecidos por TODOS os bancos: {orfaos}")
 
 
-@pytest.mark.parametrize("campo", sorted(TOTALIZADORES))
-def test_faixa_febraban_documentada(campo):
-    assert campo in _documentados()
 
 
 @pytest.mark.parametrize("campo", sorted(CAMPOS_POR_BANCO))
@@ -80,40 +84,3 @@ def test_apelido_do_contrato_e_o_da_engine():
     from pycobranca.contracts import NOMES_DO_CONTRATO
     assert pycob.NOMES_DO_CONTRATO == dict(NOMES_DO_CONTRATO)
 
-
-def test_faixa_febraban_chega_ao_papel():
-    """Os cinco campos sao novos na engine: valem so se aparecerem impressos."""
-    import io
-
-    from pypdf import PdfReader
-    dados = {
-        "valor": 150.0, "cedente": "Empresa Teste LTDA",
-        "documento_cedente": "11222333000181", "sacado": "Joao da Silva",
-        "sacado_documento": "52998224725", "agencia": "3073",
-        "conta_corrente": "12345678", "convenio": "1234567", "carteira": "18",
-        "nosso_numero": "123", "data_vencimento": "2027-12-30",
-        "desconto_abatimento": 50.00, "mora_multa": 8.00,
-    }
-    pdf, info = pycob.emitir_boleto("banco_brasil", dados)
-    texto = "".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
-    assert "50,00" in texto and "8,00" in texto
-    # 150 - 50 + 8 = 108: o total sai somado, nao em branco
-    assert info["totalizadores"]["valor_cobrado"] == "108,00"
-    assert "108,00" in texto
-
-
-def test_sem_encargo_a_faixa_sai_em_branco():
-    """Padrao de boleto comum: quem preenche a faixa e o caixa, no pagamento.
-
-    Imprimir um total antecipado induziria o pagador a erro.
-    """
-    dados = {
-        "valor": 150.0, "cedente": "Empresa Teste LTDA",
-        "documento_cedente": "11222333000181", "sacado": "Joao da Silva",
-        "sacado_documento": "52998224725", "agencia": "3073",
-        "conta_corrente": "12345678", "convenio": "1234567", "carteira": "18",
-        "nosso_numero": "123", "data_vencimento": "2027-12-30",
-    }
-    _pdf, info = pycob.emitir_boleto("banco_brasil", dados)
-    assert set(info["totalizadores"]) == set(TOTALIZADORES)
-    assert all(v == "" for v in info["totalizadores"].values())

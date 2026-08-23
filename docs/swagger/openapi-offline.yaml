@@ -1044,8 +1044,6 @@ paths:
                 instrucoes:
                   - Apos o vencimento, multa de 2% e juros de 1% ao mes.
                   - Nao receber apos 30 dias; decorrido o prazo, protestar.
-                desconto_abatimento: 150.00
-                mora_multa: 8.00
                 chave_pix: '11222333000181'
                 logo_empresa: EXEMPLO
                 cor_marca: '1B4F8A'
@@ -1147,8 +1145,6 @@ paths:
                 sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
                 instrucoes:
                 - Parcela 1 de 3 do contrato CTR-2027-0042.
-                desconto_abatimento: 150.0
-                mora_multa: 8.0
                 chave_pix: '11222333000181'
                 external_id: CTR-2027-0042/1
               - agencia: '3073'
@@ -1166,8 +1162,6 @@ paths:
                 sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
                 instrucoes:
                 - Parcela 2 de 3 do contrato CTR-2027-0042.
-                desconto_abatimento: 150.0
-                mora_multa: 8.0
                 chave_pix: '11222333000181'
                 external_id: CTR-2027-0042/2
               - agencia: '3073'
@@ -1185,8 +1179,6 @@ paths:
                 sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
                 instrucoes:
                 - Parcela 3 de 3 do contrato CTR-2027-0042.
-                desconto_abatimento: 150.0
-                mora_multa: 8.0
                 chave_pix: '11222333000181'
                 external_id: CTR-2027-0042/3
       responses:
@@ -1315,8 +1307,6 @@ paths:
                 instrucoes:
                 - Apos o vencimento, multa de 2% e juros de 1% ao mes.
                 - Nao receber apos 30 dias; decorrido o prazo, protestar.
-                desconto_abatimento: 150.0
-                mora_multa: 8.0
                 chave_pix: '11222333000181'
                 logo_empresa: EXEMPLO
                 cor_marca: 1B4F8A
@@ -1833,32 +1823,28 @@ components:
           description: |
             Byte identificador do nosso número. Obrigatório no **Sicredi**.
           example: '2'
-        # Faixa FEBRABAN, impressa no rodapé da ficha de compensação. Em branco
+        # A faixa FEBRABAN — (-) Desconto/Abatimento, (+) Mora/Multa,
+        # (=) Valor cobrado — NÃO tem campo aqui, e é de propósito. Desconto,
+        # multa e juros dependem da DATA DO PAGAMENTO, que não se sabe na
+        # emissão: quem calcula e escreve na faixa é o caixa, no ato. Número
+        # impresso antes disso induz o pagador a erro, e está errado em qualquer
+        # data que não a suposta.
+        #
+        # Os dois lugares certos existem:
+        #   - a REGRA vai em `instrucoes`, impressa no boleto ("após o
+        #     vencimento, multa de 2% e juros de 1% ao mês") — texto, não valor;
+        #   - os PARÂMETROS vão na remessa CNAB (POST /api/remessa), no
+        #     `Pagamento`: codigo_multa/percentual_multa/data_multa, tipo_mora +
+        #     valor_mora ou percentual_mora/data_mora, cod_desconto/
+        #     valor_desconto/data_desconto e valor_abatimento. É o arquivo que o
+        #     banco processa, e é dele que ele aprende a calcular na data em que
+        #     o título for pago.
+        #
+        # Enviar um dos cinco aqui responde 400 apontando os dois caminhos.
         # por padrão, e de propósito: no boleto comum quem preenche essa faixa é
         # o caixa, no ato do pagamento. Informe quando o valor já é conhecido na
         # emissão — desconto por pontualidade, abatimento negociado, ou boleto
         # reemitido com a mora já apurada.
-        desconto_abatimento:
-          type: number
-          description: '`(-) Desconto / Abatimento` — deduz do valor cobrado.'
-          example: 50.00
-        outras_deducoes:
-          type: number
-          description: '`(-) Outras deduções` — deduz do valor cobrado.'
-        mora_multa:
-          type: number
-          description: '`(+) Mora / Multa` — acresce ao valor cobrado.'
-          example: 8.00
-        outros_acrescimos:
-          type: number
-          description: '`(+) Outros acréscimos` — acresce ao valor cobrado.'
-        valor_cobrado:
-          type: number
-          description: |
-            `(=) Valor cobrado`. Omitido, é somado a partir dos quatro campos
-            acima e do `valor`; informado, sobrepõe o cálculo. Sem nenhum dos
-            cinco, a faixa inteira sai **em branco** — e não zerada.
-          example: 108.00
         data_vencimento:
           type: string
           description: Data de vencimento (YYYY/MM/DD)
@@ -2074,22 +2060,6 @@ components:
             (C6, Inter, Sicoob). Sem ele, um Bolepix só é pagável por quem
             consegue apontar a câmera para outra tela.
           example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
-        totalizadores:
-          type: object
-          description: |
-            A faixa FEBRABAN **como foi impressa**, já formatada em reais. Os
-            cinco campos vêm sempre; string vazia é campo em branco no papel,
-            que é o padrão do boleto comum. `valor_cobrado` traz a soma quando
-            o emissor informou algum dos outros e não o total.
-          additionalProperties:
-            type: string
-          example:
-            desconto_abatimento: '50,00'
-            outras_deducoes: ''
-            mora_multa: '8,00'
-            outros_acrescimos: ''
-            valor_cobrado: '108,00'
-
     # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
     # código de barras — é para isso que ele existe. O schema prometia
     # exatamente `codigo_barras` e `linha_digitavel`, que a rota não devolve, e

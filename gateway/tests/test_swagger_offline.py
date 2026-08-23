@@ -32,7 +32,6 @@ DADOS = {
     "conta_corrente": "12345678", "convenio": "1234567", "carteira": "18",
     "nosso_numero": "1042", "numero_documento": "NF-2027-0042",
     "data_vencimento": "2027-09-10", "chave_pix": "11222333000181",
-    "desconto_abatimento": 150.00, "mora_multa": 8.00,
     "logo_empresa": "EXEMPLO", "cor_marca": "1B4F8A",
 }
 SEM_TEMA = {k: v for k, v in DADOS.items() if k not in ("logo_empresa", "cor_marca")}

@@ -342,6 +342,27 @@ _CAMPO_SEM_SUPORTE = {
                  " não há como injetar TTF pelo payload",
 }
 
+#: A faixa FEBRABAN — `(-) Desconto/Abatimento`, `(+) Mora/Multa`,
+#: `(=) Valor cobrado` — **não é preenchida por quem emite**. Desconto, multa e
+#: juros dependem da DATA DO PAGAMENTO, que não se sabe na emissão: quem calcula
+#: e escreve ali é o caixa, no ato. Imprimir um número antecipado induz o pagador
+#: a erro, e ele estará errado em qualquer data que não a suposta.
+#:
+#: A engine sabe desenhar a faixa; é o produto que não expõe. Os dois lugares
+#: certos existem e são outros:
+#:
+#: - a **regra** vai em `instrucoes`, impressa no boleto ("após o vencimento,
+#:   multa de 2% e juros de 1% ao mês") — texto, não valor;
+#: - os **parâmetros** vão na remessa CNAB (`POST /api/remessa`), em
+#:   `codigo_multa`/`percentual_multa`/`data_multa`, `tipo_mora`/`valor_mora`
+#:   ou `percentual_mora`/`data_mora`, `cod_desconto`/`valor_desconto`/
+#:   `data_desconto` e `valor_abatimento`. É o arquivo que o banco processa, e
+#:   é lá que ele aprende a calcular na data em que o título for pago.
+_TOTALIZADORES_DO_CAIXA = (
+    "desconto_abatimento", "outras_deducoes", "mora_multa",
+    "outros_acrescimos", "valor_cobrado",
+)
+
 #: Campos que o gateway consome mas o construtor do banco não conhece: as
 #: instruções numeradas e a faixa de marca são traduzidas aqui antes de chegar
 #: à engine, e `tipo_chave_pix` é aceito-e-ignorado por decisão documentada (a
@@ -561,6 +582,18 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
     if sem_suporte:
         raise DadosInvalidos([f"`{c}` não tem efeito — {_CAMPO_SEM_SUPORTE[c]}"
                               for c in sem_suporte])
+    do_caixa = [c for c in _TOTALIZADORES_DO_CAIXA if data.get(c) is not None]
+    if do_caixa:
+        raise DadosInvalidos([
+            f"{', '.join(f'`{c}`' for c in do_caixa)}: desconto, multa e juros"
+            " dependem da DATA DO PAGAMENTO e não são impressos no boleto — a"
+            " faixa sai em branco para o caixa preencher no ato. A regra vai em"
+            " `instrucoes` (texto impresso: 'após o vencimento, multa de 2% e"
+            " juros de 1% ao mês'); os valores vão na remessa CNAB"
+            " (`POST /api/remessa`), em codigo_multa/percentual_multa/data_multa,"
+            " tipo_mora + valor_mora ou percentual_mora/data_mora,"
+            " cod_desconto/valor_desconto/data_desconto e valor_abatimento — é o"
+            " arquivo que o banco processa para calcular na data do pagamento"])
 
     instrucoes = _instrucoes_do_payload(data)
     for numerada in _INSTRUCOES_NUMERADAS:
@@ -651,7 +684,6 @@ def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
             "codigo_barras": contexto.get("codigo_barras") or boleto.codigo_barras,
             "linha_digitavel": contexto.get("linha_digitavel") or boleto.linha_digitavel,
             "pix_copia_cola": pix.get("copia_cola") if pix.get("habilitado") else None,
-            "totalizadores": contexto.get("totalizadores") or {},
         }
 
 
@@ -690,7 +722,6 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
         "codigo_barras": emitido.codigo_barras,
         "linha_digitavel": emitido.linha_digitavel,
         "pix_copia_cola": emitido.pix_copia_cola,
-        "totalizadores": dict(emitido.totalizadores),
     }
 
 

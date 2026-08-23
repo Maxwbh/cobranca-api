@@ -71,7 +71,9 @@ CONTAS = {
 
 FAIXA = {"logo_empresa": "EXEMPLO", "cor_marca": "1B4F8A",
          "rodape_contato": "financeiro@exemplo.com.br  -  (31) 3333-0000"}
-ENCARGOS = {"desconto_abatimento": 150.00, "mora_multa": 8.00}
+#: Desconto, multa e juros NAO vao no boleto — dependem da data do pagamento e
+#: a faixa FEBRABAN e' preenchida pelo caixa. A regra vai impressa, como texto,
+#: nas `instrucoes` acima; os valores vao na remessa CNAB.
 BOLEPIX = {"chave_pix": "11222333000181", "txid": "PEDIDO000000000042"}
 
 
@@ -125,12 +127,12 @@ def main() -> int:
     # galeria por banco não mostra, porque todos saem no padrão.
     for modelo in ("moderno", "classico"):
         pdf, _ = pycob.emitir_boleto(
-            "banco_brasil", _dados("banco_brasil", **ENCARGOS, **BOLEPIX), modelo)
+            "banco_brasil", _dados("banco_brasil", **BOLEPIX), modelo)
         _png(f"modelo-{modelo}", pdf)
 
     # Faixa de marca: só no `moderno`, e é o que o `classico` não tem.
     pdf, _ = pycob.emitir_boleto(
-        "banco_brasil", _dados("banco_brasil", **FAIXA, **ENCARGOS, **BOLEPIX))
+        "banco_brasil", _dados("banco_brasil", **FAIXA, **BOLEPIX))
     _png("faixa-de-marca", pdf)
 
     _comparativo()

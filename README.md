@@ -287,11 +287,12 @@ parâmetro. A faixa de marca é opcional e existe só no `moderno`: pedi-la no
   </sub>
 </p>
 
-A **faixa de totalizadores** (FEBRABAN) sai preenchida quando o valor já é
-conhecido na emissão — `desconto_abatimento`, `outras_deducoes`, `mora_multa`,
-`outros_acrescimos` — e o `(=) Valor cobrado` é somado. Sem nenhum deles a faixa
-fica em branco, que é o padrão do boleto comum: quem a preenche é o caixa, no
-ato do pagamento.
+A **faixa de totalizadores** (FEBRABAN) sai sempre em branco, e é assim que
+tem de ser: desconto, multa e juros dependem da **data do pagamento**, então
+quem preenche ali é o caixa, no ato. A regra vai impressa nas `instrucoes`
+("após o vencimento, multa de 2% e juros de 1% ao mês") e os valores vão na
+**remessa CNAB** — é o arquivo que o banco processa para calcular na data em
+que o título for pago.
 
 > As imagens acima são geradas por
 > [`scripts/gerar-boletos-exemplo.py`](./scripts/gerar-boletos-exemplo.py), que

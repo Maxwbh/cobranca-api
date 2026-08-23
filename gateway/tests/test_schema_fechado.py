@@ -78,6 +78,68 @@ def test_as_duas_grafias_com_valores_diferentes_sao_recusadas():
     assert "mesmo campo" in exc.value.erros[0]
 
 
+@pytest.mark.parametrize("campo", ["desconto_abatimento", "outras_deducoes",
+                                   "mora_multa", "outros_acrescimos", "valor_cobrado"])
+def test_faixa_do_caixa_nao_vai_para_o_boleto(campo):
+    """Desconto, multa e juros dependem da DATA DO PAGAMENTO.
+
+    A faixa FEBRABAN do boleto e' preenchida pelo CAIXA, no ato: o valor nao se
+    sabe na emissao, e numero impresso antes disso induz o pagador a erro — vai
+    estar errado em qualquer data que nao a suposta. A engine sabe desenhar a
+    faixa; o produto e' que nao expoe.
+    """
+    with pytest.raises(pycob.DadosInvalidos) as exc:
+        pycob.dados_boleto(BANCO, {**BASE, campo: 8.00})
+    msg = "; ".join(exc.value.erros)
+    assert "DATA DO PAGAMENTO" in msg
+    assert "instrucoes" in msg and "/api/remessa" in msg, "o erro tem de dizer para onde ir"
+
+
+def test_zero_tambem_e_recusado():
+    """`0` e valor informado, nao ausencia — e imprimiria `0,00` na faixa."""
+    with pytest.raises(pycob.DadosInvalidos):
+        pycob.dados_boleto(BANCO, {**BASE, "mora_multa": 0})
+
+
+def test_a_regra_impressa_continua_valendo():
+    """O lugar certo do desconto/multa no PAPEL e' o texto da instrucao."""
+    import io
+
+    from pypdf import PdfReader
+    pdf = pycob.pdf_boleto(BANCO, {**BASE, "instrucoes": [
+        "Apos o vencimento, multa de 2% e juros de 1% ao mes.",
+        "Desconto de R$ 150,00 ate 5 dias antes do vencimento."]})
+    texto = "".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+    assert "multa de 2%" in texto and "Desconto de R$ 150,00" in texto
+
+
+def test_os_encargos_continuam_indo_no_cnab():
+    """O CNAB e' arquivo de processamento do banco: ele PRECISA dos valores.
+
+    E' de la que o banco aprende a calcular na data em que o titulo for pago —
+    o que o boleto impresso nao tem como saber.
+    """
+    dados = {
+        "empresa_mae": "Empresa Teste LTDA", "documento_cedente": "11222333000181",
+        "agencia": "3073", "conta_corrente": "12345678", "convenio": "1234567",
+        "carteira": "18", "sequencial_remessa": 1,
+        "pagamentos": [{
+            "nosso_numero": "123456789", "numero_documento": "NF-1",
+            "data_vencimento": "2027-12-31", "valor": 1279.50,
+            "sacado": "Joao", "sacado_documento": "52998224725",
+            "sacado_endereco": "Rua Teste, 100", "sacado_bairro": "Centro",
+            "sacado_cidade": "Sao Paulo", "sacado_uf": "SP", "sacado_cep": "01000000",
+            "codigo_multa": "2", "percentual_multa": 2.00, "data_multa": "2028-01-01",
+            "tipo_mora": "2", "percentual_mora": 1.00, "data_mora": "2028-01-01",
+            "cod_desconto": "1", "valor_desconto": 150.00, "data_desconto": "2027-12-26",
+        }],
+    }
+    cnab = pycob.gerar_remessa(BANCO, "cnab240", dados)
+    linhas = cnab.splitlines()
+    # segmento R: e' onde multa, desconto e mora viajam no CNAB 240
+    assert [l for l in linhas if len(l) > 13 and l[13] == "R"], "segmento R ausente"
+
+
 def test_campo_deprecado_vazio_continua_sendo_ausencia():
     """`emv: ""` e ausencia, nao intencao -- e o campo esta documentado."""
     pycob.dados_boleto(BANCO, {**BASE, "emv": ""})
