@@ -16,7 +16,31 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Alterado
+- ⚠️ **Campo desconhecido em `data` responde `400`.** Era descartado em
+  silêncio: `numero_docmento` produzia um boleto sem número de documento, com
+  `200`, e nada na resposta acusava a falta. O erro nomeia o campo e sugere o
+  parecido. `account_config` continua sendo blob por provider — lá o que não se
+  aplica ao banco é ignorado, como sempre foi. `BOLETO_ACEITA_CAMPO_DESCONHECIDO=1`
+  devolve o comportamento antigo; sai na 3.0.0.
+- ⚠️ **A mesma conta escrita nas duas grafias responde `400`.**
+  `conta_corrente` e `conta` são o mesmo campo: com valores diferentes, a ordem
+  do dicionário decidia qual ia para o boleto.
+- ⚠️ **Engine `pyCobrança` atualizada — o boleto `moderno` tem desenho novo.**
+  Chips de Vencimento/Valor/Nosso Número com mais contraste, faixa de marca,
+  grade alinhada e linha de corte contínua. Junto vêm correções de layout que
+  produziam PDF válido em bytes e errado no papel: texto longo saindo da
+  página, primeiro dígito da linha digitável cortado no `classico`, nome do
+  banco por cima do código-DV e encargo por cima do rótulo.
+- Retorno CNAB é lido direto dos bytes do upload: o arquivo do banco — que traz
+  nome, documento e valor de cada pagador — não passa mais por arquivo
+  temporário em disco.
+
 ### Corrigido
+- ⚠️ **O endereço do pagador chega inteiro ao boleto.** Bairro, cidade, UF e
+  CEP eram enviados como campos próprios que o título **não tem**: o construtor
+  descartava os quatro, um a um, em silêncio. O boleto saía com rua e número e
+  mais nada. Agora vão na linha de endereço, como um boleto de verdade imprime.
 - **`pix_copia_cola` passa a vir no caminho offline.** O campo já existia em
   `POST /cobranca` e era preenchido por C6, Inter e Sicoob; com `provider=off`
   voltava `null` mesmo com o QR Bolepix impresso no PDF. Agora sai também em
@@ -44,6 +68,12 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - `fonte_ttf` responde **`400`**: nunca houve suporte, nem aqui nem na engine.
 
 ### Adicionado
+- **Faixa de totalizadores FEBRABAN**: `desconto_abatimento`,
+  `outras_deducoes`, `mora_multa`, `outros_acrescimos` e `valor_cobrado` entram
+  no `BoletoData` e **saem impressos**. O total é somado quando não informado.
+  Sem nenhum dos cinco a faixa segue em branco, que é o padrão do boleto comum
+  — quem a preenche é o caixa, no ato do pagamento. As respostas trazem
+  `totalizadores` com os cinco já formatados.
 - **Nove campos específicos de banco no `BoletoData`**: `data_documento`,
   `digito_conta`, `digito_agencia`, `digito_convenio`, `variacao`,
   `incremento`, `portfolio`, `posto` e `byte_idt`. Já eram aceitos e não

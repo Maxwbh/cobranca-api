@@ -7,19 +7,22 @@ from __future__ import annotations
 
 import io
 import inspect
+import os
 import re
-import tempfile
 from contextlib import contextmanager
 from datetime import date
+from difflib import get_close_matches
 from functools import lru_cache
 from typing import Any
 
 from pycobranca import __version__ as PYCOBRANCA_VERSION
 from pycobranca.bancos import Bancos
-from pycobranca.contracts import SLUG_POR_CODIGO
+from pycobranca.contracts import (NOMES_DO_CONTRATO, SLUG_POR_CODIGO,
+                                  TEMA_DO_CONTRATO, tema_de_api)
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
                                    OFXInvalido, PyCobrancaError, RetornoInvalido)
-from pycobranca.render import render_boleto_pdf, render_carne_pdf, render_fatura_pdf
+from pycobranca.render import (emite_boleto, render_boleto_pdf, render_carne_pdf,
+                               render_fatura_pdf)
 from pycobranca.render.marcas import logo_do_banco
 from pycobranca.render.modelos import MODELOS_BOLETO
 from pycobranca import cnab as _cnab
@@ -95,13 +98,16 @@ def _para_date(valor: Any) -> Any:
     return valor
 
 
-# Contrato REST -> kwargs do BancoBase (o inverso de contracts.boleto_para_api)
-_MAPA_CAMPOS = {
-    "conta_corrente": "conta",
-    "documento_cedente": "cedente_documento",
-    "chave_pix": "pix_chave",
-    "txid": "pix_txid",
-}
+# Contrato REST -> kwargs do BancoBase (o inverso de contracts.boleto_para_api).
+#
+# Vem da engine: são os quatro nomes que divergem entre o payload e o domínio,
+# e `documento_cedente`/`cedente_documento` inverte as palavras — exatamente o
+# tipo de detalhe em que duas cópias escritas à mão acabam discordando. Se a
+# engine acrescentar um par, ele passa a valer aqui sem ninguém lembrar.
+_MAPA_CAMPOS = dict(NOMES_DO_CONTRATO)
+
+#: Nome público do mapa acima, para quem monta payload para a engine.
+NOMES_DO_CONTRATO = _MAPA_CAMPOS
 _CAMPOS_DATA = {"data_vencimento", "data_documento", "data_processamento"}
 # A engine desenha estes campos linha a linha e espera uma LISTA. Recebendo
 # string ela itera os caracteres: o boleto sai com "A", "p", "o", "s"... um por
@@ -326,6 +332,94 @@ _CAMPO_SEM_SUPORTE = {
                  " não há como injetar TTF pelo payload",
 }
 
+#: Campos que o gateway consome mas o construtor do banco não conhece: as
+#: instruções numeradas e a faixa de marca são traduzidas aqui antes de chegar
+#: à engine, e `tipo_chave_pix` é aceito-e-ignorado por decisão documentada (a
+#: engine deduz o tipo do valor da chave).
+#:
+#: `external_id` e `seu_numero` identificam o ITEM dentro de um lote (é de onde
+#: sai o `item_id` que acusa parcela duplicada) — não são campos do título, mas
+#: são nomes do contrato e chegam no mesmo objeto.
+#:
+#: `emv`, `pix_label` e `fonte_ttf` entram aqui para que **vazio continue sendo
+#: ausência**: preenchidos, param antes com a mensagem que explica por que não
+#: funcionam; em branco, são como se não tivessem sido enviados.
+_CAMPOS_DO_GATEWAY = frozenset(
+    {f"instrucao{n}" for n in range(1, 7)}
+    | set(TEMA_DO_CONTRATO) | {"parcela_atual", "total_parcelas"}
+    | {"tipo_chave_pix", "external_id", "seu_numero"}
+    | {"emv", "pix_label", "fonte_ttf"}
+)
+
+#: Volta ao descarte silencioso de campo desconhecido. Existe para quem
+#: descobrir em produção que mandava um campo a mais e precisar de uma noite
+#: para arrumar a integração — não para ficar ligado. Sai na 3.0.0.
+FLAG_CAMPO_DESCONHECIDO = "BOLETO_ACEITA_CAMPO_DESCONHECIDO"
+
+
+def _campos_aceitos(klass) -> set[str]:
+    """Tudo que este banco entende, nos dois vocabulários.
+
+    O construtor fala o nome do domínio (`conta`, `cedente_documento`); o
+    contrato REST fala o do payload (`conta_corrente`, `documento_cedente`).
+    Os dois valem na entrada — recusar o nome nativo quebraria quem já o usa.
+    """
+    construtor = set(inspect.signature(klass.__init__).parameters) - {"self"}
+    return construtor | set(_MAPA_CAMPOS) | set(_CAMPOS_DO_GATEWAY)
+
+
+def campos_aceitos(bank: str) -> set[str]:
+    """Campos que o `data` deste banco aceita. Recusa banco desconhecido."""
+    return _campos_aceitos(_classe_banco(bank))
+
+
+def _recusar_desconhecidos(klass, data: dict[str, Any]) -> None:
+    """Campo fora do contrato é erro, não sobra.
+
+    O descarte silencioso era o mecanismo por trás de quase toda a família de
+    defeitos deste módulo: o campo entrava no payload, não era nome de nada, e
+    sumia — com `200` e um boleto que não tem o que o chamador achou que tinha.
+    `numero_docmento` produzia um título sem número de documento, e nada no
+    corpo da resposta dizia que faltava.
+
+    A engine fechou a mesma fronteira em `contracts.boleto_de_api`. Aqui a
+    recusa vem com sugestão: quase todo caso é erro de digitação, e apontar o
+    campo certo resolve mais rápido que listar os 40 aceitos.
+    """
+    if os.environ.get(FLAG_CAMPO_DESCONHECIDO, "").strip().lower() in ("1", "true"):
+        return
+    aceitos = _campos_aceitos(klass)
+    estranhos = sorted(c for c in data if c not in aceitos)
+    if not estranhos:
+        return
+    erros = []
+    for campo in estranhos:
+        perto = get_close_matches(campo, aceitos, n=2, cutoff=0.75)
+        dica = f" — você quis dizer {' ou '.join(repr(p) for p in perto)}?" if perto else ""
+        erros.append(f"campo desconhecido em `data`: {campo!r}{dica}")
+    erros.append(f"Campo aceito por {klass.nome} ({klass.codigo}) é um destes: "
+                 + ", ".join(sorted(aceitos)))
+    raise DadosInvalidos(erros)
+
+
+def _recusar_apelido_em_conflito(data: dict[str, Any]) -> None:
+    """O mesmo campo escrito nos dois vocabulários, com valores diferentes.
+
+    `conta_corrente` e `conta` são o MESMO campo; mandar os dois deixava a
+    ordem do dicionário decidir qual sobrevive. Um dos dois valores ia para o
+    boleto e o outro sumia, sem erro — e nos dois casos é o número da conta
+    que se está errando.
+    """
+    erros = []
+    for contrato, nativo in _MAPA_CAMPOS.items():
+        a, b = data.get(contrato), data.get(nativo)
+        if a not in (None, "") and b not in (None, "") and str(a) != str(b):
+            erros.append(f"`{contrato}` ({a!r}) e `{nativo}` ({b!r}) são o mesmo campo"
+                         f" com valores diferentes — envie só `{contrato}`")
+    if erros:
+        raise DadosInvalidos(erros)
+
+
 #: Instruções numeradas do contrato REST -> a lista que a engine desenha.
 #:
 #: `instrucao1`..`instrucao6` estavam na doc, e NENHUMA chegava ao boleto: não
@@ -353,16 +447,6 @@ def _instrucoes_do_payload(data: dict[str, Any]) -> Any:
     return data.get("instrucoes")
 
 
-#: `campo do contrato REST` -> `chave do bloco tema` do contexto de render. Os
-#: mesmos quatro pares que a pyCobrança expõe em `contracts.TEMA_DO_CONTRATO`;
-#: quando a versão instalada trouxer a constante, ela substitui esta cópia.
-_TEMA_DO_CONTRATO = {
-    "cor_marca": "cor",
-    "logo_empresa": "logo_texto",
-    "marca_dagua": "marca_dagua",
-    "rodape_contato": "rodape",
-}
-
 #: Modelos que desenham a faixa de marca. Medido: `classico` e o carnê ignoram o
 #: bloco `tema` por completo; a fatura desenha porque monta o boleto moderno.
 MODELOS_COM_TEMA = ("moderno",)
@@ -377,11 +461,12 @@ def tema_do_payload(data: dict[str, Any], *, modelo: str | None = None
     banco, e o gateway nunca montava o bloco que o renderizador de fato lê. O
     boleto saía idêntico ao de um payload sem tema nenhum, com `200`.
 
-    O renderizador usa outro vocabulário (`cor_marca` × `cor`, `rodape_contato`
-    × `rodape`…), que é o que `_TEMA_DO_CONTRATO` traduz. `empresa` não tem
-    campo próprio no contrato: herda de `logo_empresa`.
+    A tradução de vocabulário (`cor_marca` × `cor`, `rodape_contato` × `rodape`,
+    `parcela_atual`/`total_parcelas` × `parcela_texto`) é da engine —
+    `contracts.tema_de_api`. Aqui fica só o que é da fronteira HTTP: normalizar
+    a cor e recusar o que não teria efeito.
     """
-    pedidos = {c for c in (*_TEMA_DO_CONTRATO, "parcela_atual", "total_parcelas")
+    pedidos = {c for c in (*TEMA_DO_CONTRATO, "parcela_atual", "total_parcelas")
                if data.get(c) not in (None, "")}
     if not pedidos:
         return None
@@ -391,19 +476,16 @@ def tema_do_payload(data: dict[str, Any], *, modelo: str | None = None
              f" {', '.join(f'`{c}`' for c in sorted(pedidos))} não teria efeito."
              f" Use um destes: {', '.join(MODELOS_COM_TEMA)}"])
 
-    tema: dict[str, Any] = {}
-    for origem, destino in _TEMA_DO_CONTRATO.items():
-        valor = data.get(origem)
-        if valor in (None, ""):
-            continue
-        tema[destino] = _cor_tema(valor) if origem == "cor_marca" else str(valor)
-    if "logo_texto" in tema:
-        tema["logo_texto"] = _logo_texto(tema["logo_texto"])
-        tema.setdefault("empresa", tema["logo_texto"])
-    atual, total = data.get("parcela_atual"), data.get("total_parcelas")
-    if atual and total:
-        tema["parcela_texto"] = f"Parcela {atual}/{total}"
-    return {"habilitado": True, **tema} if tema else None
+    # A engine recebe os campos já saneados: `cor_marca` sem `#` é a forma que
+    # a doc mandava usar e a que faz o reportlab levantar lá no fundo do render,
+    # e `logo_empresa` é o TEXTO da marca — caminho de arquivo sairia impresso
+    # na faixa.
+    saneado = dict(data)
+    if data.get("cor_marca") not in (None, ""):
+        saneado["cor_marca"] = _cor_tema(data["cor_marca"])
+    if data.get("logo_empresa") not in (None, ""):
+        saneado["logo_empresa"] = _logo_texto(str(data["logo_empresa"]))
+    return tema_de_api(saneado)
 
 
 def _cor_tema(valor: Any) -> str:
@@ -463,8 +545,10 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
         data["instrucoes"] = instrucoes
 
     klass = _classe_banco(bank)
+    _recusar_desconhecidos(klass, data)
+    _recusar_apelido_em_conflito(data)
     aceitos = set(inspect.signature(klass.__init__).parameters) - {"self"}
-    tem_pix = bool(data.get("chave_pix"))
+    tem_pix = bool(data.get("chave_pix") or data.get("pix_chave"))
     kwargs: dict[str, Any] = {}
     for chave, valor in data.items():
         destino = _MAPA_CAMPOS.get(chave, chave)
@@ -509,6 +593,18 @@ def _construido_e_validado(bank: str, data: dict[str, Any],
     return boleto
 
 
+def _nosso_numero_impresso(boleto) -> tuple[str, str]:
+    """(formatado, dígito) — o dígito vem vazio nos bancos que já o embutem."""
+    formatado = boleto.nosso_numero_formatado()
+    dv = getattr(boleto, "nosso_numero_dv", None)
+    if callable(dv):
+        dv = dv()
+    if dv is None:
+        m = re.search(r"-(\w+)$", formatado)
+        dv = m.group(1) if m else ""
+    return formatado, str(dv)
+
+
 def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
                      ) -> dict[str, Any]:
     """Campos CALCULADOS do título, a partir de um boleto já montado.
@@ -521,22 +617,17 @@ def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
     """
     with erro_do_banco():
         contexto = contexto if contexto is not None else boleto.contexto_render()
-        formatado = boleto.nosso_numero_formatado()
-        dv = getattr(boleto, "nosso_numero_dv", None)
-        if callable(dv):
-            dv = dv()
-        if dv is None:
-            m = re.search(r"-(\w+)$", formatado)
-            dv = m.group(1) if m else ""
+        formatado, dv = _nosso_numero_impresso(boleto)
         pix = contexto.get("pix") or {}
         return {
             "bank": bank,
             "nosso_numero": str(boleto.nosso_numero),
             "nosso_numero_formatado": formatado,
-            "nosso_numero_dv": str(dv),
+            "nosso_numero_dv": dv,
             "codigo_barras": contexto.get("codigo_barras") or boleto.codigo_barras,
             "linha_digitavel": contexto.get("linha_digitavel") or boleto.linha_digitavel,
             "pix_copia_cola": pix.get("copia_cola") if pix.get("habilitado") else None,
+            "totalizadores": contexto.get("totalizadores") or {},
         }
 
 
@@ -554,8 +645,10 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
     bastam, e, pior, dois objetos diferentes servindo de fonte para o papel e
     para o JSON. Nada garantia que descreviam o mesmo boleto.
 
-    É a forma que a pyCobrança passou a oferecer como `render.emite_boleto`;
-    quando a versão instalada trouxer, esta função vira uma casca em cima dela.
+    Quem monta é a engine, por `render.emite_boleto`: ela desenha e lê os
+    números do MESMO contexto, então não há como o papel e o JSON discordarem.
+    Aqui fica o que é da fronteira HTTP — o nome do banco, o nosso número
+    impresso e o dígito, que a engine não devolve.
     """
     if template not in MODELOS_BOLETO:
         raise DadosInvalidos([f"template '{template}' inválido"
@@ -563,9 +656,18 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
     boleto = _construido_e_validado(bank, data, modelo=template)
     tema = tema_do_payload(data, modelo=template)
     with erro_do_banco():
-        contexto = boleto.contexto_render()
-        pdf = render_boleto_pdf(_com_tema(contexto, tema), modelo=template)
-    return pdf, _dados_do_boleto(bank, boleto, contexto)
+        emitido = emite_boleto(boleto, modelo=template, tema=tema)
+        formatado, dv = _nosso_numero_impresso(boleto)
+    return emitido.pdf, {
+        "bank": bank,
+        "nosso_numero": str(boleto.nosso_numero),
+        "nosso_numero_formatado": formatado,
+        "nosso_numero_dv": dv,
+        "codigo_barras": emitido.codigo_barras,
+        "linha_digitavel": emitido.linha_digitavel,
+        "pix_copia_cola": emitido.pix_copia_cola,
+        "totalizadores": dict(emitido.totalizadores),
+    }
 
 
 def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> bytes:
@@ -849,15 +951,19 @@ def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = 
 
 
 def parse_retorno(conteudo: bytes, layout_hint: str | None = None) -> list[dict[str, Any]]:
-    with tempfile.NamedTemporaryFile(suffix=".ret", delete=True) as f:
-        f.write(conteudo)
-        f.flush()
-        try:
-            retorno = Retorno.ler(f.name)
-        except RetornoInvalido as e:
-            raise DadosInvalidos([f"Arquivo de retorno inválido: {e}"]) from e
-        except (PyCobrancaError, ValueError) as e:
-            raise DadosInvalidos(_erros(e)) from e
+    """Lê o retorno CNAB direto dos bytes do upload.
+
+    Escrevia num `NamedTemporaryFile` porque `Retorno.ler` só aceitava caminho.
+    A engine passou a aceitar `bytes` — como `Extrato.ler` já fazia —, então o
+    arquivo do banco deixa de tocar o disco: um retorno traz nome, documento e
+    valor de cada pagador, e o melhor lugar para esse dado é nenhum.
+    """
+    try:
+        retorno = Retorno.ler(conteudo)
+    except RetornoInvalido as e:
+        raise DadosInvalidos([f"Arquivo de retorno inválido: {e}"]) from e
+    except (PyCobrancaError, ValueError) as e:
+        raise DadosInvalidos(_erros(e)) from e
     layout = getattr(retorno, "layout", None) or layout_hint or "400"
     layout = str(layout).replace("cnab", "")
     return [retorno_item_para_api(r, layout=layout) for r in retorno.registros]

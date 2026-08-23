@@ -54,6 +54,17 @@ class PyCobrancaProvider(BankProvider):
 
 
 def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any]) -> dict[str, Any]:
+    """Monta o `data` da engine a partir da cobrança e do `account_config`.
+
+    O `account_config` é **blob por provider**, por decisão de projeto: um
+    tenant pode guardar no mesmo lugar as chaves do caminho online (do Sicoob,
+    por exemplo: `cooperativa`, `numeroCliente`) e as do offline. Só o que se
+    aplica a ESTE banco é repassado — o resto não é erro de quem chama, é o
+    blob sendo blob, e recusar culparia o chamador por uma montagem nossa.
+
+    Já o `data` que o cliente declara em `/api/*` é contrato fechado: lá campo
+    desconhecido é recusado, em `construir_boleto`.
+    """
     pagador = cobranca.pagador
     dados: dict[str, Any] = {
         "valor": float(cobranca.valor),
@@ -62,32 +73,62 @@ def _to_engine_payload(cobranca: Cobranca, account_config: dict[str, Any]) -> di
         "numero_documento": cobranca.seu_numero,
         "sacado": pagador.nome,
         "sacado_documento": pagador.documento,
-        **{k: v for k, v in account_config.items() if k != "bank"},
+        "sacado_endereco": _endereco_do_sacado(pagador.endereco or {}),
+        **_do_account_config(account_config),
     }
-    dados.update(_endereco_do_sacado(pagador.endereco or {}))
     return {k: v for k, v in dados.items() if v not in (None, "")}
 
 
-def _endereco_do_sacado(end: dict[str, Any]) -> dict[str, Any]:
-    """Endereço do pagador para o motor offline.
+def _do_account_config(account_config: dict[str, Any]) -> dict[str, Any]:
+    """As chaves do blob que este banco entende.
+
+    O mesmo blob costuma carregar OS DOIS lados — o que a API do banco precisa
+    para registrar e o que a engine precisa para desenhar —, e os dois usam
+    `conta` com significados diferentes: no C6 é a conta do REST, na engine é o
+    que o contrato chama de `conta_corrente`. Quando as duas grafias aparecem,
+    vale a do **contrato**: é a que foi escrita para a engine.
+    """
+    bank = account_config.get("bank", "")
+    try:
+        aceitos = pycob.campos_aceitos(bank)
+    except pycob.DadosInvalidos:
+        aceitos = None
+    dados = {k: v for k, v in account_config.items()
+             if k != "bank" and (aceitos is None or k in aceitos)}
+    for contrato, nativo in pycob.NOMES_DO_CONTRATO.items():
+        if contrato in dados:
+            dados.pop(nativo, None)
+    return dados
+
+
+def _endereco_do_sacado(end: dict[str, Any]) -> str | None:
+    """Endereço do pagador numa linha — que é o que o boleto tem.
 
     Aqui NÃO se converte o número para inteiro, ao contrário do C6: o
-    `endereco_sacado` da engine é uma linha de texto livre ("Rua Teste, 100"),
-    então "126A" e "S/N" entram como estão. A conversão é exigência do
-    /v1/bank_slips e mora no provider que a sofre.
+    `sacado_endereco` da engine é texto livre, então "126A" e "S/N" entram como
+    estão. A conversão é exigência do /v1/bank_slips e mora no provider que a
+    sofre.
 
-    O que existia era pior que a falta de conversão: só o logradouro seguia, e
-    número, bairro, cidade, UF e CEP eram descartados em silêncio — apesar de a
-    engine ter posição para todos no CNAB. Boleto com rua e sem número é
-    endereço incompleto, e o registro sai assim mesmo, sem ninguém reclamar.
+    Bairro, cidade, UF e CEP eram enviados como campos próprios —
+    `sacado_bairro`, `sacado_cidade`… — e o boleto **não tem** esses campos: o
+    construtor os descartava, um por um, em silêncio. Aquelas posições existem
+    no CNAB, não no título. O boleto sai com rua e número e mais nada, e o
+    pagador impresso mora numa cidade que o papel não diz.
+
+    Concatenar é o que o formato permite e é como um boleto de verdade imprime
+    (o exemplo da própria doc: "Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia,
+    GO, CEP 74360390").
     """
-    logradouro = end.get("logradouro") or end.get("street")
-    numero = end.get("numero") or end.get("number")
-    linha = f"{logradouro}, {numero}" if logradouro and numero else logradouro
-    return {
-        "sacado_endereco": linha,
-        "sacado_bairro": end.get("bairro") or end.get("neighborhood"),
-        "sacado_cidade": end.get("cidade") or end.get("city"),
-        "sacado_uf": end.get("uf") or end.get("state"),
-        "sacado_cep": end.get("cep") or end.get("zip_code"),
-    }
+    partes = [
+        ", ".join(p for p in (end.get("logradouro") or end.get("street"),
+                              str(end.get("numero") or end.get("number") or "") or None)
+                  if p),
+        end.get("bairro") or end.get("neighborhood"),
+        end.get("cidade") or end.get("city"),
+        end.get("uf") or end.get("state"),
+    ]
+    cep = end.get("cep") or end.get("zip_code")
+    if cep:
+        partes.append(f"CEP {cep}")
+    linha = ", ".join(p for p in partes if p)
+    return linha or None

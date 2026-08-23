@@ -1656,6 +1656,32 @@ components:
           description: |
             Byte identificador do nosso número. Obrigatório no **Sicredi**.
           example: '2'
+        # Faixa FEBRABAN, impressa no rodapé da ficha de compensação. Em branco
+        # por padrão, e de propósito: no boleto comum quem preenche essa faixa é
+        # o caixa, no ato do pagamento. Informe quando o valor já é conhecido na
+        # emissão — desconto por pontualidade, abatimento negociado, ou boleto
+        # reemitido com a mora já apurada.
+        desconto_abatimento:
+          type: number
+          description: '`(-) Desconto / Abatimento` — deduz do valor cobrado.'
+          example: 50.00
+        outras_deducoes:
+          type: number
+          description: '`(-) Outras deduções` — deduz do valor cobrado.'
+        mora_multa:
+          type: number
+          description: '`(+) Mora / Multa` — acresce ao valor cobrado.'
+          example: 8.00
+        outros_acrescimos:
+          type: number
+          description: '`(+) Outros acréscimos` — acresce ao valor cobrado.'
+        valor_cobrado:
+          type: number
+          description: |
+            `(=) Valor cobrado`. Omitido, é somado a partir dos quatro campos
+            acima e do `valor`; informado, sobrepõe o cálculo. Sem nenhum dos
+            cinco, a faixa inteira sai **em branco** — e não zerada.
+          example: 108.00
         data_vencimento:
           type: string
           description: Data de vencimento (YYYY/MM/DD)
@@ -1862,6 +1888,21 @@ components:
             (C6, Inter, Sicoob). Sem ele, um Bolepix só é pagável por quem
             consegue apontar a câmera para outra tela.
           example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
+        totalizadores:
+          type: object
+          description: |
+            A faixa FEBRABAN **como foi impressa**, já formatada em reais. Os
+            cinco campos vêm sempre; string vazia é campo em branco no papel,
+            que é o padrão do boleto comum. `valor_cobrado` traz a soma quando
+            o emissor informou algum dos outros e não o total.
+          additionalProperties:
+            type: string
+          example:
+            desconto_abatimento: '50,00'
+            outras_deducoes: ''
+            mora_multa: '8,00'
+            outros_acrescimos: ''
+            valor_cobrado: '108,00'
 
     # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
     # código de barras — é para isso que ele existe. O schema prometia
