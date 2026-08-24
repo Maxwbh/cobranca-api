@@ -348,12 +348,18 @@ _CAMPO_SEM_SUPORTE = {
 #: e escreve ali é o caixa, no ato. Imprimir um número antecipado induz o pagador
 #: a erro, e ele estará errado em qualquer data que não a suposta.
 #:
-#: A engine sabe desenhar a faixa; é o produto que não expõe. Os dois lugares
-#: certos existem e são outros:
+#: São **aceitos e ignorados** na emissão, não recusados: o mesmo registro de
+#: cobrança costuma alimentar o boleto E a remessa, e é natural que o payload
+#: traga os encargos. Recusar aqui obrigaria quem integra a montar dois objetos
+#: para o mesmo título — atrapalha sem proteger ninguém, porque o valor não
+#: chega ao papel de qualquer forma.
+#:
+#: Onde eles têm efeito de verdade:
 #:
 #: - a **regra** vai em `instrucoes`, impressa no boleto ("após o vencimento,
-#:   multa de 2% e juros de 1% ao mês") — texto, não valor;
-#: - os **parâmetros** vão na remessa CNAB (`POST /api/remessa`), em
+#:   multa de 2% e juros de 1% ao mês") — texto, não valor, e por isso continua
+#:   verdadeiro em qualquer data;
+#: - os **valores** vão na remessa CNAB (`POST /api/remessa`), em
 #:   `codigo_multa`/`percentual_multa`/`data_multa`, `tipo_mora`/`valor_mora`
 #:   ou `percentual_mora`/`data_mora`, `cod_desconto`/`valor_desconto`/
 #:   `data_desconto` e `valor_abatimento`. É o arquivo que o banco processa, e
@@ -582,18 +588,11 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
     if sem_suporte:
         raise DadosInvalidos([f"`{c}` não tem efeito — {_CAMPO_SEM_SUPORTE[c]}"
                               for c in sem_suporte])
-    do_caixa = [c for c in _TOTALIZADORES_DO_CAIXA if data.get(c) is not None]
-    if do_caixa:
-        raise DadosInvalidos([
-            f"{', '.join(f'`{c}`' for c in do_caixa)}: desconto, multa e juros"
-            " dependem da DATA DO PAGAMENTO e não são impressos no boleto — a"
-            " faixa sai em branco para o caixa preencher no ato. A regra vai em"
-            " `instrucoes` (texto impresso: 'após o vencimento, multa de 2% e"
-            " juros de 1% ao mês'); os valores vão na remessa CNAB"
-            " (`POST /api/remessa`), em codigo_multa/percentual_multa/data_multa,"
-            " tipo_mora + valor_mora ou percentual_mora/data_mora,"
-            " cod_desconto/valor_desconto/data_desconto e valor_abatimento — é o"
-            " arquivo que o banco processa para calcular na data do pagamento"])
+    # Aceitos e ignorados: a faixa do caixa não é preenchida na emissão. Sair
+    # daqui é o que garante que a engine não os desenhe — a 1.1.0 os aceita no
+    # construtor e imprimiria o valor.
+    for campo in _TOTALIZADORES_DO_CAIXA:
+        data.pop(campo, None)
 
     instrucoes = _instrucoes_do_payload(data)
     for numerada in _INSTRUCOES_NUMERADAS:

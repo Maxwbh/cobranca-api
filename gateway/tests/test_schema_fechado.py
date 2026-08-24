@@ -80,25 +80,37 @@ def test_as_duas_grafias_com_valores_diferentes_sao_recusadas():
 
 @pytest.mark.parametrize("campo", ["desconto_abatimento", "outras_deducoes",
                                    "mora_multa", "outros_acrescimos", "valor_cobrado"])
-def test_faixa_do_caixa_nao_vai_para_o_boleto(campo):
+def test_faixa_do_caixa_e_aceita_e_nao_vai_para_o_boleto(campo):
     """Desconto, multa e juros dependem da DATA DO PAGAMENTO.
 
     A faixa FEBRABAN do boleto e' preenchida pelo CAIXA, no ato: o valor nao se
     sabe na emissao, e numero impresso antes disso induz o pagador a erro — vai
-    estar errado em qualquer data que nao a suposta. A engine sabe desenhar a
-    faixa; o produto e' que nao expoe.
+    estar errado em qualquer data que nao a suposta.
+
+    Aceito e ignorado, nao recusado: o mesmo registro de cobranca alimenta o
+    boleto E a remessa, e e' natural que o payload traga os encargos. Recusar
+    obrigaria quem integra a montar dois objetos para o mesmo titulo.
     """
-    with pytest.raises(pycob.DadosInvalidos) as exc:
-        pycob.dados_boleto(BANCO, {**BASE, campo: 8.00})
-    msg = "; ".join(exc.value.erros)
-    assert "DATA DO PAGAMENTO" in msg
-    assert "instrucoes" in msg and "/api/remessa" in msg, "o erro tem de dizer para onde ir"
+    import io
+
+    from pypdf import PdfReader
+    pdf, info = pycob.emitir_boleto(BANCO, {**BASE, campo: 1234.56})
+    texto = "".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+    assert "1.234,56" not in texto, f"`{campo}` foi impresso no boleto"
+    assert "totalizadores" not in info
 
 
-def test_zero_tambem_e_recusado():
+def test_o_boleto_sai_identico_com_ou_sem_os_encargos():
+    """Ignorar de verdade: nem o codigo de barras nem o papel mudam."""
+    com = {**BASE, "desconto_abatimento": 150.0, "mora_multa": 8.0,
+           "valor_cobrado": 1137.50}
+    assert pycob.dados_boleto(BANCO, com) == pycob.dados_boleto(BANCO, BASE)
+
+
+def test_zero_tambem_e_ignorado():
     """`0` e valor informado, nao ausencia — e imprimiria `0,00` na faixa."""
-    with pytest.raises(pycob.DadosInvalidos):
-        pycob.dados_boleto(BANCO, {**BASE, "mora_multa": 0})
+    assert pycob.dados_boleto(BANCO, {**BASE, "mora_multa": 0}) == \
+        pycob.dados_boleto(BANCO, BASE)
 
 
 def test_a_regra_impressa_continua_valendo():

@@ -1017,6 +1017,12 @@ paths:
                   description: |
                     Dados do título. Campo fora deste schema responde `400`
                     nomeando o campo e sugerindo o parecido.
+
+                    ⚠️ A faixa FEBRABAN (`desconto_abatimento`,
+                    `outras_deducoes`, `mora_multa`, `outros_acrescimos`,
+                    `valor_cobrado`) é **aceita e não enviada ao boleto** — sai
+                    em branco no PDF, porque depende da data do pagamento. A
+                    regra vai em `instrucoes` e o valor na remessa CNAB.
                 template:
                   type: string
                   enum: [moderno, classico]
@@ -1275,6 +1281,9 @@ paths:
                   description: |
                     Dados do título que vai abaixo do corpo da fatura, incluindo
                     o `valor` — a API não soma os itens.
+
+                    ⚠️ A faixa FEBRABAN é **aceita e não enviada ao boleto**;
+                    ver `BoletoData`.
                 itens:
                   type: array
                   description: Nível 1 — linhas da fatura (repassadas ao engine).
@@ -1823,24 +1832,129 @@ components:
           description: |
             Byte identificador do nosso número. Obrigatório no **Sicredi**.
           example: '2'
-        # A faixa FEBRABAN — (-) Desconto/Abatimento, (+) Mora/Multa,
-        # (=) Valor cobrado — NÃO tem campo aqui, e é de propósito. Desconto,
-        # multa e juros dependem da DATA DO PAGAMENTO, que não se sabe na
-        # emissão: quem calcula e escreve na faixa é o caixa, no ato. Número
-        # impresso antes disso induz o pagador a erro, e está errado em qualquer
-        # data que não a suposta.
-        #
-        # Os dois lugares certos existem:
-        #   - a REGRA vai em `instrucoes`, impressa no boleto ("após o
-        #     vencimento, multa de 2% e juros de 1% ao mês") — texto, não valor;
-        #   - os PARÂMETROS vão na remessa CNAB (POST /api/remessa), no
-        #     `Pagamento`: codigo_multa/percentual_multa/data_multa, tipo_mora +
-        #     valor_mora ou percentual_mora/data_mora, cod_desconto/
-        #     valor_desconto/data_desconto e valor_abatimento. É o arquivo que o
-        #     banco processa, e é dele que ele aprende a calcular na data em que
-        #     o título for pago.
-        #
-        # Enviar um dos cinco aqui responde 400 apontando os dois caminhos.
+        desconto_abatimento:
+          type: number
+          description: |
+            ⚠️ **Não é enviado ao boleto e não é impresso.** O campo é
+            aceito e descartado na emissão: a faixa FEBRABAN
+            — `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor cobrado` —
+            sai **em branco** no PDF, sempre.
+
+            Desconto, multa e juros dependem da **data do pagamento**, que não
+            se sabe na emissão: quem calcula e escreve na faixa é o caixa, no
+            ato. Número impresso antes disso induz o pagador a erro, e estaria
+            errado em qualquer data que não a suposta.
+
+            O campo é aceito porque o mesmo registro de cobrança costuma
+            alimentar o boleto **e** a remessa; recusar obrigaria a montar dois
+            objetos para o mesmo título. Onde ele tem efeito de verdade:
+
+            - a **regra** vai em `instrucoes`, impressa no boleto ("após o
+              vencimento, multa de 2% e juros de 1% ao mês");
+            - o **valor** vai na remessa CNAB (`POST /api/remessa`), no
+              `Pagamento` — é o arquivo que o banco processa para calcular na
+              data em que o título for pago.
+
+              Aqui: `cod_desconto` + `valor_desconto` + `data_desconto`.
+          example: 150.00
+        outras_deducoes:
+          type: number
+          description: |
+            ⚠️ **Não é enviado ao boleto e não é impresso.** O campo é
+            aceito e descartado na emissão: a faixa FEBRABAN
+            — `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor cobrado` —
+            sai **em branco** no PDF, sempre.
+
+            Desconto, multa e juros dependem da **data do pagamento**, que não
+            se sabe na emissão: quem calcula e escreve na faixa é o caixa, no
+            ato. Número impresso antes disso induz o pagador a erro, e estaria
+            errado em qualquer data que não a suposta.
+
+            O campo é aceito porque o mesmo registro de cobrança costuma
+            alimentar o boleto **e** a remessa; recusar obrigaria a montar dois
+            objetos para o mesmo título. Onde ele tem efeito de verdade:
+
+            - a **regra** vai em `instrucoes`, impressa no boleto ("após o
+              vencimento, multa de 2% e juros de 1% ao mês");
+            - o **valor** vai na remessa CNAB (`POST /api/remessa`), no
+              `Pagamento` — é o arquivo que o banco processa para calcular na
+              data em que o título for pago.
+
+              Aqui: `valor_abatimento`.
+        mora_multa:
+          type: number
+          description: |
+            ⚠️ **Não é enviado ao boleto e não é impresso.** O campo é
+            aceito e descartado na emissão: a faixa FEBRABAN
+            — `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor cobrado` —
+            sai **em branco** no PDF, sempre.
+
+            Desconto, multa e juros dependem da **data do pagamento**, que não
+            se sabe na emissão: quem calcula e escreve na faixa é o caixa, no
+            ato. Número impresso antes disso induz o pagador a erro, e estaria
+            errado em qualquer data que não a suposta.
+
+            O campo é aceito porque o mesmo registro de cobrança costuma
+            alimentar o boleto **e** a remessa; recusar obrigaria a montar dois
+            objetos para o mesmo título. Onde ele tem efeito de verdade:
+
+            - a **regra** vai em `instrucoes`, impressa no boleto ("após o
+              vencimento, multa de 2% e juros de 1% ao mês");
+            - o **valor** vai na remessa CNAB (`POST /api/remessa`), no
+              `Pagamento` — é o arquivo que o banco processa para calcular na
+              data em que o título for pago.
+
+              Aqui: `codigo_multa`/`percentual_multa`/`data_multa` e
+              `tipo_mora` + `valor_mora` ou `percentual_mora`/`data_mora`.
+          example: 8.00
+        outros_acrescimos:
+          type: number
+          description: |
+            ⚠️ **Não é enviado ao boleto e não é impresso.** O campo é
+            aceito e descartado na emissão: a faixa FEBRABAN
+            — `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor cobrado` —
+            sai **em branco** no PDF, sempre.
+
+            Desconto, multa e juros dependem da **data do pagamento**, que não
+            se sabe na emissão: quem calcula e escreve na faixa é o caixa, no
+            ato. Número impresso antes disso induz o pagador a erro, e estaria
+            errado em qualquer data que não a suposta.
+
+            O campo é aceito porque o mesmo registro de cobrança costuma
+            alimentar o boleto **e** a remessa; recusar obrigaria a montar dois
+            objetos para o mesmo título. Onde ele tem efeito de verdade:
+
+            - a **regra** vai em `instrucoes`, impressa no boleto ("após o
+              vencimento, multa de 2% e juros de 1% ao mês");
+            - o **valor** vai na remessa CNAB (`POST /api/remessa`), no
+              `Pagamento` — é o arquivo que o banco processa para calcular na
+              data em que o título for pago.
+
+              Aqui: `valor_iof`.
+        valor_cobrado:
+          type: number
+          description: |
+            ⚠️ **Não é enviado ao boleto e não é impresso.** O campo é
+            aceito e descartado na emissão: a faixa FEBRABAN
+            — `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor cobrado` —
+            sai **em branco** no PDF, sempre.
+
+            Desconto, multa e juros dependem da **data do pagamento**, que não
+            se sabe na emissão: quem calcula e escreve na faixa é o caixa, no
+            ato. Número impresso antes disso induz o pagador a erro, e estaria
+            errado em qualquer data que não a suposta.
+
+            O campo é aceito porque o mesmo registro de cobrança costuma
+            alimentar o boleto **e** a remessa; recusar obrigaria a montar dois
+            objetos para o mesmo título. Onde ele tem efeito de verdade:
+
+            - a **regra** vai em `instrucoes`, impressa no boleto ("após o
+              vencimento, multa de 2% e juros de 1% ao mês");
+            - o **valor** vai na remessa CNAB (`POST /api/remessa`), no
+              `Pagamento` — é o arquivo que o banco processa para calcular na
+              data em que o título for pago.
+
+              O total é do caixa: ele soma na data do pagamento.
         # por padrão, e de propósito: no boleto comum quem preenche essa faixa é
         # o caixa, no ato do pagamento. Informe quando o valor já é conhecido na
         # emissão — desconto por pontualidade, abatimento negociado, ou boleto
