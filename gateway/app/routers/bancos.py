@@ -153,6 +153,12 @@ def _caminho_do_banco(banco: Banco) -> dict:
         "fallback_offline": fallback,
         "caminho_efetivo": "on" if pronto else ("off" if fallback else "on"),
         "flag": f"{banco.value.upper()}_REGISTERED_READY",
+        # Capacidade cujo dialeto o provider herda e que ninguém confirmou NESTE
+        # banco: some de `capacidades` e aparece aqui, com a variável que a
+        # libera. Sai vazio quando não há nenhuma — que é o caso hoje. Fica em
+        # `_caminho_do_banco` porque vale para todos, e pendurar na entrada de um
+        # banco só foi o que fez o campo faltar nos outros três.
+        "capacidades_nao_confirmadas": nao_confirmadas(banco.value),
     }
 
 
@@ -273,7 +279,6 @@ def listar() -> dict:
                 "codigo_banco": "077",
                 "tipo": "rest",
                 "capacidades": _capacidades(InterProvider, "inter"),
-                "capacidades_nao_confirmadas": nao_confirmadas("inter"),
                 "credentials": _ESQUEMA_INTER,
                 "sandbox": "https://cdpj-sandbox.partners.uatinter.co (OAuth + mTLS)",
                 "documentacao": "docs/development/inter-rest.md",

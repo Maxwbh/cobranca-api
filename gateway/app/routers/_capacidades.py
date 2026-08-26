@@ -22,27 +22,19 @@ from app.schemas import Banco, Provider
 #: diz `True`, e o catálogo — que existe justamente para não envelhecer — passa
 #: a anunciar o que ninguém verificou.
 #:
-#: O caso concreto: o **Inter** herda `BacenPixAutomaticoMixin`, então
-#: `GET /bancos` listava `pix_automatico` para ele. A própria evidência de
-#: homologação (`docs/homologacao/evidencia-sandbox-inter.json`, caso `PA_01`)
-#: diz o contrário, com todas as letras: *"não consta no SDK oficial do Inter
-#: (inter-co/pj-sdk-java) […] falta confirmar no portal se o banco expõe as
-#: rotas. Prometer antes de confirmar seria vender o que não se sabe"*.
+#: **Hoje está vazio, e isso é resultado, não descuido.** O caso que motivou o
+#: mecanismo foi o Pix Automático do Inter: o provider herdava
+#: `BacenPixAutomaticoMixin` e o catálogo o anunciava, enquanto a evidência de
+#: homologação dizia que ninguém tinha confirmado. Ficou atrás da flag até a
+#: confirmação chegar — e ela chegou da spec OpenAPI do próprio banco, com as 17
+#: chamadas do mixin batendo uma a uma. Ver
+#: `docs/homologacao/evidencia-pix-automatico-inter.json`.
 #:
-#: C6 (15 casos em 4 jornadas) e Sicoob (`PA_01`, 201) estão confirmados no
-#: sandbox e por isso NÃO entram aqui — a lista é de quem falta confirmar, não
-#: de quem usa mixin.
+#: O mecanismo fica: o próximo mixin herdado por um banco que não o exponha cai
+#: aqui em uma linha, em vez de virar promessa sem lastro.
 #:
 #: `banco -> {método: (recurso, motivo)}`.
-_NAO_CONFIRMADO: dict[str, dict[str, tuple[str, str]]] = {
-    "inter": {
-        "criar_recorrencia": (
-            "Pix Automático",
-            "o provider herda o dialeto BACEN de recorrência, mas `rec`/`solicrec`"
-            " não constam no SDK oficial do Inter e não foram exercitados no"
-            " sandbox"),
-    },
-}
+_NAO_CONFIRMADO: dict[str, dict[str, tuple[str, str]]] = {}
 
 
 def flag_de_confirmacao(banco: str, metodo: str) -> str:

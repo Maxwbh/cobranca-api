@@ -65,8 +65,7 @@ a validação vale integração ponta a ponta.
 
 ## Serviços do banco × Cobranca-API
 
-> Legenda: ✅ disponível · 🔜 planejado · ❓ dialeto pronto e **não confirmado**
-> no banco · ⛔ fora de escopo do produto (cobrança).
+> Legenda: ✅ disponível · 🔜 planejado · ⛔ fora de escopo do produto (cobrança).
 
 | ID | Serviço no Inter | Endpoint do banco | Status | Uso na Cobranca-API |
 |---|---|---|:---:|---|
@@ -80,7 +79,7 @@ a validação vale integração ponta a ponta.
 | INT-S08 | Banking v2 — extrato | `GET /banking/v2/extrato` | ✅ | `GET /extrato` |
 | INT-S09 | Banking v2 — saldo | `GET /banking/v2/saldo` | 🔜 | Sem rota hoje (idem `SIC-S06`) |
 | INT-S10 | Banking v2 — pagamentos, DARF, lote, Pix pagamento | `/banking/v2/pagamento*` | ⛔ | Saída de dinheiro |
-| INT-S11 | Pix Automático (`rec`/`solicrec`/`cobr`) | `/pix/v2/rec`, `/solicrec`, `/cobr` | ❓ | Dialeto pronto pelo mixin; **não confirmado no banco** — ver *O que falta* |
+| INT-S11 | Pix Automático (`rec`/`solicrec`/`cobr`/`locrec`) | `/pix/v2` — `/rec`, `/solicrec`, `/cobr`, `/locrec`, `/webhookrec`, `/webhookcobr` | ✅ | **Grátis** pelo `BacenPixAutomaticoMixin`: as 17 chamadas batem com a spec do banco. Exige CNPJ com 6+ meses (BACEN) |
 
 > **Pix Automático não consta no SDK oficial.** Não há `rec`/`solicrec`/`cobr`
 > em `pj-sdk-java` — pode ser ausência do SDK, não da API. Enquanto não se
@@ -213,39 +212,44 @@ boleto sem Pix pede `formas_recebimento: "BOLETO"` explicitamente.
 
 ## O que falta
 
-1. **Confirmar o Pix Automático no portal.** O provider herda o mixin BACEN, o
-   dialeto está pronto — mas `rec`/`solicrec` não constam no SDK oficial e não
-   foram exercitados no sandbox (`PA_01`).
+1. ~~Confirmar o Pix Automático no portal.~~ **Confirmado — a capacidade está
+   ligada.** A spec OpenAPI do próprio banco fecha a questão:
 
-   **O que já se sabe:** o portal lista o produto —
-   [developers.inter.co/references/pix-automatico](https://developers.inter.co/references/pix-automatico),
-   *"Pix Automático — Receba pagamentos recorrentes de forma automática e
-   instantânea"*. Ou seja, o Inter **oferece** Pix Automático; a ausência no
-   `pj-sdk-java` era do SDK, não do banco.
+   | | |
+   |---|---|
+   | path base | `/pix/v2` — **o mesmo** que `InterProvider.PIX_BASE` já usava |
+   | produção | `https://cdpj.partners.bancointer.com.br/pix/v2` |
+   | sandbox | `https://cdpj-sandbox.partners.uatinter.co/pix/v2` |
+   | recursos | `/rec`, `/solicrec`, `/cobr`, `/locrec`, `/webhookrec`, `/webhookcobr` |
+   | scopes | `rec.*`, `solicrec.*`, `cobr.*`, `webhookrec.*`, `webhookcobr.*`, `payloadlocationrec.*` |
 
-   **O que ainda falta**, e é o que a flag espera: os **paths**, o **path base**
-   (`/pix/v2` como o resto do BACEN, ou outro) e os **scopes** OAuth. A página de
-   referência monta o conteúdo por JavaScript, então nem o fetch nem o `curl`
-   chegam à tabela de endpoints — vem só a casca do catálogo. Confirmar exige
-   abrir a página no navegador ou uma chamada com credencial real.
+   **As 17 chamadas do `BacenPixAutomaticoMixin` existem na spec, uma a uma** —
+   zero divergências. A ausência no `pj-sdk-java` era do SDK, não do banco.
 
-   Ligar a capacidade só com o nome do produto seria trocar uma promessa sem
-   lastro por outra: o mixin fala BACEN puro, e um path base diferente faz toda
-   chamada bater em 404 — que é exatamente a falha que a flag existe para não
-   entregar ao integrador.
+   Faltava um detalhe que teria quebrado tudo em produção: o token do Inter
+   **não pedia nenhum** dos escopos do recurso. Paths certos e escopo faltando
+   dá `403` — falha que não se parece com "faltou escopo". Os doze entraram em
+   `INTER_SCOPES`.
 
-   Até a confirmação, a capacidade **não é anunciada**: `GET /bancos` deixou de
-   listar `pix_automatico` para o Inter e passou a trazer
+   > **Como chegar à spec.** A página de referência é SPA (Redocly) e não
+   > entrega os endpoints por fetch nem por `curl` — devolve a casca do
+   > catálogo. A URL sai do bundle `/assets/js/main.*.js`, onde o redocusaurus
+   > a declara:
+   > `https://developers.inter.co/redocusaurus/swagger-api-pix-automatico-yaml.yaml`
+   >
+   > O inventário extraído está versionado em
+   > `docs/homologacao/evidencia-pix-automatico-inter.json`, e um teste compara
+   > o mixin contra ele — sem rede, e sem depender de quem leu a página.
 
-   ```json
-   "capacidades_nao_confirmadas": {"pix_automatico": "INTER_PIX_AUTOMATICO_READY"}
-   ```
+   > ⚠️ **Restrição do BACEN, não da API:** o Pix Automático só é oferecido a
+   > **CNPJ com pelo menos 6 meses de atividade** (aviso no topo da referência).
+   > É recusa de cadastro, não erro de integração — sem isso registrado, a
+   > investigação começa pelo lugar errado.
 
-   e a rota responde `422` dizendo *não foi confirmado* — que é diferente de
-   *não oferece*, a frase reservada a quem sabidamente não tem (Itaú). Quem
-   tiver credencial real confirma, liga `INTER_PIX_AUTOMATICO_READY=true` e usa,
-   sem esperar por versão nossa. Confirmado: some da lista e volta às
-   capacidades — o teste que prende isso lê a própria evidência de homologação.
+   **O que ainda falta:** exercitar no sandbox com credencial real. A spec traz
+   `/sandbox/rec/{idRec}/status`, `/sandbox/solicrec/{idRec}/status`,
+   `/sandbox/cobr/{txId}/status` e `/sandbox/cobr/pagamento` — dá para simular
+   autorização e pagamento de ponta a ponta, como foi feito no C6.
 
 2. **`INT-S05` — listar/sumário de cobranças.** Sem rota hoje; avaliar.
 

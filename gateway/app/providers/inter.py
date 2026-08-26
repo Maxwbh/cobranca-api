@@ -19,8 +19,11 @@
 #     mixins; aqui só muda PIX_BASE.
 #   - Banking v2: /banking/v2/extrato
 #
-# Pix Automático NÃO consta no SDK oficial — o mixin é herdado porque o dialeto
-# é o mesmo, mas nada garante que o Inter exponha as rotas. Ver inter-rest.md.
+# Pix Automático: não consta no SDK oficial, mas o banco EXPÕE. A spec OpenAPI
+# publicada (swagger-api-pix-automatico) usa a mesma base /pix/v2 e traz /rec,
+# /solicrec, /cobr, /locrec e os dois webhooks — as 17 chamadas do mixin batem
+# uma a uma. Inventário em docs/homologacao/evidencia-pix-automatico-inter.json.
+# Restrição do BACEN: só para CNPJ com 6+ meses de atividade.
 #
 # Validado no sandbox em 04/08/2026: emissão, consulta, PDF, cancelamento,
 # webhook e extrato fecham em 2xx, e o banco ECOA o que foi enviado (seuNumero,
@@ -45,6 +48,14 @@ INTER_SCOPES = [
     "lotecobv.read", "lotecobv.write", "pix.read", "pix.write",
     "payloadlocation.read", "payloadlocation.write",
     "webhook.read", "webhook.write", "extrato.read",
+    # Pix Automático. Sem eles os paths certos morriam na AUTORIZAÇÃO: o token
+    # sai sem o escopo e toda chamada volta 403 — falha que não se parece com
+    # "faltou escopo". Os nomes saem da spec do próprio banco, versionada em
+    # `docs/homologacao/evidencia-pix-automatico-inter.json`.
+    "rec.read", "rec.write", "solicrec.read", "solicrec.write",
+    "cobr.read", "cobr.write", "webhookrec.read", "webhookrec.write",
+    "webhookcobr.read", "webhookcobr.write",
+    "payloadlocationrec.read", "payloadlocationrec.write",
 ]
 # Pagamentos (pagamento-boleto.*, pagamento-darf.*, pagamento-lote.*,
 # pagamento-pix.*, webhook-banking.*) ficam de fora do token de propósito: são

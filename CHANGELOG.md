@@ -44,15 +44,18 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.
 
 ### Corrigido
-- ⚠️ **`pix_automatico` deixa de ser anunciado no Inter.** O provider herda o
-  dialeto BACEN de recorrência, e a introspecção do catálogo lia isso como
-  "o banco tem" — mas `rec`/`solicrec` não constam no SDK oficial do Inter e não
-  foram exercitados no sandbox. `GET /bancos` passa a trazer
-  `capacidades_nao_confirmadas: {"pix_automatico": "INTER_PIX_AUTOMATICO_READY"}`
-  e a rota responde `422` dizendo *não foi confirmado* — diferente de *não
-  oferece*, reservado a quem sabidamente não tem. Ligue a variável depois de
-  confirmar com credencial real. **C6 e Sicoob não mudam:** os dois têm o
-  recurso confirmado em sandbox.
+- **Pix Automático do Inter: confirmado e ligado.** A spec OpenAPI do banco usa
+  a mesma base `/pix/v2` e traz `rec`, `solicrec`, `cobr`, `locrec` e os dois
+  webhooks — as 17 chamadas do nosso dialeto batem uma a uma. O token do Inter
+  **não pedia nenhum** dos escopos do recurso, o que daria `403` com os paths
+  certos; os doze entraram. ⚠️ Restrição do BACEN: só para **CNPJ com 6+ meses
+  de atividade**.
+- **`capacidades_nao_confirmadas` no `GET /bancos`.** Capacidade cujo dialeto o
+  provider herda de um mixin e que ninguém confirmou naquele banco some de
+  `capacidades` e aparece aqui, com a variável que a libera — e a rota responde
+  `422` dizendo *não foi confirmado*, diferente de *não oferece*. Hoje sai vazio
+  para todos; existe para o próximo mixin herdado por um banco que não o exponha
+  não virar promessa sem lastro.
 - ⚠️ **O QR montado de `chave_pix` não é Bolepix.** Ele é **estático**: credita
   a chave, mas o banco não sabe que aquele PIX quitou o título, que fica **em
   aberto** — risco de segunda cobrança ou de protesto de boleto já pago. O
