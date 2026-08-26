@@ -144,10 +144,15 @@ integra uma única vez):
 
 ### `GET /credenciais` — quando a integração para de funcionar
 
-O certificado mTLS dos bancos vale **um ano** e não tem renovação in-place:
-vence, e toda chamada passa a falhar no handshake de uma vez, sem nada no código
-ter mudado. Era risco de operação sem nenhuma visibilidade — o material entrava
-cifrado no cofre e ninguém mais olhava.
+O certificado mTLS dos bancos não tem renovação in-place: vence, e toda chamada
+passa a falhar no handshake de uma vez, sem nada no código ter mudado. Era risco
+de operação sem nenhuma visibilidade — o material entrava cifrado no cofre e
+ninguém mais olhava.
+
+**A validade varia muito por banco**: o do C6 vale um ano, o do Inter vale trinta
+dias. Por isso o limiar de `expirando` é proporcional e não fixo — fixo em 30, o
+do Inter nasceria `expirando`, com a validade inteira pela frente, e um alerta
+que nunca desliga ensina a ignorar o campo.
 
 ```json
 {
@@ -159,6 +164,7 @@ cifrado no cofre e ninguém mais olhava.
     "emissor": "baas-api-sandbox.c6bank.info Issuing CA",
     "valido_ate": "2027-08-21",
     "dias_restantes": 360,
+    "alerta_a_partir_de": 30,
     "cnpj": "05230380000174",
     "par_confere": true,
     "host": "baas-api-sandbox.c6bank.info",
@@ -170,7 +176,8 @@ cifrado no cofre e ninguém mais olhava.
 
 | Campo | Para que serve |
 |---|---|
-| `situacao` | `ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel` |
+| `situacao` | `ok` · `expirando` · `expirado` · `ilegivel` |
+| `alerta_a_partir_de` | Quantos dias restantes fazem virar `expirando`. **Acompanha a vida do certificado**: 30 para um anual, um terço da validade para os de vida curta |
 | `titular` | **Qual** certificado está em uso. O ambiente está no *host* dentro do CN: `baas-api-sandbox` é sandbox, `baas-api` é produção |
 | `cnpj` | Extraído do CN, para conferir num olhar que é a empresa certa |
 | `par_confere` | A chave privada é a **deste** certificado? `false` é o erro clássico da troca — `.crt` novo com `.key` antiga —, que no handshake vira uma mensagem de TLS que não aponta o par trocado |

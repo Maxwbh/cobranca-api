@@ -13534,7 +13534,7 @@
           "situacao": {
             "type": "string",
             "title": "Situacao",
-            "description": "`ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel`",
+            "description": "`ok` · `expirando` · `expirado` · `ilegivel`. O limiar de `expirando` acompanha a **vida** do certificado: 30 dias para um anual, um terço da validade para os de vida curta. Fixo em 30, o certificado do Inter — que vive 30 dias — nascia `expirando`.",
             "examples": [
               "ok"
             ]
@@ -13588,6 +13588,21 @@
             "title": "Valido Ate",
             "examples": [
               "2027-08-21"
+            ]
+          },
+          "alerta_a_partir_de": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alerta A Partir De",
+            "description": "Quantos dias restantes fazem este certificado virar `expirando`. Varia com a vida dele — sem este campo, `expirando` com 9 dias num caso e `ok` com 25 noutro pareceria incoerência.",
+            "examples": [
+              30
             ]
           },
           "dias_restantes": {

@@ -65,6 +65,12 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.
 
 ### Corrigido
+- **O alerta de vencimento do certificado acompanha a vida dele.** Eram 30 dias
+  fixos, calibrados para certificado anual: o do **Inter vive 30 dias** e nascia
+  `expirando`, com a validade inteira pela frente — alerta que nunca desliga
+  ensina a ignorar o campo. O limiar passa a ser um terço da validade, com teto
+  de 30 dias (nada muda para quem vive um ano), e sai na resposta em
+  `alerta_a_partir_de`.
 - **`service=COBRANCA` voltou a ser aceito em `/config/webhook-banco`.** O campo
   virou enum com o vocabulário do C6 (`BANK_SLIP`, `CHECKOUT`) e passou a recusar
   com `422` a palavra que a documentação do **Inter** usa para o webhook de

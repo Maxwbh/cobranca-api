@@ -15,10 +15,30 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from typing import Any
 
-#: Dias antes do vencimento em que o certificado passa a ser reportado como
-#: `expirando`. Trinta é o prazo em que ainda dá para pedir, receber e trocar o
-#: certificado sem parada — abaixo disso a renovação vira urgência.
+#: TETO de dias antes do vencimento em que o certificado é reportado como
+#: `expirando`. Trinta é o prazo em que ainda dá para pedir, receber e trocar um
+#: certificado anual sem parada — abaixo disso a renovação vira urgência.
 DIAS_DE_ALERTA = 30
+
+#: Fração da vida do certificado usada quando ele vive menos que o teto acima.
+#: Um terço: sobra tempo para pedir, receber e trocar, proporcionalmente.
+FRACAO_DE_ALERTA = 3
+
+
+def limiar_de_alerta(vida_em_dias: int) -> int:
+    """A partir de quantos dias restantes este certificado é `expirando`.
+
+    Trinta dias fixos foi calibrado para certificado ANUAL e mentia em cima de
+    qualquer outro: o do Inter vive 30 dias, então nascia `expirando` no dia da
+    emissão, com a validade inteira pela frente. Alerta que nunca desliga não é
+    alerta — é ruído que ensina a ignorar o campo, e o campo existe justamente
+    para ser levado a sério no dia em que importa.
+
+    O teto continua valendo para quem vive um ano; abaixo dele, o limiar é
+    proporcional. Nunca menos de um dia: certificado de vida curtíssima ainda
+    merece um aviso antes de virar `expirado`.
+    """
+    return max(1, min(DIAS_DE_ALERTA, vida_em_dias // FRACAO_DE_ALERTA))
 
 
 @dataclass(frozen=True)
@@ -32,6 +52,11 @@ class Certificado:
     valido_de: str | None = None
     valido_ate: str | None = None
     dias_restantes: int | None = None
+    #: A partir de quantos dias restantes este certificado vira `expirando`.
+    #: Sai na resposta porque um limiar que varia com a vida do certificado
+    #: precisa ser legível: sem ele, `expirando` com 9 dias restantes num
+    #: caso e `ok` com 25 noutro parece incoerência, e é a regra funcionando.
+    alerta_a_partir_de: int | None = None
     formato: str | None = None
     detalhe: str | None = None
 
@@ -58,16 +83,19 @@ def _nome(x509_nome) -> str:
 
 
 def _do_x509(cert, formato: str, hoje: date) -> Certificado:
+    inicio = cert.not_valid_before_utc.date()
     fim = cert.not_valid_after_utc.date()
     dias = (fim - hoje).days
-    situacao = "expirado" if dias < 0 else ("expirando" if dias <= DIAS_DE_ALERTA else "ok")
+    limiar = limiar_de_alerta((fim - inicio).days)
+    situacao = "expirado" if dias < 0 else ("expirando" if dias <= limiar else "ok")
     return Certificado(
         situacao=situacao,
         titular=_nome(cert.subject),
         emissor=_nome(cert.issuer),
-        valido_de=cert.not_valid_before_utc.date().isoformat(),
+        valido_de=inicio.isoformat(),
         valido_ate=fim.isoformat(),
         dias_restantes=dias,
+        alerta_a_partir_de=limiar,
         formato=formato,
     )
 

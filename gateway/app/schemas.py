@@ -714,7 +714,10 @@ class CertificadoOut(BaseModel):
     """Metadado do certificado mTLS. **Nunca** o certificado nem a chave."""
 
     situacao: str = Field(
-        description=("`ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel`"),
+        description=("`ok` · `expirando` · `expirado` · `ilegivel`. O limiar de "
+                     "`expirando` acompanha a **vida** do certificado: 30 dias para um "
+                     "anual, um terço da validade para os de vida curta. Fixo em 30, o "
+                     "certificado do Inter — que vive 30 dias — nascia `expirando`."),
         examples=["ok"])
     titular: str | None = Field(default=None, examples=[
         "MSDOBRASILLTDA05230380000174-baas-api-sandbox.c6bank.info"],
@@ -724,6 +727,11 @@ class CertificadoOut(BaseModel):
     emissor: str | None = None
     valido_de: str | None = None
     valido_ate: str | None = Field(default=None, examples=["2027-08-21"])
+    alerta_a_partir_de: int | None = Field(
+        default=None, examples=[30],
+        description="Quantos dias restantes fazem este certificado virar `expirando`. "
+                    "Varia com a vida dele — sem este campo, `expirando` com 9 dias num "
+                    "caso e `ok` com 25 noutro pareceria incoerência.")
     dias_restantes: int | None = Field(
         default=None, examples=[360],
         description="Negativo quando já venceu. O certificado dos bancos vale um ano e "

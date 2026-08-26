@@ -25,16 +25,25 @@ from app.core import certificado
 SEGREDO = "nao-pode-vazar-jamais"
 
 
-def _par(cn: str, *, dias_ate_vencer: int = 360):
-    """Certificado autoassinado com o CN e a validade pedidos."""
+def _par(cn: str, *, dias_ate_vencer: int = 360, vida_em_dias: int = 365):
+    """Certificado autoassinado com o CN, a validade restante e a VIDA pedidas.
+
+    `vida_em_dias` existe porque o limiar de alerta é proporcional a ela: um
+    certificado com 29 dias restantes é `expirando` se for anual e `ok` se
+    nasceu com 90. Antes, o emissor era fixo em "5 dias atrás" e todo
+    certificado de teste tinha vida curta — os casos diziam "anual" e
+    construíam um de 34 dias. A premissa errada só apareceu quando a regra
+    passou a depender dela.
+    """
     chave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     nome = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     hoje = date.today()
+    nascido_ha = max(1, vida_em_dias - dias_ate_vencer)
     cert = (x509.CertificateBuilder()
             .subject_name(nome).issuer_name(nome)
             .public_key(chave.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(_dt(hoje - timedelta(days=5)))
+            .not_valid_before(_dt(hoje - timedelta(days=nascido_ha)))
             .not_valid_after(_dt(hoje + timedelta(days=dias_ate_vencer)))
             .sign(chave, hashes.SHA256()))
     pem_cert = cert.public_bytes(serialization.Encoding.PEM).decode()
@@ -285,3 +294,68 @@ def test_banco_sem_caminho_on_nao_tem_base():
     from app.registry import base_do_banco
     assert base_do_banco("bradesco") is None
     assert base_do_banco(None) is None
+
+
+# --- o limiar acompanha a vida do certificado -------------------------------------
+#
+# Trinta dias fixos foi calibrado para certificado ANUAL. O do Inter vive 30
+# dias — nascia `expirando` no dia da emissão, com a validade inteira pela
+# frente. Alerta que nunca desliga não é alerta: é ruído que ensina a ignorar o
+# campo, e o campo existe para ser levado a sério no dia em que importa.
+
+@pytest.mark.parametrize("vida,limiar", [
+    (365, 30),   # anual: o teto continua valendo, nada muda para o C6
+    (366, 30),
+    (90, 30),    # trimestral: 30 é exatamente um terço, ainda no teto
+    (30, 10),    # o do Inter
+    (7, 2),
+    (2, 1),      # nunca zero: vida curtíssima ainda merece um aviso
+    (0, 1),
+])
+def test_limiar_e_proporcional_abaixo_do_teto(vida, limiar):
+    assert certificado.limiar_de_alerta(vida) == limiar
+
+
+def test_certificado_de_vida_curta_nasce_ok():
+    """A regressão que motivou tudo: o do Inter vive 30 dias e, no dia da
+    emissão, era reportado como `expirando`."""
+    cert, _ = _par(CN_SANDBOX, dias_ate_vencer=30, vida_em_dias=30)
+    c = certificado.descrever({"cert_pem": cert})
+    assert c.situacao == "ok"
+    assert c.dias_restantes == 30
+    assert c.alerta_a_partir_de == 10
+
+
+@pytest.mark.parametrize("dias_ate_vencer,situacao", [
+    (11, "ok"),          # acima do limiar de 10
+    (10, "expirando"),   # no limiar
+    (1, "expirando"),
+    (-1, "expirado"),    # vencido continua vencido, qualquer que seja a vida
+])
+def test_a_fronteira_do_alerta_num_certificado_curto(dias_ate_vencer, situacao):
+    """Vida de 30 dias, como a do Inter."""
+    cert, _ = _par(CN_SANDBOX, dias_ate_vencer=dias_ate_vencer, vida_em_dias=30)
+    assert certificado.descrever({"cert_pem": cert}).situacao == situacao
+
+
+@pytest.mark.parametrize("dias_ate_vencer,situacao", [
+    (31, "ok"),
+    (30, "expirando"),
+    (29, "expirando"),
+])
+def test_o_anual_nao_mudou(dias_ate_vencer, situacao):
+    """O C6 vive um ano; o teto de 30 dias vale como sempre valeu. A correção do
+    curto não pode ter mexido no caso para o qual o número foi escolhido."""
+    cert, _ = _par(CN_SANDBOX, dias_ate_vencer=dias_ate_vencer, vida_em_dias=365)
+    c = certificado.descrever({"cert_pem": cert})
+    assert c.alerta_a_partir_de == 30
+    assert c.situacao == situacao
+
+
+def test_o_limiar_sai_na_resposta(client, valido):
+    """Sem ele, `expirando` com 9 dias restantes num caso e `ok` com 25 noutro
+    pareceria incoerência — e é a regra funcionando."""
+    r = client.post("/credenciais", json={
+        "tenant_id": "empresa1", "provider": "c6", "credentials": valido})
+    assert r.status_code == 201, r.text
+    assert r.json()["certificado"]["alerta_a_partir_de"] == 30
