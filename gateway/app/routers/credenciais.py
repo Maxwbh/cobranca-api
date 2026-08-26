@@ -5,25 +5,30 @@ from fastapi import APIRouter, Header, HTTPException
 
 from app.core import certificado as cert_mod
 from app.core import credential_store
-from app.registry import chave_credencial
+from app.registry import base_do_banco, chave_credencial
 from app.schemas import (Banco, CertificadoOut, CredencialIn, CredencialOut,
                          Provider)
 
 router = APIRouter(prefix="/credenciais", tags=["credenciais"])
 
 
-def _certificado(credenciais: dict) -> CertificadoOut | None:
+def _certificado(credenciais: dict, chave: str | None = None) -> CertificadoOut | None:
     """Metadado do certificado — nunca o certificado, nunca a chave.
 
     `core/vault.py`: "NUNCA logar credencial/certificado". O que sai daqui é
-    derivado e não reconstrói nada: titular, emissor, validade e se o par casa.
+    derivado e não reconstrói nada: titular, emissor, validade, se o par casa e
+    se o ambiente do certificado é o mesmo para onde a API está apontada.
     """
     achado = cert_mod.descrever(credenciais)
     if achado is None:
         return None
+    base = base_do_banco(chave)
     return CertificadoOut(**achado.to_dict(),
                           cnpj=cert_mod.cnpj_do_titular(achado),
-                          par_confere=cert_mod.par_confere(credenciais))
+                          par_confere=cert_mod.par_confere(credenciais),
+                          host=cert_mod.host_do_titular(achado),
+                          base_em_uso=base,
+                          ambiente_confere=cert_mod.ambiente_confere(achado, base))
 
 
 @router.post("", response_model=CredencialOut, status_code=201)
@@ -42,7 +47,7 @@ def cadastrar(body: CredencialIn) -> CredencialOut:
     chave = chave_credencial(body.provider, body.banco)
     token = credential_store.enroll(store, body.tenant_id, chave, body.credentials)
     return CredencialOut(token=token, tenant_id=body.tenant_id, provider=body.provider,
-                         banco=body.banco, certificado=_certificado(body.credentials))
+                         banco=body.banco, certificado=_certificado(body.credentials, chave))
 
 
 @router.delete("", status_code=204)
@@ -83,4 +88,4 @@ def consultar(authorization: str = Header(description="Bearer bapi_...")) -> Cre
         token="bapi_" + "*" * 8, tenant_id=tenant_id,
         provider=Provider(chave) if chave in Provider._value2member_map_ else Provider.on,
         banco=Banco(chave) if chave in Banco._value2member_map_ else None,
-        certificado=_certificado(credenciais))
+        certificado=_certificado(credenciais, chave))

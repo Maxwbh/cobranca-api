@@ -729,6 +729,19 @@ class CertificadoOut(BaseModel):
         description="Negativo quando já venceu. O certificado dos bancos vale um ano e "
                     "**não tem renovação in-place**: vence e toda chamada passa a falhar "
                     "no handshake, de uma vez.")
+    host: str | None = Field(
+        default=None, examples=["baas-api-sandbox.c6bank.info"],
+        description="O host extraído do CN — é ele que diz o ambiente. `null` quando o "
+                    "banco não carimba host no CN (o do Inter é só o nome da aplicação).")
+    base_em_uso: str | None = Field(
+        default=None, examples=["https://baas-api-sandbox.c6bank.info"],
+        description="Para onde ESTE servidor está apontado naquele banco.")
+    ambiente_confere: bool | None = Field(
+        default=None, examples=[True],
+        description="O certificado é do mesmo ambiente da `base_em_uso`? `false` significa "
+                    "que toda chamada vai falhar no handshake — o banco responde `403 mTLS`, "
+                    "que se lê como credencial inválida e manda conferir client_id e secret, "
+                    "que estão certos. `null` = não dá para dizer (sem host no CN).")
     formato: str | None = Field(default=None, examples=["pem"])
     detalhe: str | None = Field(default=None,
                                 description="Por que não deu para ler, quando `ilegivel`.")

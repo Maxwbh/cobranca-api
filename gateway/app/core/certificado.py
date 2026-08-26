@@ -133,6 +133,40 @@ def par_confere(credenciais: dict[str, Any]) -> bool | None:
         return None
 
 
+def host_do_titular(cert: Certificado | None) -> str | None:
+    """O host que o banco carimbou no CN, quando há.
+
+    É o que separa sandbox de produção no C6: `...-baas-api-sandbox.c6bank.info`
+    contra `...-baas-api.c6bank.info`. Nem todo banco carimba — o CN do Inter é
+    só o nome da aplicação (`Cobrança_api`) —, e por isso a resposta é `None` em
+    vez de um palpite: ausência de host não é sinal de nada.
+    """
+    if not cert or not cert.titular:
+        return None
+    achado = re.search(r"-([A-Za-z0-9.-]+\.[A-Za-z]{2,})$", cert.titular.strip())
+    return achado.group(1) if achado else None
+
+
+def ambiente_confere(cert: Certificado | None, base_url: str | None) -> bool | None:
+    """O certificado é do MESMO ambiente para onde a API está apontada?
+
+    `None` quando não dá para dizer (sem host no CN, sem base configurada) —
+    e `None` não é aviso: só três dos bancos carimbam host no CN.
+
+    O que isto evita já aconteceu: certificado de PRODUÇÃO carregado com a base
+    de SANDBOX. O banco recusa o handshake e responde `403 mTLS`, que se lê como
+    "credencial inválida" — manda conferir client_id e secret, que estão certos.
+    A informação para dizer a verdade estava aqui o tempo todo: o host do CN e o
+    host da base. Custava uma comparação de string e custou uma homologação
+    inteira, 54 casos recusados um a um.
+    """
+    host = host_do_titular(cert)
+    if not host or not base_url:
+        return None
+    alvo = re.sub(r"^\w+://", "", base_url.strip()).split("/")[0].split(":")[0]
+    return bool(alvo) and host.lower() == alvo.lower()
+
+
 def cnpj_do_titular(cert: Certificado | None) -> str | None:
     """CNPJ que o banco carimbou no CN, quando há.
 

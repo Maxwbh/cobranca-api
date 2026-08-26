@@ -24,6 +24,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   começa em 1, como no resto da API. O sumário devolve os totais por situação em
   `sumario`. Hoje só o **Inter** publica as duas — nos demais bancos a rota
   responde `422` dizendo quem publica.
+- **`ambiente_confere` no `/credenciais` — certificado do ambiente errado, dito
+  na hora do cadastro.** Os bancos carimbam o host no CN (`baas-api-sandbox` ×
+  `baas-api`) e a API agora compara com a base para onde está apontada. Sem isso,
+  o desencontro só aparecia no primeiro handshake, como `403 mTLS` — que se lê
+  como credencial inválida e manda conferir `client_id` e `secret`, que estão
+  certos. Vêm junto `host` e `base_em_uso`; `null` quando o banco não carimba
+  host (o CN do Inter é só o nome da aplicação).
 - **`GET /credenciais` — quando a integração para de funcionar.** O certificado
   mTLS dos bancos vale um ano e não tem renovação in-place: vence e toda chamada
   falha no handshake, de uma vez. A rota diz a validade, os dias restantes, o

@@ -10,10 +10,10 @@ from typing import Any
 from app.core.vault import Vault
 from app.providers.base import BankProvider
 from app.providers.offline_engine import PyCobrancaProvider
-from app.providers.c6 import C6Provider
-from app.providers.inter import InterProvider
-from app.providers.itau import ItauProvider
-from app.providers.sicoob import SicoobProvider
+from app.providers.c6 import C6_BASE as c6_base, C6Provider
+from app.providers.inter import INTER_BASE as inter_base, InterProvider
+from app.providers.itau import ITAU_BASE as itau_base, ItauProvider
+from app.providers.sicoob import SICOOB_BASE as sicoob_base, SicoobProvider
 from app.schemas import Banco, PROVIDER_LEGADO_BANCO, Provider, eh_offline
 
 # --- os dois eixos, cada um no seu mapa ---------------------------------------
@@ -188,6 +188,31 @@ def build_rest_provider(
     _, banco = resolver_caminho(provider, banco, account_config)
     creds = credentials or vault.get_credentials(tenant_id, banco.value)
     return _REST_POR_BANCO[banco](account_config=account_config, credentials=creds)
+
+
+#: Para onde cada banco está apontado — variável de ambiente e o default do
+#: provider. É lido na CHAMADA, e não no import, porque quem aponta o serviço
+#: para o sandbox mexe no ambiente: congelar no import faria a resposta descrever
+#: um destino diferente do que o cliente HTTP vai usar.
+_BASE_POR_BANCO: dict[str, tuple[str, str]] = {
+    Banco.c6.value: ("C6_BASE_URL", c6_base),
+    Banco.inter.value: ("INTER_BASE_URL", inter_base),
+    Banco.sicoob.value: ("SICOOB_BASE_URL", sicoob_base),
+    Banco.itau.value: ("ITAU_BASE_URL", itau_base),
+}
+
+
+def base_do_banco(chave: str | None) -> str | None:
+    """A base HTTP em uso para aquele banco, ou `None` se ele não tem caminho ON.
+
+    Serve ao diagnóstico de credencial: é contra este host que o host do CN do
+    certificado é comparado (`core/certificado.ambiente_confere`).
+    """
+    par = _BASE_POR_BANCO.get(chave or "")
+    if par is None:
+        return None
+    variavel, padrao = par
+    return os.environ.get(variavel) or padrao
 
 
 def credentials_from_header(value: str | None) -> dict[str, Any] | None:

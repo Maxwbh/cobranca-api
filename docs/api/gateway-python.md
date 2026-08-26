@@ -160,7 +160,10 @@ cifrado no cofre e ninguém mais olhava.
     "valido_ate": "2027-08-21",
     "dias_restantes": 360,
     "cnpj": "05230380000174",
-    "par_confere": true
+    "par_confere": true,
+    "host": "baas-api-sandbox.c6bank.info",
+    "base_em_uso": "https://baas-api-sandbox.c6bank.info",
+    "ambiente_confere": true
   }
 }
 ```
@@ -171,6 +174,13 @@ cifrado no cofre e ninguém mais olhava.
 | `titular` | **Qual** certificado está em uso. O ambiente está no *host* dentro do CN: `baas-api-sandbox` é sandbox, `baas-api` é produção |
 | `cnpj` | Extraído do CN, para conferir num olhar que é a empresa certa |
 | `par_confere` | A chave privada é a **deste** certificado? `false` é o erro clássico da troca — `.crt` novo com `.key` antiga —, que no handshake vira uma mensagem de TLS que não aponta o par trocado |
+| `host` / `base_em_uso` | O host do CN e para onde este servidor está apontado naquele banco |
+| `ambiente_confere` | Os dois batem? **`false` significa que toda chamada vai falhar no handshake** — o banco responde `403 mTLS`, que se lê como credencial inválida e manda conferir `client_id` e `secret`, que estão certos. `null` quando não dá para dizer: o CN do Inter é só o nome da aplicação, sem host |
+
+> **`ambiente_confere: false` custou uma homologação inteira antes de existir.**
+> Certificado de produção carregado com a base de sandbox: 54 casos recusados um
+> a um, cada um com o `403 mTLS` apontando para o lugar errado. A informação para
+> dizer a verdade — o host do CN e o host da base — já estava toda aqui.
 
 O metadado é **derivado e não reconstrói nada**: certificado, chave privada e
 `client_secret` nunca saem. É a regra do `core/vault.py`.

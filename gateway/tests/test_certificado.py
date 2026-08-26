@@ -202,3 +202,86 @@ def test_token_revogado_nao_consulta_mais(client, token):
     client.delete("/credenciais", headers={"Authorization": f"Bearer {token}"})
     r = client.get("/credenciais", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
+
+
+# --- ambiente: a regra estava escrita e ninguém a aplicava -------------------------
+#
+# O schema já dizia, em prosa, que "o host diz o ambiente: `baas-api-sandbox` é
+# sandbox, `baas-api` é produção — é por aqui que se confere qual certificado
+# está em uso". Conferir era trabalho do leitor. Custou uma homologação inteira:
+# certificado de PRODUÇÃO carregado com a base de SANDBOX, 54 casos recusados um
+# a um com `403 mTLS`, que se lê como "credencial inválida" e manda procurar
+# defeito no client_id, que estava certo.
+
+@pytest.mark.parametrize("cn,esperado", [
+    (CN_SANDBOX, "baas-api-sandbox.c6bank.info"),
+    (CN_PRODUCAO, "baas-api.c6bank.info"),
+    # O Inter carimba só o nome da aplicação — não há host para extrair.
+    ("Cobrança_api", None),
+    ("sem-ponto-nenhum", None),
+])
+def test_host_sai_do_cn_quando_o_banco_carimba(cn, esperado):
+    cert, _ = _par(cn)
+    assert certificado.host_do_titular(certificado.descrever({"cert_pem": cert})) == esperado
+
+
+@pytest.mark.parametrize("cn,base,veredito", [
+    (CN_SANDBOX, "https://baas-api-sandbox.c6bank.info", True),
+    (CN_PRODUCAO, "https://baas-api.c6bank.info", True),
+    # Os dois cruzamentos que quebram o handshake — e é só isto que se pedia.
+    (CN_PRODUCAO, "https://baas-api-sandbox.c6bank.info", False),
+    (CN_SANDBOX, "https://baas-api.c6bank.info", False),
+    # Porta e caminho na base não mudam o host.
+    (CN_SANDBOX, "https://baas-api-sandbox.c6bank.info:443/v1", True),
+])
+def test_ambiente_confere_pega_o_cruzamento(cn, base, veredito):
+    cert, _ = _par(cn)
+    assert certificado.ambiente_confere(certificado.descrever({"cert_pem": cert}), base) is veredito
+
+
+@pytest.mark.parametrize("cn,base", [
+    ("Cobrança_api", "https://cdpj-sandbox.partners.uatinter.co"),  # sem host no CN
+    (CN_SANDBOX, None),                                            # sem base
+    (CN_SANDBOX, ""),
+])
+def test_sem_dado_para_decidir_o_veredito_e_nulo(cn, base):
+    """`None` não é aviso. Só três bancos carimbam host no CN; devolver `False`
+    onde não dá para dizer transformaria o guarda em alarme falso — e alarme
+    falso ensina a ignorar o campo, que é o oposto do que ele existe para fazer."""
+    cert, _ = _par(cn)
+    assert certificado.ambiente_confere(certificado.descrever({"cert_pem": cert}), base) is None
+
+
+def test_o_cadastro_avisa_o_ambiente_trocado(client, monkeypatch):
+    """Ponta a ponta: o `POST /credenciais` responde `ambiente_confere: false`
+    ANTES de qualquer ida ao banco — que é onde a informação servia para algo."""
+    monkeypatch.setenv("C6_BASE_URL", "https://baas-api-sandbox.c6bank.info")
+    cert, chave = _par(CN_PRODUCAO)
+    r = client.post("/credenciais", json={
+        "tenant_id": "empresa1", "provider": "c6",
+        "credentials": {"client_id": "x", "client_secret": SEGREDO,
+                        "cert_pem": cert, "key_pem": chave}})
+    assert r.status_code == 201, r.text
+    c = r.json()["certificado"]
+    assert c["ambiente_confere"] is False
+    assert c["host"] == "baas-api.c6bank.info"
+    assert c["base_em_uso"] == "https://baas-api-sandbox.c6bank.info"
+    assert c["situacao"] == "ok"          # o certificado em si está bom...
+    assert c["par_confere"] is True       # ...e o par também: só o ambiente é outro
+
+
+def test_a_base_e_lida_na_chamada_e_nao_no_import(client, monkeypatch):
+    """Quem aponta o serviço para o sandbox mexe no ambiente. Congelada no
+    import, a resposta descreveria um destino diferente do que o cliente HTTP
+    usaria — um diagnóstico que mente é pior que nenhum."""
+    from app.registry import base_do_banco
+    monkeypatch.setenv("C6_BASE_URL", "https://baas-api.c6bank.info")
+    assert base_do_banco("c6") == "https://baas-api.c6bank.info"
+    monkeypatch.setenv("C6_BASE_URL", "https://baas-api-sandbox.c6bank.info")
+    assert base_do_banco("c6") == "https://baas-api-sandbox.c6bank.info"
+
+
+def test_banco_sem_caminho_on_nao_tem_base():
+    from app.registry import base_do_banco
+    assert base_do_banco("bradesco") is None
+    assert base_do_banco(None) is None

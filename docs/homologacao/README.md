@@ -116,21 +116,26 @@ que muda é quem fez a chamada, e está dito no documento.
 
 ## Resultado da execução — C6
 
-Última execução: **04/08/2026**, contra o sandbox.
+Última execução: **26/08/2026**, contra o sandbox.
 
 | | Tabelas |
 |---|---|
 | Retorno `2xx` do banco | **50** |
-| Recusa do banco, com o corpo do erro | **4** |
-| Marcadas `N/A` com o motivo | **14**, hoje **13** |
+| Recusa do banco, com o corpo do erro | **5** |
+| Marcadas `N/A` com o motivo | **13** |
 | Em branco | **0** |
 | Total do formulário | **68** |
 
-> **`P_03_02` saiu dos `N/A` depois desta execução.** Ele era ausente porque
-> `revisar_lote_cobv` existia no mixin BACEN e o router não expunha; a rota
-> `PATCH /pix/lote/{id}` fechou a lacuna, e o caso passa a ser executável. Os
-> números da tabela são os da rodada de 04/08 e **não** foram remedidos — a
-> próxima execução é que dirá se o banco aceita.
+> **`P_03_02` saiu dos `N/A` e a próxima execução respondeu.** Ele era ausente
+> porque `revisar_lote_cobv` existia no mixin BACEN e o router não expunha; a
+> rota `PATCH /pix/lote/{id}` fechou a lacuna. Executado agora, o banco responde
+> **`502`** — o mesmo dos outros três casos do lote de cobv. É por isso que as
+> recusas passaram de 4 para 5 sem nenhuma regressão: um `N/A` virou recusa
+> medida, que é estritamente mais evidência do que "não se aplica".
+
+> **Comparação caso a caso com 04/08: uma diferença só**, a do `P_03_02` acima.
+> Vinte e dois dias, nenhuma regressão — e `B_04`, `B_08` e `BP_04`, que dependem
+> da CIP e oscilam entre rodadas, fecharam em 2xx desta vez.
 
 > O formulário tem **68** tabelas de retorno, não 51. Ele usa duas formas —
 > Pix Automático e `BP_01` trazem um subtítulo entre o título e o cabeçalho — e
@@ -205,13 +210,13 @@ diferença importa — só o primeiro é decisão de produto:
 
 ## O que o sandbox não deixou concluir
 
-Quatro casos foram executados e não fecharam em 2xx. Nenhum é defeito de
+Cinco casos foram executados e não fecharam em 2xx. Nenhum é defeito de
 integração, e isso precisa estar dito no e-mail ao banco:
 
 | Caso | O que aconteceu |
 |---|---|
 | `C_05_02` — Evento de pagamento de link | **`403` do próprio banco.** O evento nasce do pagamento na página hospedada do C6, e essa página não abre: `payment-h.c6pay.com.br` responde `403` (Cloudflare, *"Sorry, you have been blocked"*) na URL do checkout e na raiz do domínio, de navegador e de `curl`. A API cria o link e o banco devolve a URL — falta o acesso à página. **Não é `N/A`**: o caso está no escopo e implementado (`checkout.atualizado` → `liquidado`, com teste), e marcá-lo "não se aplica" esconderia um defeito do C6 atrás da nossa declaração de escopo |
-| `P_03_01`, `P_03_03`, `P_03_04` — lote de cobv | `502` do próprio banco, em `PUT` e em `GET`. Isolado: o `id` do lote foi testado em 20, 26, 30 e 35 caracteres (a spec exige `[a-zA-Z0-9]{26,35}`) e o payload confere com o exemplo `loteCobVBody1` da própria documentação; `/cob`, `/cobv` e `/pix` respondem `200` na mesma conexão, mesmo token e mesma janela. O corpo do `502` é HTML de Cloudflare, e a spec do C6 nem documenta `502` — só `400`, `403`, `404` e `503` |
+| `P_03_01`…`P_03_04` — lote de cobv | `502` do próprio banco, em `PUT`, `GET` e `PATCH`. Isolado: o `id` do lote foi testado em 20, 26, 30 e 35 caracteres (a spec exige `[a-zA-Z0-9]{26,35}`) e o payload confere com o exemplo `loteCobVBody1` da própria documentação; `/cob`, `/cobv` e `/pix` respondem `200` na mesma conexão, mesmo token e mesma janela. O corpo do `502` é HTML de Cloudflare, e a spec do C6 nem documenta `502` — só `400`, `403`, `404` e `503`. **`P_03_02` entrou nesta família na reexecução de 26/08**: em 04/08 ele ainda era ausente (a rota de revisão do lote não existia; veio com o `BC-088`), e agora que existe recebe o mesmo `502` dos irmãos — o defeito é do recurso inteiro, não de um verbo |
 
 **A recusa também é evidência.** A operação foi tentada e o banco respondeu; o
 corpo do erro está no documento, não um campo vazio.
@@ -264,9 +269,14 @@ Vale a mesma janela de sempre — **seg-sex, 7h-23h BRT**. Fora dela *todo* caso
 falha na autenticação, e uma rodada inteira em vermelho por horário não diz nada
 sobre o que se está observando.
 
-Compare com o estado de 04/08 na tabela acima: `502` em `P_03_01`, `P_03_03` e
-`P_03_04`, `403` em `C_05_02`, e massa ausente em `P_05_01`, `P_05_03` e
-`P_05_04`. Qualquer um desses virando 2xx é a notícia.
+Compare com o estado de **26/08** na tabela acima: `502` em `P_03_01`…`P_03_04`,
+`403` em `C_05_02`, e massa ausente em `P_05_01`, `P_05_03` e `P_05_04`. Qualquer
+um desses virando 2xx é a notícia.
+
+A reexecução de 26/08 fechou em **50 casos em 2xx, 5 falhas, 13 ausentes** — e a
+comparação caso a caso com 04/08 acusou **uma única diferença**, o `P_03_02`
+descrito acima. Nenhuma regressão em 22 dias, e os três casos que dependem da CIP
+(`B_04`, `B_08`, `BP_04`) fecharam em 2xx desta vez.
 
 Quando algo destravar: rode o roteiro **completo**, regenere o `.docx` e
 atualize os números da seção acima — eles são daquela rodada e não se atualizam

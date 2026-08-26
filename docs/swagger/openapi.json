@@ -13605,6 +13605,51 @@
               360
             ]
           },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host",
+            "description": "O host extraído do CN — é ele que diz o ambiente. `null` quando o banco não carimba host no CN (o do Inter é só o nome da aplicação).",
+            "examples": [
+              "baas-api-sandbox.c6bank.info"
+            ]
+          },
+          "base_em_uso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Em Uso",
+            "description": "Para onde ESTE servidor está apontado naquele banco.",
+            "examples": [
+              "https://baas-api-sandbox.c6bank.info"
+            ]
+          },
+          "ambiente_confere": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ambiente Confere",
+            "description": "O certificado é do mesmo ambiente da `base_em_uso`? `false` significa que toda chamada vai falhar no handshake — o banco responde `403 mTLS`, que se lê como credencial inválida e manda conferir client_id e secret, que estão certos. `null` = não dá para dizer (sem host no CN).",
+            "examples": [
+              true
+            ]
+          },
           "formato": {
             "anyOf": [
               {
