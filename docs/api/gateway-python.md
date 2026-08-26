@@ -137,7 +137,47 @@ integra uma única vez):
    `bapi_` (única vez);
 2. **Todas as demais chamadas** autenticam com `Authorization: Bearer bapi_...`
    — a API valida o token e usa as credenciais do banco internamente;
-3. `DELETE /credenciais` revoga.
+3. `GET /credenciais` responde **o que está guardado** sob o token — sem o
+   segredo, e com o token mascarado (ele é exibido uma única vez e o servidor
+   não consegue recuperá-lo);
+4. `DELETE /credenciais` revoga.
+
+### `GET /credenciais` — quando a integração para de funcionar
+
+O certificado mTLS dos bancos vale **um ano** e não tem renovação in-place:
+vence, e toda chamada passa a falhar no handshake de uma vez, sem nada no código
+ter mudado. Era risco de operação sem nenhuma visibilidade — o material entrava
+cifrado no cofre e ninguém mais olhava.
+
+```json
+{
+  "token": "bapi_********",
+  "tenant_id": "empresa_123",
+  "certificado": {
+    "situacao": "ok",
+    "titular": "MSDOBRASILLTDA05230380000174-baas-api-sandbox.c6bank.info",
+    "emissor": "baas-api-sandbox.c6bank.info Issuing CA",
+    "valido_ate": "2027-08-21",
+    "dias_restantes": 360,
+    "cnpj": "05230380000174",
+    "par_confere": true
+  }
+}
+```
+
+| Campo | Para que serve |
+|---|---|
+| `situacao` | `ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel` |
+| `titular` | **Qual** certificado está em uso. O ambiente está no *host* dentro do CN: `baas-api-sandbox` é sandbox, `baas-api` é produção |
+| `cnpj` | Extraído do CN, para conferir num olhar que é a empresa certa |
+| `par_confere` | A chave privada é a **deste** certificado? `false` é o erro clássico da troca — `.crt` novo com `.key` antiga —, que no handshake vira uma mensagem de TLS que não aponta o par trocado |
+
+O metadado é **derivado e não reconstrói nada**: certificado, chave privada e
+`client_secret` nunca saem. É a regra do `core/vault.py`.
+
+O mesmo bloco volta no `POST /credenciais`, que é onde o erro custa menos:
+carregar o certificado do ambiente errado só aparecia no primeiro handshake,
+horas depois.
 
 O **esquema de credenciais é próprio de cada banco** — o campo `credentials` é
 livre e o `GET /bancos` documenta o esquema vigente:

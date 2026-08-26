@@ -17,6 +17,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **`GET /credenciais` — quando a integração para de funcionar.** O certificado
+  mTLS dos bancos vale um ano e não tem renovação in-place: vence e toda chamada
+  falha no handshake, de uma vez. A rota diz a validade, os dias restantes, o
+  titular (é o **host** dentro do CN que separa sandbox de produção) e se a
+  chave privada é a **deste** certificado — o erro clássico da troca. Sem
+  segredo: certificado, chave e `client_secret` não saem, e o token volta
+  mascarado. O mesmo bloco vem no `POST /credenciais`.
 - **`X-Remessa-Avisos` em `POST /api/remessa`.** Header presente só quando há
   aviso: diz o que o layout **não gravou** do que você mandou. `carteira` está
   na base de toda remessa, mas oito layouts não têm esse campo — quem monta a
@@ -73,6 +80,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   só o **Inter** os grava; nos demais entravam e sumiam, e o título ia ao banco
   sem o encargo pedido. `percentual_mora` segue válido no CNAB 240 e recusado
   no 400 (exceto Inter). O erro diz quem grava o campo e qual é a alternativa.
+- **C6 aceita o certificado no formato que o banco entrega.** O C6 manda o par
+  PEM (`.crt` + `.key`); o provider só repassava `pfx_base64`, então o material
+  do banco era inutilizável e obrigava um `openssl pkcs12 -export` antes da
+  primeira chamada. O PFX continua valendo. O esquema em `GET /bancos` passou a
+  citar `cert_pem`/`key_pem` — ele prometia menos do que a rota aceita.
 - **Sicoob: a carteira `09` gerava um boleto diferente da `9`.** São a mesma
   carteira, e o campo livre ficava com o primeiro caractere — gravava `0`, que
   não existe no Sicoob. O boleto saía estruturalmente válido, então nenhuma

@@ -270,6 +270,59 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "credenciais"
+        ],
+        "summary": "Consultar",
+        "description": "O que está guardado sob este token — **sem** o segredo.\n\nExiste por causa de uma pergunta que a API não sabia responder: *quando a\nminha integração para de funcionar?* O certificado mTLS dos bancos vale um\nano e não tem renovação in-place — vence, e toda chamada passa a falhar no\nhandshake de uma vez, sem nada no código ter mudado.\n\nResponde também *qual* certificado está em uso, que é onde a confusão\nacontece de verdade: os bancos entregam pacotes com mais de um, e o ambiente\nestá no **host** dentro do CN (`baas-api-sandbox` × `baas-api`). Carregar o\ndo ambiente errado só aparecia no primeiro handshake.\n\nO `token` volta mascarado: ele é exibido uma única vez, no cadastro, e o\nservidor não consegue recuperá-lo — devolvê-lo aqui seria mentira.",
+        "operationId": "consultar_credenciais_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer bapi_...",
+              "title": "Authorization"
+            },
+            "description": "Bearer bapi_..."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredencialOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido, revogado ou de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/cobranca": {
@@ -12721,6 +12774,146 @@
         "type": "object",
         "title": "CarneOut"
       },
+      "CertificadoOut": {
+        "properties": {
+          "situacao": {
+            "type": "string",
+            "title": "Situacao",
+            "description": "`ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel`",
+            "examples": [
+              "ok"
+            ]
+          },
+          "titular": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titular",
+            "description": "CN do certificado. Os bancos escrevem `<RAZAO><CNPJ>-<host>`, e o **host diz o ambiente**: `baas-api-sandbox` é sandbox, `baas-api` é produção. É por aqui que se confere qual certificado está em uso.",
+            "examples": [
+              "MSDOBRASILLTDA05230380000174-baas-api-sandbox.c6bank.info"
+            ]
+          },
+          "emissor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emissor"
+          },
+          "valido_de": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valido De"
+          },
+          "valido_ate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valido Ate",
+            "examples": [
+              "2027-08-21"
+            ]
+          },
+          "dias_restantes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Restantes",
+            "description": "Negativo quando já venceu. O certificado dos bancos vale um ano e **não tem renovação in-place**: vence e toda chamada passa a falhar no handshake, de uma vez.",
+            "examples": [
+              360
+            ]
+          },
+          "formato": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formato",
+            "examples": [
+              "pem"
+            ]
+          },
+          "detalhe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalhe",
+            "description": "Por que não deu para ler, quando `ilegivel`."
+          },
+          "cnpj": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cnpj",
+            "description": "Extraído do CN, para conferência num olhar.",
+            "examples": [
+              "05230380000174"
+            ]
+          },
+          "par_confere": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Par Confere",
+            "description": "A chave privada é a DESTE certificado? `null` quando não há par PEM para comparar. `false` é o erro clássico da troca de certificado — `.crt` novo com `.key` antigo —, que no handshake vira uma mensagem de TLS que não aponta o par trocado.",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "situacao"
+        ],
+        "title": "CertificadoOut",
+        "description": "Metadado do certificado mTLS. **Nunca** o certificado nem a chave."
+      },
       "CheckoutCobranca": {
         "properties": {
           "valor": {
@@ -13542,6 +13735,17 @@
             "examples": [
               "c6"
             ]
+          },
+          "certificado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CertificadoOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metadado do certificado mTLS enviado, quando há. Vem no cadastro porque é onde o erro custa menos: carregar o certificado do ambiente errado só aparecia no primeiro handshake, horas depois."
           }
         },
         "type": "object",

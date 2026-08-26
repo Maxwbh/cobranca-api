@@ -702,12 +702,49 @@ class CredencialIn(BaseModel):
     )
 
 
+class CertificadoOut(BaseModel):
+    """Metadado do certificado mTLS. **Nunca** o certificado nem a chave."""
+
+    situacao: str = Field(
+        description=("`ok` · `expirando` (30 dias ou menos) · `expirado` · `ilegivel`"),
+        examples=["ok"])
+    titular: str | None = Field(default=None, examples=[
+        "MSDOBRASILLTDA05230380000174-baas-api-sandbox.c6bank.info"],
+        description="CN do certificado. Os bancos escrevem `<RAZAO><CNPJ>-<host>`, e o "
+                    "**host diz o ambiente**: `baas-api-sandbox` é sandbox, `baas-api` "
+                    "é produção. É por aqui que se confere qual certificado está em uso.")
+    emissor: str | None = None
+    valido_de: str | None = None
+    valido_ate: str | None = Field(default=None, examples=["2027-08-21"])
+    dias_restantes: int | None = Field(
+        default=None, examples=[360],
+        description="Negativo quando já venceu. O certificado dos bancos vale um ano e "
+                    "**não tem renovação in-place**: vence e toda chamada passa a falhar "
+                    "no handshake, de uma vez.")
+    formato: str | None = Field(default=None, examples=["pem"])
+    detalhe: str | None = Field(default=None,
+                                description="Por que não deu para ler, quando `ilegivel`.")
+    cnpj: str | None = Field(default=None, examples=["05230380000174"],
+                             description="Extraído do CN, para conferência num olhar.")
+    par_confere: bool | None = Field(
+        default=None, examples=[True],
+        description="A chave privada é a DESTE certificado? `null` quando não há par PEM "
+                    "para comparar. `false` é o erro clássico da troca de certificado — "
+                    "`.crt` novo com `.key` antigo —, que no handshake vira uma mensagem "
+                    "de TLS que não aponta o par trocado.")
+
+
 class CredencialOut(BaseModel):
     token: str = Field(description="Token opaco (bapi_...) — exibido UMA única vez; guarde-o. "
                                    "Use nas demais rotas via Authorization: Bearer")
     tenant_id: str
     provider: Provider
     banco: Banco | None = campo_banco("Instituição destas credenciais (eco do request).")
+    certificado: CertificadoOut | None = Field(
+        default=None,
+        description="Metadado do certificado mTLS enviado, quando há. Vem no cadastro "
+                    "porque é onde o erro custa menos: carregar o certificado do ambiente "
+                    "errado só aparecia no primeiro handshake, horas depois.")
 
 
 # --- Conciliação (C6 Pay statement) ------------------------------------------

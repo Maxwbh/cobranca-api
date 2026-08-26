@@ -7856,6 +7856,57 @@
       "description": "Roda por ÚLTIMO: revoga o token ativo (invalida o Bearer da run).",
       "item": [
         {
+          "name": "BC-091 · Consultar credencial e validade do certificado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/credenciais",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credenciais"
+              ]
+            },
+            "description": "O que está guardado sob o token, SEM o segredo. Responde a pergunta que a API não sabia responder: quando a integração para de funcionar. O certificado mTLS dos bancos vale um ano e não tem renovação in-place — vence e toda chamada falha no handshake de uma vez. Diz também QUAL certificado está em uso: o ambiente está no host dentro do CN (baas-api-sandbox × baas-api), e carregar o do ambiente errado só aparecia no primeiro handshake."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 401]);",
+                  "// So valida o CORPO quando houve sucesso: sem token valido nao ha payload.",
+                  "if (pm.response.code === 200) {",
+                  "  const b = pm.response.json();",
+                  "  pm.test('o token volta mascarado', () =>",
+                  "    pm.expect(b.token).to.match(/^bapi_\\*+$/));",
+                  "  pm.test('o segredo do banco nao sai na resposta', () => {",
+                  "    const corpo = JSON.stringify(b);",
+                  "    pm.expect(corpo).to.not.include('PRIVATE KEY');",
+                  "    pm.expect(corpo).to.not.include('client_secret');",
+                  "  });",
+                  "  if (b.certificado) {",
+                  "    pm.test('situacao do certificado e conhecida', () =>",
+                  "      pm.expect(['ok', 'expirando', 'expirado', 'ilegivel']).to.include(b.certificado.situacao));",
+                  "    pm.test('certificado nao vencido', () =>",
+                  "      pm.expect(b.certificado.situacao).to.not.eql('expirado'));",
+                  "    if (b.certificado.par_confere !== null && b.certificado.par_confere !== undefined) {",
+                  "      pm.test('a chave privada e a deste certificado', () =>",
+                  "        pm.expect(b.certificado.par_confere).to.be.true);",
+                  "    }",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "BC-008 · Revogar token ativo",
           "request": {
             "method": "DELETE",
