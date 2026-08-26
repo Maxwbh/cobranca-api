@@ -25,7 +25,7 @@ _ALT_PIX = ("webhook Pix por chave é do dialeto BACEN — hoje C6, Sicoob e Int
             "`banco=c6|sicoob|inter`. Para boleto, o caminho é `/config/webhook-banco`")
 
 _SERVICE = Query(default=ServicoWebhook.bank_slip,
-                 description="O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)")
+                 description="O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão). `COBRANCA` é a grafia do Inter para o boleto e vale como sinônimo — o Inter tem uma notificação só, e ali o campo é ignorado.")
 _CHAVE = Query(description="Chave Pix do recebedor", examples=["financeiro@empresa.com.br"])
 
 # As seis respostas são repassadas COMO O BANCO MANDOU — confirmação do cadastro,
@@ -46,7 +46,7 @@ def _provider(tenant_id, provider, vault, credentials, banco=None):
 @router.post("", response_model=dict, responses=_RESP_DO_BANCO)
 def cadastrar(body: WebhookBancoIn, authorization: str | None = _AUTH_HEADER,
               vault: Vault = Depends(get_vault)) -> dict:
-    """Registra a URL de notificação no banco (service: BANK_SLIP | CHECKOUT)."""
+    """Registra a URL de notificação no banco (service: BANK_SLIP | CHECKOUT | COBRANCA)."""
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
                                         tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
     p = _provider(body.tenant_id, body.provider, vault, creds, banco=body.banco)

@@ -58,6 +58,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.
 
 ### Corrigido
+- **`service=COBRANCA` voltou a ser aceito em `/config/webhook-banco`.** O campo
+  virou enum com o vocabulário do C6 (`BANK_SLIP`, `CHECKOUT`) e passou a recusar
+  com `422` a palavra que a documentação do **Inter** usa para o webhook de
+  boleto — numa rota que atende os dois bancos. `COBRANCA` vale como sinônimo; no
+  C6 é traduzido antes de sair, para o alias não virar `400` do banco.
 - **Pix Automático do Inter: confirmado e ligado.** A spec OpenAPI do banco usa
   a mesma base `/pix/v2` e traz `rec`, `solicrec`, `cobr`, `locrec` e os dois
   webhooks — as 17 chamadas do nosso dialeto batem uma a uma. O token do Inter

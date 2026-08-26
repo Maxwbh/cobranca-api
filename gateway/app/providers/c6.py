@@ -230,15 +230,26 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
 
     # --- webhooks no banco (/v1/webhooks) ------------------------------------------
 
+    #: Grafias do MESMO serviço em bancos diferentes -> a palavra do C6.
+    #: `COBRANCA` é como o Inter chama o webhook de boleto; repassada crua ao
+    #: C6 vira `400` do banco, que não se parece com "essa palavra é do outro".
+    _SERVICO_EQUIVALENTE = {"COBRANCA": "BANK_SLIP"}
+
+    def _servico(self, service: str) -> str:
+        return self._SERVICO_EQUIVALENTE.get(service, service)
+
     def cadastrar_webhook(self, *, url: str, service: str) -> dict[str, Any]:
         """Registra a URL de notificação no banco (service: BANK_SLIP | CHECKOUT)."""
-        return self._client().request("POST", "/v1/webhooks/", json={"url": url, "service": service})
+        return self._client().request(
+            "POST", "/v1/webhooks/", json={"url": url, "service": self._servico(service)})
 
     def consultar_webhook(self, *, service: str) -> dict[str, Any]:
-        return self._client().request("GET", "/v1/webhooks/", params={"service": service})
+        return self._client().request(
+            "GET", "/v1/webhooks/", params={"service": self._servico(service)})
 
     def remover_webhook(self, *, service: str) -> dict[str, Any]:
-        return self._client().request("DELETE", "/v1/webhooks/", params={"service": service})
+        return self._client().request(
+            "DELETE", "/v1/webhooks/", params={"service": self._servico(service)})
 
     # --- conciliação (C6 Pay /v1/c6pay/statement) -------------------------------
 

@@ -9,7 +9,7 @@ evidência. Sicoob e Inter seguem o mesmo roteiro, sem formulário do banco.
 | *(formulário preenchido)* | **Não é versionado**: é documento de envio ao banco, gerado por `preencher_roteiro_c6.py` a partir da evidência JSON — regenerável a qualquer momento |
 | `evidencia-sandbox-c6.json` | A evidência crua do C6 — status HTTP e corpo de cada caso, como o banco devolveu |
 | `evidencia-sandbox-sicoob.json` | A evidência crua do Sicoob (veja a ressalva abaixo) |
-| `evidencia-sandbox-inter.json` | A evidência crua do Banco Inter — **13 casos em 2xx, zero falhas**, com o banco ecoando o que foi enviado |
+| `evidencia-sandbox-inter.json` | A evidência crua do Banco Inter — **16 casos, zero falhas**, com o banco ecoando o que foi enviado |
 | `evidencia-open-finance.json` | O que os quatro bancos publicam no **Diretório de Participantes** do Open Finance (fonte pública, sem credencial) — leitura em [open-finance.md](../development/open-finance.md) |
 
 ## O que cada sandbox prova — e a diferença não é detalhe
@@ -83,6 +83,7 @@ PYTHONPATH=gateway python scripts/homologacao_sicoob.py --json > evidencia-sicoo
 export INTER_SANDBOX_CLIENT_ID=... INTER_SANDBOX_CLIENT_SECRET=...
 export INTER_SANDBOX_CERT_PEM="$(cat Sandbox_InterAPI_Certificado.crt)"
 export INTER_SANDBOX_KEY_PEM="$(cat Sandbox_InterAPI_Chave.key)"
+export INTER_SANDBOX_CHAVE_PIX=...   # sem ela, P_01/P_02/P_05 saem como AUSENTE
 PYTHONPATH=gateway python scripts/homologacao_inter.py --json > evidencia-inter.json
 ```
 
@@ -142,22 +143,49 @@ criado.
 
 ## Resultado da execução — Banco Inter
 
-**13 casos em 2xx, zero falhas, 3 ausentes.** O sandbox tem comportamento real:
-a sonda de eco confirmou que `seuNumero`, valor e vencimento voltam idênticos ao
-que foi enviado.
+**16 casos, zero falhas, 3 ausentes.** O sandbox tem comportamento real: a sonda
+de eco confirmou que `seuNumero`, valor e vencimento voltam idênticos ao que foi
+enviado.
 
 Os três ausentes, e o motivo de cada um:
 
 | Caso | Por quê |
 |---|---|
 | `PG_01` — pagamentos | **Fora de escopo.** Saída de dinheiro; a [régua de escopo](../development/roadmap-providers.md) exclui pagamento em qualquer provider |
-| `PA_01` — Pix Automático | **Produto não habilitado na conta.** O provider implementa (dialeto BACEN, herdado do mixin) e `GET /bancos` declara a capacidade — o que falta é contratação, não código |
+| `PA_01` — Pix Automático | **Confirmado no banco, mas sem massa.** A spec OpenAPI do Inter publica as rotas na mesma base `/pix/v2` e as 17 chamadas do dialeto batem uma a uma ([inventário](evidencia-pix-automatico-inter.json)). O que barra a execução é o **BACEN**: só CNPJ com 6+ meses de atividade cria recorrência |
 | `SA_01` — saldo | Rota não exposta pelo gateway; o extrato cobre o caso de uso |
 
-Dois defeitos nossos só apareceram aqui, contra o banco de verdade: a emissão
+Três defeitos nossos só apareceram aqui, contra o banco de verdade: a emissão
 voltava `502` por causa da **barra final** no path (o Inter responde `307` onde
-o C6 exige a barra), e o default `formasRecebimento: BOLETO` **suprimia o QR
-Pix** — o híbrido é `BOLETO_PIX`, hoje o default.
+o C6 exige a barra); o default `formasRecebimento: BOLETO` **suprimia o QR Pix**
+— o híbrido é `BOLETO_PIX`, hoje o default; e `service=COBRANCA`, a palavra que a
+documentação do Inter usa para o webhook de boleto, tinha passado a responder
+`422` (ver abaixo).
+
+### A coleção de cobranças, contra o banco (`C_01`…`C_03`)
+
+Os três casos novos existem porque a coleção só podia ser provada com corpo real
+do banco:
+
+| Caso | O que prova |
+|---|---|
+| `C_01` — coleção | Filtra por **emissão**, não por vencimento: o boleto do `B_01` vence em 30 dias, e uma janela recente por vencimento voltaria vazia — o caso passaria sem provar nada. Por emissão, o título recém-criado aparece, e o relatório grava `achou_o_do_b01` |
+| `C_02` — sumário | O Inter devolve **array na raiz**. Com esse corpo a rota respondia `500` antes do embrulho em `sumario` — defeito que nenhum teste com dado inventado teria mostrado |
+| `C_03` — filtro inválido | `situacao=ABERTO` (o Inter chama de `A_RECEBER`) para no gateway com `422` listando os aceitos, **sem gastar ida ao banco**. É o único caso cujo sucesso é uma recusa: o runner o compara com o status esperado, não com 2xx |
+
+### Uma regressão que a reexecução pegou
+
+`B_05`/`B_06` — cadastro e consulta do webhook de cobrança — passaram em
+**04/08** e responderam `422` nesta execução. Não foi o banco: entre as duas
+datas o campo `service` deixou de ser texto livre e virou enum, e o enum só
+tinha o vocabulário do **C6** (`BANK_SLIP`, `CHECKOUT`). `COBRANCA`, a palavra
+do Inter, passou a ser recusada por uma rota que diz servir os dois bancos.
+
+É a mesma família do `BC-044` (que saiu de `422` para `424` ao trocar dict livre
+por schema): **apertar validação sem reexecutar o roteiro estreita o contrato em
+silêncio.** `COBRANCA` voltou a valer, como sinônimo — e o provider do C6 traduz
+para a palavra dele antes de falar com o banco, senão o alias viraria `400` lá
+na frente.
 
 > **O certificado do sandbox expira em 03/09/2026.** Vencido, toda chamada falha
 > na autenticação e responde `424` — que é o diagnóstico certo, mas convém não

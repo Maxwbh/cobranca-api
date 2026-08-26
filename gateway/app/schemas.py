@@ -604,10 +604,18 @@ class SolicitacaoRecorrenciaIn(BaseModel):
 
 
 class ServicoWebhook(str, Enum):
-    """O que o banco notifica naquela URL. Vocabulário do C6."""
+    """O que o banco notifica naquela URL.
+
+    O vocabulário nasceu do C6, que tem duas notificações (boleto e cartão). O
+    Inter tem UMA — e a chama de `COBRANCA`: quem lê a documentação do Inter
+    manda essa palavra e levava `422` listando só os termos do outro banco.
+    `COBRANCA` entra como grafia do mesmo serviço; o provider do C6 traduz para
+    a sua antes de falar com o banco, senão o alias viraria `400` lá na frente.
+    """
 
     bank_slip = "BANK_SLIP"
     checkout = "CHECKOUT"
+    cobranca = "COBRANCA"
 
 
 def campo_url_webhook(descricao: str) -> Any:
@@ -632,7 +640,7 @@ class WebhookBancoIn(BaseModel):
         "(ex: https://.../webhooks/c6/{tenant})")
     service: ServicoWebhook = Field(
         default=ServicoWebhook.bank_slip,
-        description="O que notificar: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão)")
+        description="O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão). `COBRANCA` é a grafia do Inter para o boleto e vale como sinônimo — o Inter tem uma notificação só, e ali o campo é ignorado.")
     credentials: dict[str, Any] | None = None
 
 

@@ -36,7 +36,7 @@ INTER = {
     "data_vencimento": "2027-09-10",
 }
 #: Nosso número que o Inter atribuiu ao registrar, no sandbox (caso `B_02`).
-NUMERADO_PELO_BANCO = "2143783023"
+NUMERADO_PELO_BANCO = "2143876889"
 
 
 @pytest.fixture
@@ -203,7 +203,13 @@ def test_o_inter_online_nao_manda_nosso_numero():
 
 
 def test_o_nosso_numero_do_sandbox_e_o_que_o_banco_atribuiu():
-    """A fixture não é número inventado: veio do sandbox do Inter."""
+    """A fixture não é número inventado: veio do sandbox do Inter.
+
+    O laço é apertado de propósito — casa com a evidência DESTA execução, não
+    com "algum número do banco". Regravar a evidência sem trazer o número junto
+    deixaria a fixture órfã: o comentário seguiria dizendo "veio do banco" e não
+    haveria mais onde conferir. Roteiro reexecutado ⇒ atualize as duas pontas.
+    """
     if not EVIDENCIA.exists():
         pytest.skip("evidência de homologação ausente")
     casos = json.loads(EVIDENCIA.read_text(encoding="utf-8"))["resultados"]

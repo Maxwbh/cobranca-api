@@ -11,7 +11,7 @@
       "ok": true,
       "status_code": 201,
       "response_body": {
-        "token": "bapi_MbjnO8RafGaQ8g4O9TMq4uS6t48_YEnhQspVtgigrjc",
+        "token": "bapi_<mascarado>",
         "tenant_id": "homologacao",
         "provider": "sicoob"
       },

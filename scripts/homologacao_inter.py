@@ -136,6 +136,20 @@ def _janela(dias: int = 7) -> tuple[str, str]:
 
 # --- casos: cada um devolve (status_code, corpo) da API ----------------------------
 
+def _sem_token(item: dict) -> dict:
+    """Mascara o `bapi_` antes de a evidência sair daqui.
+
+    O token não é um identificador: é a CHAVE que decifra as credenciais
+    guardadas (`core/credential_store`). A evidência é versionada — e
+    `core/vault.py` é explícito: "NUNCA versionar em git". O que o relatório
+    precisa provar é que o cadastro devolveu um token, não qual.
+    """
+    corpo = item.get("response_body")
+    if isinstance(corpo, dict) and isinstance(corpo.get("token"), str):
+        item = {**item, "response_body": {**corpo, "token": "bapi_<mascarado>"}}
+    return item
+
+
 def at_01():
     """Token da API sobre a credencial do banco."""
     return API("POST", "/credenciais", json={
@@ -243,6 +257,46 @@ def p_05():
         "url": "https://exemplo.com.br/webhooks/inter/pix"})
 
 
+def c_01():
+    """Coleção de boletos do período — `GET /cobrancas`.
+
+    Filtra por **EMISSÃO** e não por vencimento de propósito: o boleto do B_01
+    vence daqui a 30 dias, então uma janela recente por vencimento voltaria
+    vazia e o caso passaria sem provar nada. Por emissão, o título recém-criado
+    tem de aparecer — e é isso que o relatório afirma em `achou_o_do_b01`.
+    """
+    ini, fim = _janela(1)
+    st, b = API("GET", "/cobrancas", params=_q(
+        inicio=ini, fim=fim, pagina=1, tamanho=50, filtrar_data_por="EMISSAO"))
+    if isinstance(b, dict) and ESTADO.get("seu_numero"):
+        achou = ESTADO["seu_numero"] in json.dumps(b, ensure_ascii=False)
+        b = {**b, "achou_o_do_b01": achou}
+    return st, b
+
+
+def c_02():
+    """Sumário do período por situação — `GET /cobrancas/sumario`.
+
+    O Inter devolve **array na raiz**; o gateway embrulha em `sumario`. O caso
+    existe para provar isso contra o banco de verdade: com o corpo real, a rota
+    respondia 500 antes do embrulho.
+    """
+    ini, fim = _janela(1)
+    return API("GET", "/cobrancas/sumario",
+               params=_q(inicio=ini, fim=fim, filtrar_data_por="EMISSAO"))
+
+
+def c_03():
+    """Filtro fora do vocabulário do banco para no gateway, com 422.
+
+    Prova o lado que o banco não prova: `ABERTO` não existe no Inter (é
+    `A_RECEBER`), e mandado ao banco volta 400 genérico. Aqui a recusa nomeia
+    os valores aceitos e não gasta uma ida ao banco.
+    """
+    ini, fim = _janela(1)
+    return API("GET", "/cobrancas", params=_q(inicio=ini, fim=fim, situacao="ABERTO"))
+
+
 def e_01():
     """Extrato da conta (Banking v2)."""
     ini, fim = _janela(30)
@@ -254,9 +308,11 @@ AUSENTES: dict[str, tuple[str, str]] = {
               "fora do escopo do produto: saída de dinheiro; a Cobranca-API é cobrança "
               "(entrada). Os scopes `pagamento-*` nem são pedidos no token"),
     "PA_01": ("Pix Automático (rec/solicrec/cobr)",
-              "não consta no SDK oficial do Inter (inter-co/pj-sdk-java). O provider herda o "
-              "mixin BACEN, então o dialeto está pronto — falta confirmar no portal se o "
-              "banco expõe as rotas. Prometer antes de confirmar seria vender o que não se sabe"),
+              "CONFIRMADO no banco e ligado: a spec OpenAPI do Inter publica as rotas na "
+              "mesma base `/pix/v2` e as 17 chamadas do dialeto batem uma a uma (inventário "
+              "em docs/homologacao/evidencia-pix-automatico-inter.json). Não roda AQUI por "
+              "restrição do BACEN, não do gateway: só CNPJ com 6+ meses de atividade cria "
+              "recorrência, e a conta do sandbox não atende"),
     "SA_01": ("Banking v2 — saldo",
               "LACUNA DE SUPERFÍCIE, não de escopo: o endpoint existe e o gateway não expõe "
               "rota de saldo para nenhum banco (mesma situação do SIC-S06). ADIADO por "
@@ -266,6 +322,12 @@ AUSENTES: dict[str, tuple[str, str]] = {
 }
 
 
+#: Caso cujo SUCESSO é uma recusa. Sem isto o runner leria 2xx como único
+#: resultado bom, e uma rota que parasse de recusar entraria no relatório como
+#: aprovada — que é o inverso do que o caso prova.
+ESPERADO: dict[str, int] = {"C_03": 422}
+
+
 CASOS = [
     ("AT_01", "Token da API sobre a credencial do banco", at_01),
     ("B_01", "Emissão de boleto registrado", b_01),
@@ -273,6 +335,9 @@ CASOS = [
     ("B_03", "PDF do boleto", b_03),
     ("B_05", "Webhook de cobrança — cadastro", b_05),
     ("B_06", "Webhook de cobrança — consulta", b_06),
+    ("C_01", "Coleção de cobranças do período", c_01),
+    ("C_02", "Sumário de cobranças do período", c_02),
+    ("C_03", "Filtro fora do vocabulário do banco → 422", c_03),
     ("B_04", "Cancelamento", b_04),
     ("P_01", "Cobrança Pix imediata (cob)", p_01),
     ("P_02", "Consulta da cob", p_02),
@@ -308,8 +373,12 @@ def main() -> int:
             continue
         try:
             status, corpo = fn()
-            item = {"caso": cid, "nome": nome, "ok": 200 <= status < 300,
+            espera = ESPERADO.get(cid)
+            item = {"caso": cid, "nome": nome,
+                    "ok": status == espera if espera else 200 <= status < 300,
                     "status_code": status, "response_body": corpo}
+            if espera:
+                item["status_esperado"] = espera
         except SemMassa as e:
             item = {"caso": cid, "nome": nome, "ausente": True, "motivo": str(e),
                     "ok": None, "status_code": None, "response_body": None}
@@ -348,7 +417,8 @@ def main() -> int:
     if so_json:
         print(json.dumps({"executado_em": datetime.now().isoformat(timespec="seconds"),
                           "alvo": onde, "banco": "inter", "ambiente": BASE_SANDBOX,
-                          "sandbox_ecoa_o_enviado": eco, "resultados": resultados},
+                          "sandbox_ecoa_o_enviado": eco,
+                          "resultados": [_sem_token(r) for r in resultados]},
                          ensure_ascii=False, indent=2, default=str))
     elif eco is not None:
         print(f"\n{'='*72}")

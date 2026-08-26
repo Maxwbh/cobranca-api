@@ -233,3 +233,42 @@ def test_webhook_pix_valido_chega_ao_banco(client, bancos_no_cofre, sem_rede):
     r = client.put("/config/webhook-pix", json=_pix())
     assert r.status_code == 200, r.text
     assert sem_rede[-1]["json"] == {"webhookUrl": _URL_OK}
+
+
+# --- vocabulário do serviço: cada banco tem o seu ---------------------------------
+#
+# Achado rodando o roteiro do Inter contra o sandbox: `service=COBRANCA` — a
+# palavra que a documentação do Inter usa — levava 422 listando só `BANK_SLIP` e
+# `CHECKOUT`, que são do C6. A rota diz servir os dois bancos; recusava o termo
+# de um deles.
+
+def test_cobranca_e_aceito_como_grafia_do_inter(client, bancos_no_cofre, sem_rede):
+    r = client.post("/config/webhook-banco", json={
+        "tenant_id": "empresa1", "provider": "inter", "url": _URL_OK, "service": "COBRANCA"})
+    assert r.status_code == 200, r.text
+    assert sem_rede[-1]["json"] == {"webhookUrl": _URL_OK}
+
+
+@pytest.mark.parametrize("enviado,no_banco", [
+    ("COBRANCA", "BANK_SLIP"),   # a palavra do Inter, traduzida
+    ("BANK_SLIP", "BANK_SLIP"),
+    ("CHECKOUT", "CHECKOUT"),
+])
+def test_c6_recebe_sempre_a_palavra_dele(client, bancos_no_cofre, sem_rede,
+                                         enviado, no_banco):
+    """Aceitar o sinônimo e repassá-lo cru trocaria um 422 daqui por um 400 do
+    C6 — mais longe da causa e sem dizer que a palavra é de outro banco."""
+    r = client.post("/config/webhook-banco", json={
+        "tenant_id": "empresa1", "provider": "c6", "url": _URL_OK, "service": enviado})
+    assert r.status_code == 200, r.text
+    assert sem_rede[-1]["json"]["service"] == no_banco
+
+
+@pytest.mark.parametrize("metodo", ["get", "delete"])
+def test_consulta_e_remocao_tambem_traduzem(client, bancos_no_cofre, sem_rede, metodo):
+    """A tradução no cadastro e não na consulta deixaria o par assimétrico:
+    cadastra em BANK_SLIP e consulta COBRANCA — que no C6 é outro recurso."""
+    r = getattr(client, metodo)("/config/webhook-banco", params={
+        "tenant_id": "empresa1", "provider": "c6", "service": "COBRANCA"})
+    assert r.status_code == 200, r.text
+    assert sem_rede[-1]["params"]["service"] == "BANK_SLIP"

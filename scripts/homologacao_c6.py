@@ -736,6 +736,20 @@ CASOS = [
 # assincronia do banco, não por defeito.
 
 
+def _sem_token(item: dict) -> dict:
+    """Mascara o `bapi_` antes de a evidência sair daqui.
+
+    O token não é um identificador: é a CHAVE que decifra as credenciais
+    guardadas (`core/credential_store`). A evidência é versionada — e
+    `core/vault.py` é explícito: "NUNCA versionar em git". O que o relatório
+    precisa provar é que o cadastro devolveu um token, não qual.
+    """
+    corpo = item.get("response_body")
+    if isinstance(corpo, dict) and isinstance(corpo.get("token"), str):
+        item = {**item, "response_body": {**corpo, "token": "bapi_<mascarado>"}}
+    return item
+
+
 def main() -> int:
     global API
     argv = sys.argv[1:]
@@ -815,7 +829,7 @@ def main() -> int:
 
     if so_json:
         print(json.dumps({"executado_em": datetime.now().isoformat(timespec="seconds"),
-                          "alvo": onde, "resultados": resultados},
+                          "alvo": onde, "resultados": [_sem_token(r) for r in resultados]},
                          ensure_ascii=False, indent=2, default=str))
     falhas = [r["caso"] for r in resultados if r.get("ok") is False]
     if falhas and not so_json:

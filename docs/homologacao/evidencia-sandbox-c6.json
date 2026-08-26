@@ -8,7 +8,7 @@
       "ok": true,
       "status_code": 201,
       "response_body": {
-        "token": "bapi_0BSIM4EO3wP7ddBUIT5ozcAOvbT2BM2ZdVq9U1q1D8A",
+        "token": "bapi_<mascarado>",
         "tenant_id": "homologacao",
         "provider": "c6"
       }
