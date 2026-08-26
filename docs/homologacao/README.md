@@ -8,7 +8,7 @@ evidência. Sicoob e Inter seguem o mesmo roteiro, sem formulário do banco.
 |---|---|
 | *(formulário preenchido)* | **Não é versionado**: é documento de envio ao banco, gerado por `preencher_roteiro_c6.py` a partir da evidência JSON — regenerável a qualquer momento |
 | `evidencia-sandbox-c6.json` | A evidência crua do C6 — status HTTP e corpo de cada caso, como o banco devolveu |
-| `evidencia-sandbox-sicoob.json` | A evidência crua do Sicoob (veja a ressalva abaixo) |
+| `evidencia-sandbox-sicoob.json` | A evidência crua do Sicoob — **14 casos em 2xx, 1 recusa, 5 ausentes** contra um mock de schema que não valida credencial (veja a ressalva abaixo) |
 | `evidencia-sandbox-inter.json` | A evidência crua do Banco Inter — **16 casos, zero falhas**, com o banco ecoando o que foi enviado |
 | `evidencia-open-finance.json` | O que os quatro bancos publicam no **Diretório de Participantes** do Open Finance (fonte pública, sem credencial) — leitura em [open-finance.md](../development/open-finance.md) |
 
@@ -40,9 +40,33 @@ Onde o C6 provou integração ponta a ponta, aqui a prova é de contrato — e a
 assim valeu: o roteiro do Sicoob achou dois defeitos que o do C6 não podia
 achar (a conta ausente nas rotas de leitura e o estouro no cálculo de prazo).
 
-Última execução: **14 casos em 2xx, 5 ausentes, 1 recusa** — a recusa é a
-emissão, que no mock responde `400` enlatado com `"string"` no lugar da
-mensagem.
+Última execução (**26/08/2026**): **14 casos em 2xx, 5 ausentes, 1 recusa** — a
+recusa é a emissão, que no mock responde `400` enlatado com `"string"` no lugar
+da mensagem. Comparada caso a caso com a de 04/08, **zero diferenças**, inclusive
+o corpo enlatado do `B_01`.
+
+### O sandbox não valida credencial — medido, não suposto
+
+Reproduzir esta execução não exige credencial do portal, e isso foi verificado
+com quatro chamadas diretas ao mock:
+
+| O que foi mandado | Resposta |
+|---|---|
+| `client_id` do portal + `Authorization` qualquer | **200** |
+| `client_id` **inventado** + `Authorization` qualquer | **200** |
+| `client_id` do portal, **sem** `Authorization` | `401` |
+| **Sem** `client_id`, com `Authorization` | `401` |
+
+O mock exige a **presença** dos dois headers e não olha o conteúdo de nenhum —
+aceita até texto que não é UUID. Não há autenticação: é um portão de forma.
+
+Isso estreita ainda mais o que a evidência do Sicoob atesta. Já estava dito que
+ela vale roteamento, contrato e normalização, e não comportamento do banco;
+agora está medido que **nem a credencial é verificada**. Por isso esta execução
+usou `sandbox-do-sicoob-nao-valida-credencial` no lugar do `client_id`: inventar
+um valor com cara de credencial num artefato versionado sugeriria que alguma
+credencial estava em uso, e não estava. Com o par oficial do portal o resultado
+é idêntico — o ambiente acabou de demonstrar que é.
 
 Formulário em branco: [portal do C6](https://developers.c6bank.com.br/test-scripts/Roteiro%20de%20Testes%20-%20C6%20Developers%20v3.0.docx)
 (etapa 4 do *get-started*). Não é versionado aqui — é material do banco, sujeito
@@ -77,7 +101,9 @@ Aceita identificadores de caso como argumento para rodar só um pedaço —
 Sicoob e Inter, mesmo molde e mesmos argumentos — o que muda é a credencial:
 
 ```bash
-export SICOOB_SANDBOX_CLIENT_ID=... SICOOB_SANDBOX_ACCESS_TOKEN=...
+# O mock não valida nenhum dos dois — exige só que os headers existam (ver
+# "O sandbox não valida credencial", acima). Qualquer texto roda.
+export SICOOB_SANDBOX_CLIENT_ID=... SICOOB_SANDBOX_TOKEN=...
 PYTHONPATH=gateway python scripts/homologacao_sicoob.py --json > evidencia-sicoob.json
 
 export INTER_SANDBOX_CLIENT_ID=... INTER_SANDBOX_CLIENT_SECRET=...
