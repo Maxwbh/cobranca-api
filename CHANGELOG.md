@@ -34,6 +34,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `pix_copia_cola` o EMV que o banco devolveu ao registrar e o PDF sai com o QR
   que dá baixa — em qualquer banco, inclusive nos que a engine não sabe montar
   BR Code. Tem precedência sobre `chave_pix`.
+- **`codigo_barras` e `linha_digitavel` no `data` do boleto — conferidos, não
+  usados.** Mande o que o banco já atribuiu ao título e a API responde `400` se
+  o cálculo local discordar, em vez de imprimir um boleto que não corresponde ao
+  título registrado. Serve ao ciclo `on`→`off`: no **Inter** quem numera é o
+  banco, então renderizar offline com o seu próprio número produz outro título.
 - **`layout_generico` em cada item de `POST /api/retorno`:** `true` avisa que o
   arquivo foi lido com um layout de reserva, e não com o mapa do banco — os
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.

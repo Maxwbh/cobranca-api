@@ -2118,6 +2118,34 @@ components:
             responde `400` (`banco 041 (Banrisul) não suporta PIX`) em vez de
             imprimir o boleto sem o QR pedido.
           example: '11222333000181'
+        codigo_barras:
+          type: string
+          description: |
+            ⚠️ **Conferido, não usado.** O código de barras que o **banco** já
+            atribuiu ao título. O boleto continua saindo do cálculo local; este
+            campo só diz *"o resultado tem de ser este"*, e a API responde `400`
+            quando os dois discordam.
+
+            Existe porque os dois caminhos se sobrepõem. Registrar no `on` e
+            renderizar o PDF no `off` é o ciclo que dá o QR que liquida
+            (`pix_copia_cola`) — e nele o papel sai de um cálculo **nosso**
+            enquanto o título registrado é do **banco**. Divergir imprime um
+            boleto que não corresponde ao título: PDF perfeito, pagamento que
+            não concilia, e o erro só aparece semanas depois.
+
+            Não é hipótese remota: no **Inter** o caminho `on` nunca envia nosso
+            número — quem numera é o banco —, então renderizar com o seu próprio
+            número produz **outro título**. Use o `nossoNumero` que a consulta
+            devolveu.
+
+            Compara só os dígitos: pontuação e espaços não são divergência.
+          example: '07796193000000150000001110012345621437830237'
+        linha_digitavel:
+          type: string
+          description: |
+            ⚠️ **Conferido, não usado** — igual a `codigo_barras`, para quem tem
+            à mão a linha em vez do código. Formatada ou crua, tanto faz.
+          example: '07790.00116 10012.345621 43783.023706 6 19300000015000'
         pix_copia_cola:
           type: string
           description: |

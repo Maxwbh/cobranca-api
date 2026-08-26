@@ -217,6 +217,23 @@ boleto sem Pix pede `formas_recebimento: "BOLETO"` explicitamente.
    dialeto está pronto — mas `rec`/`solicrec` não constam no SDK oficial e não
    foram exercitados no sandbox (`PA_01`).
 
+   **O que já se sabe:** o portal lista o produto —
+   [developers.inter.co/references/pix-automatico](https://developers.inter.co/references/pix-automatico),
+   *"Pix Automático — Receba pagamentos recorrentes de forma automática e
+   instantânea"*. Ou seja, o Inter **oferece** Pix Automático; a ausência no
+   `pj-sdk-java` era do SDK, não do banco.
+
+   **O que ainda falta**, e é o que a flag espera: os **paths**, o **path base**
+   (`/pix/v2` como o resto do BACEN, ou outro) e os **scopes** OAuth. A página de
+   referência monta o conteúdo por JavaScript, então nem o fetch nem o `curl`
+   chegam à tabela de endpoints — vem só a casca do catálogo. Confirmar exige
+   abrir a página no navegador ou uma chamada com credencial real.
+
+   Ligar a capacidade só com o nome do produto seria trocar uma promessa sem
+   lastro por outra: o mixin fala BACEN puro, e um path base diferente faz toda
+   chamada bater em 404 — que é exatamente a falha que a flag existe para não
+   entregar ao integrador.
+
    Até a confirmação, a capacidade **não é anunciada**: `GET /bancos` deixou de
    listar `pix_automatico` para o Inter e passou a trazer
 
@@ -231,6 +248,17 @@ boleto sem Pix pede `formas_recebimento: "BOLETO"` explicitamente.
    capacidades — o teste que prende isso lê a própria evidência de homologação.
 
 2. **`INT-S05` — listar/sumário de cobranças.** Sem rota hoje; avaliar.
+
+   > **Ciclo `on`→`off` — resolvido.** O Inter é o único banco que existe nos
+   > dois caminhos com o mesmo layout, então dá para registrar no `on` e
+   > desenhar o PDF no `off` com o QR que liquida (`pix_copia_cola`). O risco
+   > era o número: o `registrar` daqui manda `seuNumero` e **nunca**
+   > `nossoNumero` — quem numera é o banco. Renderizar offline com o próprio
+   > número imprimia outro título, com `200`.
+   >
+   > `data.codigo_barras` e `data.linha_digitavel` agora são **conferidos**: se
+   > o cálculo local discordar do que o banco registrou, `400`. Use o
+   > `nossoNumero` que a consulta (`INT-S02`) devolve em `raw.boleto`.
 
 3. **`INT-S09` — saldo.** Lacuna de superfície, não do Inter: o gateway não
    expõe saldo para banco nenhum (idem `SIC-S06`).

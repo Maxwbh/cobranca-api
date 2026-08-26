@@ -383,11 +383,28 @@ _TOTALIZADORES_DO_CAIXA = (
 #: `emv`, `pix_label` e `fonte_ttf` entram aqui para que **vazio continue sendo
 #: ausência**: preenchidos, param antes com a mensagem que explica por que não
 #: funcionam; em branco, são como se não tivessem sido enviados.
+#: Número que o BANCO já atribuiu ao título, mandado de volta para CONFERIR o
+#: que a engine calcula. Não entra no boleto — o desenho continua saindo do
+#: cálculo local; estes campos só dizem "o resultado tem de ser este".
+#:
+#: Existem porque os dois caminhos passaram a se sobrepor. Registrar no `on` e
+#: renderizar o PDF no `off` é o ciclo que dá o QR que liquida
+#: (`pix_copia_cola`), e nele o papel sai de um cálculo NOSSO enquanto o título
+#: registrado é do BANCO. Divergir ali imprime um boleto que não corresponde ao
+#: título — papel correto em bytes, pagamento que não concilia. Não é hipótese
+#: remota: no **Inter** o caminho `on` nunca manda nosso número (quem numera é o
+#: banco), então renderizar com o seu próprio número produz OUTRO título.
+_CONFERIDOS_DO_BANCO: dict[str, str] = {
+    "codigo_barras": "codigo_barras",
+    "linha_digitavel": "linha_digitavel",
+}
+
 _CAMPOS_DO_GATEWAY = frozenset(
     {f"instrucao{n}" for n in range(1, 7)}
     | set(TEMA_DO_CONTRATO) | {"parcela_atual", "total_parcelas"}
     | {"tipo_chave_pix", "external_id", "seu_numero"}
     | {"emv", "pix_label", "fonte_ttf"}
+    | set(_CONFERIDOS_DO_BANCO)
 )
 
 #: Volta ao descarte silencioso de campo desconhecido. Existe para quem
@@ -627,6 +644,11 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
     if equivalente:
         data["carteira"] = equivalente
 
+    # Saem antes da engine: são conferência, não dado do título. A comparação
+    # acontece em `_conferir_com_o_banco`, depois do cálculo.
+    for campo in _CONFERIDOS_DO_BANCO:
+        data.pop(campo, None)
+
     instrucoes = _instrucoes_do_payload(data)
     for numerada in _INSTRUCOES_NUMERADAS:
         data.pop(numerada, None)
@@ -694,6 +716,41 @@ def _nosso_numero_impresso(boleto) -> tuple[str, str]:
     return formatado, str(dv)
 
 
+def _so_digitos(valor: Any) -> str:
+    return re.sub(r"\D", "", str(valor or ""))
+
+
+def _conferir_com_o_banco(data: dict[str, Any], calculado: dict[str, Any]) -> None:
+    """O que o banco já atribuiu tem de bater com o que a engine calcula.
+
+    Chamado DEPOIS do cálculo, com o `data` original — `construir_boleto` já
+    tirou estes campos do caminho da engine.
+
+    Recusar é o único desfecho seguro. Imprimir o número do banco por cima de um
+    cálculo divergente esconderia dados de conta errados; imprimir o nosso
+    ignorando o do banco entregaria ao pagador um boleto que não corresponde ao
+    título registrado. Nos dois casos o PDF sai bonito e a conciliação quebra
+    semanas depois, quando ninguém mais liga uma coisa à outra.
+
+    Compara só os DÍGITOS: a linha digitável circula formatada
+    (`00190.00009 01234...`) e exigir a mesma pontuação recusaria por espaço.
+    """
+    erros: list[str] = []
+    for campo, no_calculo in _CONFERIDOS_DO_BANCO.items():
+        do_banco = _so_digitos(data.get(campo))
+        if not do_banco:
+            continue
+        nosso = _so_digitos(calculado.get(no_calculo))
+        if do_banco != nosso:
+            erros.append(
+                f"`{campo}`: o banco registrou {do_banco}, o cálculo com estes dados dá"
+                f" {nosso}. O boleto impresso não corresponderia ao título registrado."
+                " Confira a conta e o `nosso_numero` — quando o banco é quem numera"
+                " (Inter), use o `nossoNumero` que ele devolveu na consulta")
+    if erros:
+        raise DadosInvalidos(erros)
+
+
 def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
                      ) -> dict[str, Any]:
     """Campos CALCULADOS do título, a partir de um boleto já montado.
@@ -725,7 +782,9 @@ def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
 
 def dados_boleto(bank: str, data: dict[str, Any]) -> dict[str, Any]:
     """Campos calculados do boleto — contrato: SEMPRE os 3 campos de nosso_numero."""
-    return _dados_do_boleto(bank, _construido_e_validado(bank, data))
+    calculado = _dados_do_boleto(bank, _construido_e_validado(bank, data))
+    _conferir_com_o_banco(data, calculado)
+    return calculado
 
 
 def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
@@ -750,7 +809,7 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
     with erro_do_banco():
         emitido = emite_boleto(boleto, modelo=template, tema=tema)
         formatado, dv = _nosso_numero_impresso(boleto)
-    return emitido.pdf, {
+    calculado = {
         "bank": bank,
         "nosso_numero": str(boleto.nosso_numero),
         "nosso_numero_formatado": formatado,
@@ -767,6 +826,8 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
         # aqui, quem integra não tem como saber o que imprimiu.
         "pix_vinculado": emitido.pix_vinculado,
     }
+    _conferir_com_o_banco(data, calculado)
+    return emitido.pdf, calculado
 
 
 def pdf_boleto(bank: str, data: dict[str, Any], template: str = "moderno") -> bytes:
