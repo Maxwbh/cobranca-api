@@ -689,6 +689,13 @@ paths:
         Gera arquivo de remessa CNAB 240 ou 400.
         Com `pix=true`, gera remessa com segmento PIX (boleto híbrido).
 
+        **O nome do arquivo importa em alguns bancos.** O `Content-Disposition`
+        traz o nome que o BANCO exige quando o layout o define — no **Inter**,
+        `CI400_001_<sequencial>.REM`, com o mesmo sequencial gravado no header,
+        e o Internet Banking recusa o upload se os dois divergirem. Nos demais
+        segue o descritivo (`remessa-<banco>-<tipo>.rem`), que não é exigência
+        de ninguém. **Suba o arquivo com o nome que veio no header.**
+
         **Encargos por pagamento** — cada um é um **trio** código/tipo → valor →
         data (a data é opcional). Use os nomes exatos; não há apelido:
 

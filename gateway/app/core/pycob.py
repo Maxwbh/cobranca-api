@@ -1080,19 +1080,23 @@ def _valida_encargos(pagamentos_raw: list[dict[str, Any]], bank: str,
 
 
 def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = False,
-                  avisos: list[str] | None = None) -> str:
+                  avisos: list[str] | None = None,
+                  nome: list[str] | None = None) -> str:
     """Gera a remessa CNAB. `avisos` recebe o que o layout ignorou, se houver.
 
-    Lista de saída em vez de valor de retorno porque a rota devolve o ARQUIVO —
-    e o aviso é sobre o pedido, não sobre o conteúdo. Quem não passa a lista
-    continua chamando como antes.
+    Listas de saída em vez de valor de retorno porque a rota devolve o ARQUIVO —
+    e nem o aviso nem o nome são conteúdo. Quem não as passa continua chamando
+    como antes.
+
+    `nome` recebe o nome do arquivo pedido ao layout (`nome_de_remessa`): é
+    regra de banco, e a instância que o sabe só existe aqui dentro.
     """
     avisos = avisos if avisos is not None else []
-    return _gerar_remessa(bank, cnab_type, dados, pix, avisos)
+    return _gerar_remessa(bank, cnab_type, dados, pix, avisos, nome)
 
 
 def _gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool,
-                   avisos: list[str]) -> str:
+                   avisos: list[str], nome: list[str] | None = None) -> str:
     klass = _REMESSAS.get((bank, cnab_type, pix))
     if klass is None:
         combos = sorted({f"{b}/{t}{'+pix' if p else ''}" for b, t, p in _REMESSAS})
@@ -1150,7 +1154,32 @@ def _gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool,
         raise DadosInvalidos(_erros(e)) from e
     avisos.extend(str(a.message) for a in capturados
                   if issubclass(a.category, CampoIgnorado))
+    if nome is not None:
+        do_banco = nome_de_remessa(remessa)
+        if do_banco:
+            nome.append(do_banco)
     return arquivo
+
+
+def nome_de_remessa(remessa: Any) -> str | None:
+    """O nome que o BANCO exige, quando o layout o define. `None` quando não há.
+
+    Layout que exige nome é regra do banco, não convenção nossa: o Inter só
+    aceita o upload se o arquivo se chamar `CI400_001_<sequencial>.REM` com o
+    MESMO sequencial gravado no header. A engine expõe `nome_arquivo()`
+    justamente para isso — a docstring dela diz, com todas as letras, que "a
+    biblioteca gera o conteúdo, quem nomeia é o chamador". O chamador é esta
+    API, e ela vinha inventando `remessa-inter-cnab400.rem`: arquivo correto,
+    recusado no upload por causa do nome.
+
+    `None` e não um nome descritivo de reserva: quem chama precisa distinguir
+    "o banco exige este nome" de "não há regra". A rota síncrona usa o
+    descritivo de sempre como nome de download; o lote, que nomeia por sublote,
+    só registra o de upload quando ele existe — devolver o descritivo ali o
+    faria anunciar uma exigência que nenhum banco fez.
+    """
+    proprio = getattr(remessa, "nome_arquivo", None)
+    return str(proprio()) if callable(proprio) else None
 
 
 def parse_retorno(conteudo: bytes, layout_hint: str | None = None,

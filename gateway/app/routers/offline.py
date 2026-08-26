@@ -436,10 +436,12 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
 async def remessa(bank: str, type: str, data: UploadFile = File(...),
                   pix: str = "false") -> Any:
     avisos: list[str] = []
+    nome: list[str] = []
     try:
         com_pix = _bool_param("pix", pix)
         valores = _objeto(json.loads(await _ler_upload(data, "data")), "data")
-        conteudo = pycob.gerar_remessa(bank, type, valores, pix=com_pix, avisos=avisos)
+        conteudo = pycob.gerar_remessa(bank, type, valores, pix=com_pix, avisos=avisos,
+                                       nome=nome)
     except ArquivoGrandeDemais as e:
         return e.resposta()
     except json.JSONDecodeError as e:
@@ -448,9 +450,10 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
     except pycob.DadosInvalidos as e:
         return JSONResponse(status_code=400, content={
             "error": "Erro ao gerar remessa", "validation_errors": e.erros})
-    sufixo = "-pix" if com_pix else ""
-    cabecalho = {
-        "Content-Disposition": f"attachment; filename=remessa-{bank}-{type}{sufixo}.rem"}
+    # O nome vem do LAYOUT quando ele o define — o Inter só aceita o upload se
+    # o arquivo se chamar como o header manda. Ver `pycob.nome_de_remessa`.
+    arquivo = nome[0] if nome else f"remessa-{bank}-{type}{'-pix' if com_pix else ''}.rem"
+    cabecalho = {"Content-Disposition": f"attachment; filename={arquivo}"}
     if avisos:
         # A resposta é o ARQUIVO, então o aviso vai no header — que é onde o
         # resto da superfície já põe metadado de download (`X-Boletos-*`).

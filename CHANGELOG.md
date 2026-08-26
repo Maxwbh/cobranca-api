@@ -65,6 +65,12 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.
 
 ### Corrigido
+- **A remessa do Inter sai com o nome que o banco exige.** O Internet Banking do
+  Inter só aceita o upload se o arquivo se chamar `CI400_001_<sequencial>.REM`,
+  com o mesmo sequencial do header — a API vinha batizando
+  `remessa-inter-cnab400.rem` e o arquivo, correto, era recusado no upload. O
+  nome passa a vir do layout. No lote, onde o arquivo é nomeado por sublote, o
+  manifesto ganha `nome_para_upload`. Bancos sem regra de nome não mudam.
 - **O alerta de vencimento do certificado acompanha a vida dele.** Eram 30 dias
   fixos, calibrados para certificado anual: o do **Inter vive 30 dias** e nascia
   `expirando`, com a validade inteira pela frente — alerta que nunca desliga

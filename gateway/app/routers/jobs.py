@@ -415,8 +415,10 @@ def _processar_remessas(job_id: str, tenant_id: str,
     for sublote in sublotes:
         sid = sublote["sublote_id"]
         try:
+            nome_layout: list[str] = []
             conteudo = pycob.gerar_remessa(sublote["bank"], sublote["cnab_type"],
-                                            sublote["dados"], pix=sublote["pix"])
+                                            sublote["dados"], pix=sublote["pix"],
+                                            nome=nome_layout)
         except pycob.DadosInvalidos as e:
             falhos += 1
             store.concluir_item(job_id, sid, js.ITEM_FAILED,
@@ -429,7 +431,8 @@ def _processar_remessas(job_id: str, tenant_id: str,
                                  "errors": [f"erro inesperado: {e}"]})
             continue
         completos += 1
-        artefato = art.salvar_remessa(job_id, sid, conteudo, tenant_id)
+        artefato = art.salvar_remessa(job_id, sid, conteudo, tenant_id,
+                                      nome_banco=nome_layout[0] if nome_layout else None)
         store.concluir_item(job_id, sid, js.ITEM_COMPLETED,
                             {"chave": sublote["chave"], "quantidade": sublote["quantidade"],
                              "artifact": artefato})

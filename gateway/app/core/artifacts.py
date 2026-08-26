@@ -170,19 +170,33 @@ def remover(job_id: str) -> None:
 
 # ------------------------------------------------------------------ CNAB (Fase 3)
 def salvar_remessa(job_id: str, sublote_id: str, conteudo: str,
-                   tenant_id: str | None = None) -> dict[str, Any]:
-    """Grava o arquivo CNAB de um sublote (imutável, para auditoria)."""
+                   tenant_id: str | None = None,
+                   nome_banco: str | None = None) -> dict[str, Any]:
+    """Grava o arquivo CNAB de um sublote (imutável, para auditoria).
+
+    O nome EM DISCO é o do sublote e continua sendo: ele é único dentro do job,
+    e é isso que o href e o zip precisam — dois sublotes do mesmo banco com o
+    mesmo sequencial se sobrescreveriam sob o nome do banco.
+
+    `nome_banco` é o nome que o BANCO exige no upload, quando o layout o define
+    (hoje só o Inter, `CI400_001_<sequencial>.REM`). Vai no manifesto em vez do
+    nome do arquivo: quem baixa precisa saber com que nome subir, e sem isso o
+    arquivo do lote é recusado pelo mesmo motivo que o da rota síncrona era.
+    """
     destino = dir_job(job_id) / "files"
     destino.mkdir(parents=True, exist_ok=True)
     nome = f"{_slug(sublote_id)}.rem"
     dados = conteudo.encode("utf-8")
     (destino / nome).write_bytes(dados)
     linhas = conteudo.splitlines()
-    return {
+    artefato = {
         "tipo": "cnab", "nome": nome, "bytes": len(dados), "sha256": sha256(dados),
         "registros": len(linhas),
         "href": _href(f"/jobs/cnab/remessas/{job_id}/files/{nome}", tenant_id),
     }
+    if nome_banco and nome_banco != nome:
+        artefato["nome_para_upload"] = nome_banco
+    return artefato
 
 
 def consolidar_remessas(job_id: str, job: dict[str, Any],

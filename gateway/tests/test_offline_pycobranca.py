@@ -2,6 +2,7 @@
 # Substitui a matriz de proxy T1-T10 (conexão com o Ruby descontinuada);
 # os contratos verificados são os mesmos (PDF binário, headers X-*, CNAB,
 # OFX, erros 400 com validation_errors).
+import inspect
 import json
 
 import pytest
@@ -1582,3 +1583,78 @@ def test_erro_do_ofx_usa_a_chave_canonica(client):
     corpo = r.json()
     assert corpo["error"] == corpo["erro"]
     assert corpo["validation_errors"]
+
+
+# --- o nome do arquivo de remessa é regra do BANCO, não convenção nossa -----------
+#
+# O Inter só aceita o upload se o arquivo se chamar `CI400_001_<sequencial>.REM`
+# com o MESMO sequencial gravado no header. A engine expõe `nome_arquivo()` e a
+# docstring dela diz, com todas as letras, que "a biblioteca gera o conteúdo,
+# quem nomeia é o chamador" — e o chamador é esta API, que vinha inventando
+# `remessa-inter-cnab400.rem`. Arquivo correto, recusado por causa do nome.
+
+def _remessa_inter(client, sequencial: int):
+    import io
+    import json as _json
+    data = {
+        "beneficiario": {"nome": "M&S", "documento": "05230380000174",
+                         "agencia": "0001", "conta_corrente": "123456",
+                         "convenio": "123456"},
+        "digito_conta": "7", "carteira": "110",
+        "pagamentos": [{"nosso_numero": "1234567890", "numero_documento": "A-1",
+                        "valor": "100.00", "data_vencimento": "2027-09-10",
+                        "sacado": "Fulano", "sacado_documento": "52998224725",
+                        "endereco_sacado": "Av. Teste, 100", "cep_sacado": "35700000"}],
+        "sequencial_remessa": sequencial,
+    }
+    return client.post("/api/remessa?bank=inter&type=cnab400", files={
+        "data": ("d.json", io.BytesIO(_json.dumps(data).encode()), "application/json")})
+
+
+@pytest.mark.parametrize("sequencial,esperado", [
+    (1, "CI400_001_0000001.REM"),
+    (42, "CI400_001_0000042.REM"),
+    (1234567, "CI400_001_1234567.REM"),
+])
+def test_a_remessa_do_inter_sai_com_o_nome_que_o_banco_exige(client, sequencial, esperado):
+    r = _remessa_inter(client, sequencial)
+    assert r.status_code == 200, r.text[:200]
+    assert f"filename={esperado}" in r.headers["content-disposition"]
+
+
+def test_banco_sem_regra_de_nome_mantem_o_descritivo(client):
+    """Mudar o nome onde não há regra de banco quebraria quem automatiza o
+    download por nada — a troca vale só onde o layout manda."""
+    with open("postman/fixtures/remessa_cnab240_bb.json", "rb") as f:
+        r = client.post("/api/remessa?bank=banco_brasil&type=cnab240",
+                        files={"data": ("d.json", f, "application/json")})
+    assert r.status_code == 200, r.text[:200]
+    assert "filename=remessa-banco_brasil-cnab240.rem" in r.headers["content-disposition"]
+
+
+def test_o_nome_vem_do_layout_e_nao_de_uma_copia_da_regra_aqui(monkeypatch):
+    """A regra mora na engine; aqui só se pergunta.
+
+    Provado por comportamento e não por texto: um dublê devolve outro nome e a
+    rota tem de usar ESSE. Conferir a string `CI400` no nosso código passaria
+    igual se alguém reimplementasse o formato aqui — e aí o dia em que o banco
+    mudasse a exigência, a engine saberia e a API não.
+    """
+    from app.core import pycob
+
+    class LayoutQueNomeia:
+        def nome_arquivo(self):
+            return "NOME_DO_LAYOUT.REM"
+
+    class LayoutQueNaoNomeia:
+        pass
+
+    assert pycob.nome_de_remessa(LayoutQueNomeia()) == "NOME_DO_LAYOUT.REM"
+    # Sem regra, `None` — e não um nome de reserva. Quem chama precisa
+    # distinguir "o banco exige este nome" de "não há regra": o lote registra
+    # o de upload só quando ele existe, e um descritivo ali anunciaria uma
+    # exigência que nenhum banco fez.
+    assert pycob.nome_de_remessa(LayoutQueNaoNomeia()) is None
+    # E o layout do Inter continua publicando o nome — se parar, a rota
+    # silenciosamente voltaria a inventar um nome que o banco recusa.
+    assert hasattr(pycob._REMESSAS[("inter", "cnab400", False)], "nome_arquivo")
