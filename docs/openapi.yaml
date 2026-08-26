@@ -40,7 +40,7 @@ info:
 
     ## Funcionalidades
 
-    - **Boletos**: Geração de boletos em **PDF** — 18 bancos, sem convênio
+    - **Boletos**: Geração de boletos em **PDF** — 19 bancos, sem convênio
     - **Remessa**: Geração de arquivos CNAB 240 e 400
     - **Retorno**: Parsing de arquivos de retorno CNAB 240 e 400
     - **OFX**: Parsing de extratos bancários OFX v1 (SGML) e v2 (XML) com extração automática de nosso_numero
@@ -182,7 +182,7 @@ paths:
         - Health
       summary: Lista bancos suportados com capacidades detalhadas
       description: |
-        Retorna os 18 bancos suportados, com o código bancário, os layouts CNAB
+        Retorna os 19 bancos suportados, com o código bancário, os layouts CNAB
         de remessa disponíveis e se há remessa com PIX.
 
         Dados vêm dinamicamente da engine pyCobrança (`Bancos`).
@@ -846,12 +846,25 @@ paths:
       tags:
         - Retorno
       summary: Processar arquivo de retorno
-      description: Faz parsing de arquivo de retorno CNAB 240 ou 400
+      description: |
+        Faz parsing de arquivo de retorno CNAB 240 ou 400.
+
+        O **banco sai do header do arquivo**, não do `bank` do request: é dele
+        que dependem o layout e o sentido de cada ocorrência. Quando os dois
+        discordam a resposta é `400` — antes o `bank` era exigido e nunca lido,
+        então subir o retorno do banco errado devolvia `200` com campos lidos
+        pelo layout de outro banco.
+
+        Cada item traz `layout_generico`: `true` avisa que a engine não tinha o
+        mapa daquele banco e leu com um layout de reserva.
       operationId: processRetorno
       parameters:
         - name: bank
           in: query
           required: true
+          description: |
+            Banco esperado. Conferido contra o header do arquivo; divergência
+            responde `400` em vez de ler com o layout errado.
           schema:
             $ref: '#/components/schemas/BankCode'
         - name: type
@@ -1069,9 +1082,17 @@ paths:
                     type: string
                     nullable: true
                     description: |
-                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
-                      `null` quando não. Sem ele o QR sai no PDF e a integração
-                      não tem o texto para exibir ao lado.
+                      BR Code do QR desenhado no PDF; `null` quando o boleto não
+                      tem PIX. Sem ele o QR sai no papel e a integração não tem o
+                      texto para exibir ao lado.
+                  pix_vinculado:
+                    type: boolean
+                    nullable: true
+                    description: |
+                      O QR **liquida o título**? `true` = Bolepix (veio do banco,
+                      em `data.pix_copia_cola`); `false` = QR **avulso**, montado
+                      de `data.chave_pix`, que credita a chave e deixa o título
+                      **em aberto**; `null` = boleto sem PIX.
                   pdf_base64: { type: string, description: PDF em base64 }
         '400':
           description: Dados do boleto inválidos
@@ -1339,8 +1360,16 @@ paths:
                     type: string
                     nullable: true
                     description: |
-                      BR Code do Bolepix quando `data.chave_pix` foi enviado;
-                      `null` quando não.
+                      BR Code do QR desenhado no boleto da fatura; `null` quando
+                      o payload não traz PIX.
+                  pix_vinculado:
+                    type: boolean
+                    nullable: true
+                    description: |
+                      O QR **liquida o título**? `true` = Bolepix (veio do banco,
+                      em `data.pix_copia_cola`); `false` = QR **avulso**, montado
+                      de `data.chave_pix`, que credita a chave e deixa o título
+                      **em aberto**; `null` = sem PIX.
                   pdf_base64: { type: string, description: PDF (fatura + boleto) em base64 }
         '400':
           description: Dados do boleto inválidos, ou `fatura.desenhar` (nível 3) enviado via REST
@@ -1472,7 +1501,7 @@ components:
         - citibank
         - hsbc
         - ailos
-      description: Código do banco suportado (18 bancos brasileiros)
+      description: Código do banco suportado (19 bancos brasileiros)
 
     OutputType:
       type: string
@@ -2036,13 +2065,48 @@ components:
           type: string
           description: |
             Chave PIX do beneficiário (CPF, CNPJ, e-mail, telefone ou
-            aleatória). **É o campo que gera o QR** no PDF.
+            aleatória). Gera um QR no PDF.
 
-            Só nos sete bancos que a engine sabe fazer Bolepix — Banco do
+            ⚠️ **Este QR não é Bolepix e não liquida o título.** O BR Code
+            montado a partir da chave é **estático**: quem paga credita a sua
+            chave, mas o banco não sabe que aquele PIX quitou *este* boleto — o
+            título fica **em aberto**, com risco de segunda cobrança ou de
+            protesto de boleto já pago.
+
+            Bolepix exige QR **dinâmico**, gerado pelo banco no registro da
+            cobrança. Para tê-lo: registre pelo caminho `on` e mande o EMV que o
+            banco devolveu em `pix_copia_cola` (abaixo), que tem precedência
+            sobre este campo e funciona em qualquer banco.
+
+            A resposta diz qual dos dois saiu no papel, em `pix_vinculado`.
+
+            Só nos sete bancos que a engine sabe montar o BR Code — Banco do
             Brasil, Bradesco, Caixa, Itaú, Santander, Sicoob e C6. Nos demais
             responde `400` (`banco 041 (Banrisul) não suporta PIX`) em vez de
             imprimir o boleto sem o QR pedido.
           example: '11222333000181'
+        pix_copia_cola:
+          type: string
+          description: |
+            Payload EMV que o **banco** devolveu ao registrar a cobrança — o
+            Bolepix de verdade: QR dinâmico, vinculado ao título, com baixa
+            automática.
+
+            Vai para o QR como veio, tem **precedência sobre `chave_pix`** e
+            funciona em qualquer banco (o desenho não depende de a engine saber
+            montar o BR Code daquele layout).
+
+            É o campo que fecha o ciclo entre os dois caminhos: registre pelo
+            `on` (C6, Sicoob, Inter ou Itaú), pegue o `pix_copia_cola` da
+            resposta e renderize o PDF pelo `off` com o QR que liquida.
+          example: '00020101021226870014br.gov.bcb.pix2565qrcode.exemplo/pix/v2/cobv/9d36b84f'
+        pix_observacao:
+          type: string
+          maxLength: 40
+          description: |
+            Texto livre no campo 26-02 do BR Code, para descrever a cobrança a
+            quem paga. Até 40 caracteres.
+          example: 'Mensalidade 09/2027'
         tipo_chave_pix:
           type: string
           description: |
@@ -2055,8 +2119,9 @@ components:
           maxLength: 25
           pattern: '^[A-Za-z0-9]{1,25}$'
           description: |
-            Identificador da transação Pix, gravado **dentro do BR Code** do
-            Bolepix. Até 25 alfanuméricos.
+            Identificador da transação Pix, gravado **dentro do BR Code**. Até
+            25 alfanuméricos. Vazio, a engine deriva do nosso número — antes ia
+            `***` e o crédito chegava órfão na conciliação por OFX.
 
             ⚠️ **Não é o mesmo `txid` do Pix cob/cobv**, que o BACEN define com
             26 a 35 caracteres — e que o gateway exige nesse tamanho nas rotas
@@ -2166,14 +2231,31 @@ components:
           type: string
           nullable: true
           description: |
-            BR Code (EMV) do Bolepix, montado pela engine a partir de
-            `chave_pix`. **`null` quando o payload não traz chave** — boleto sem
-            QR não tem copia-e-cola, e a API não inventa um.
+            BR Code (EMV) do QR desenhado no boleto. **`null` quando o payload
+            não traz PIX** — boleto sem QR não tem copia-e-cola, e a API não
+            inventa um.
+
+            Vem de `data.pix_copia_cola` quando informado (o EMV do banco), ou é
+            montado pela engine a partir de `data.chave_pix`. `pix_vinculado`
+            diz qual dos dois.
 
             É o mesmo campo que `POST /cobranca` devolve no caminho `on`
-            (C6, Inter, Sicoob). Sem ele, um Bolepix só é pagável por quem
+            (C6, Sicoob, Inter, Itaú). Sem ele, um QR só é pagável por quem
             consegue apontar a câmera para outra tela.
           example: '00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92'
+        pix_vinculado:
+          type: boolean
+          nullable: true
+          description: |
+            O QR do boleto **liquida o título**?
+
+            - `true` — **Bolepix**: o EMV veio do banco (`data.pix_copia_cola`),
+              é dinâmico e vinculado ao título; pagar por ele dá baixa.
+            - `false` — QR **avulso**, montado de `data.chave_pix`. É estático:
+              credita a chave e o título fica **em aberto**, com risco de segunda
+              cobrança ou de protesto de boleto já pago.
+            - `null` — boleto sem PIX.
+          example: false
     # `/api/boleto/nosso_numero` é o `/api/boleto/data` **sem** o cálculo do
     # código de barras — é para isso que ele existe. O schema prometia
     # exatamente `codigo_barras` e `linha_digitavel`, que a rota não devolve, e
@@ -2471,7 +2553,27 @@ components:
           description: Código da ocorrência bancária
         motivo_ocorrencia:
           type: string
-          description: Descrição da ocorrência
+          description: |
+            Descrição da ocorrência, **no vocabulário do banco do arquivo**.
+
+            O mesmo código significa coisas opostas em bancos diferentes: o `40`
+            é *baixa por ter sido liquidado* no mapa geral e *baixa de título
+            protestado* no **Safra**; o `07` é *liquidação parcial* no geral e
+            *cancelado* no **Inter**. Numa conciliação, confundir os dois é dar
+            por pago um título protestado.
+        layout_generico:
+          type: boolean
+          description: |
+            ⚠️ `true` quando o arquivo foi lido com um **layout de reserva**, e
+            não com o mapa do banco — a engine não tem o layout daquele código.
+
+            O arquivo é lido até o fim e **nenhum erro é levantado**, mas os
+            campos podem ter vindo de posições que não são as daquele banco. É a
+            falha mais perigosa do parsing porque a saída é plausível: trate os
+            valores como suspeitos e confira contra o extrato antes de conciliar.
+
+            `false` quando o banco tem layout próprio (16 dos 19).
+          example: false
 
     OfxResponse:
       type: object

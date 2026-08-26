@@ -107,7 +107,8 @@ _ESQUEMA_ITAU = {
 }
 
 
-# 18 bancos suportados pelo caminho offline (engine pyCobrança / CNAB).
+# Os 19 bancos do caminho offline (engine pyCobrança / CNAB). Eram 18 até a
+# 1.1.1 implementar o Inter (077).
 # Derivado do mapa que o roteador realmente usa: lista escrita à mão aqui já
 # significaria catálogo dizendo uma coisa e `provider=off` fazendo outra.
 _BANCOS_CNAB = sorted(_SLUG_ENGINE.values())

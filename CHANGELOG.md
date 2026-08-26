@@ -16,6 +16,44 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Adicionado
+- **Inter (077) é o 19º banco offline.** A engine passou a ter o layout, então
+  `provider=off&banco=inter` emite boleto, remessa e retorno CNAB 400 — só a
+  **carteira 110** (na 112 quem numera é o banco). Antes o caminho `off` do Inter
+  respondia `422`, porque cair em outro banco registraria a cobrança no lugar
+  errado. Ele passa a existir nos dois caminhos, como C6, Sicoob e Itaú.
+- **`pix_vinculado` na resposta** de `/cobranca`, `/api/boleto/data`,
+  `/api/render/boleto` e `/api/render/fatura`: diz se o QR do boleto **liquida o
+  título** (`true`) ou se é um QR avulso que só credita a chave (`false`).
+- **`pix_copia_cola` e `pix_observacao` no `data` do boleto.** Mande em
+  `pix_copia_cola` o EMV que o banco devolveu ao registrar e o PDF sai com o QR
+  que dá baixa — em qualquer banco, inclusive nos que a engine não sabe montar
+  BR Code. Tem precedência sobre `chave_pix`.
+- **`layout_generico` em cada item de `POST /api/retorno`:** `true` avisa que o
+  arquivo foi lido com um layout de reserva, e não com o mapa do banco — os
+  campos podem ter vindo de outras posições. Antes esse aviso era engolido.
+
+### Corrigido
+- ⚠️ **O QR montado de `chave_pix` não é Bolepix.** Ele é **estático**: credita
+  a chave, mas o banco não sabe que aquele PIX quitou o título, que fica **em
+  aberto** — risco de segunda cobrança ou de protesto de boleto já pago. O
+  comportamento não muda; a documentação parava de chamá-lo do que ele não é, e
+  `pix_vinculado` diz qual dos dois saiu no papel.
+- **A ocorrência do retorno saía no vocabulário errado.** O `40` é *baixa por
+  ter sido liquidado* no mapa geral e *baixa de título protestado* no **Safra**;
+  o `07` é *liquidação parcial* no geral e *cancelado* no **Inter**. Agora a
+  descrição vem do banco do arquivo.
+- ⚠️ **`POST /api/retorno` recusa arquivo de outro banco.** O `bank` era exigido
+  e **nunca lido**: subir o retorno errado devolvia `200` com campos lidos pelo
+  layout de outro banco. Agora divergir do header do arquivo responde `400`.
+- ⚠️ **Encargo sem posição no layout responde `400` em vez de sumir.**
+  `valor_multa` e `percentual_desconto` passaram a ser aceitos pela engine, mas
+  só o **Inter** os grava; nos demais entravam e sumiam, e o título ia ao banco
+  sem o encargo pedido. `percentual_mora` segue válido no CNAB 240 e recusado
+  no 400 (exceto Inter). O erro diz quem grava o campo e qual é a alternativa.
+- **Carteira `CSB` do HSBC saiu**: o campo livre dela montava 27 posições onde
+  cabem 25 — nunca produziu boleto válido. Resta a `CNR`.
+
 ### Alterado
 - **A faixa FEBRABAN não vai para o boleto.** `desconto_abatimento`,
   `outras_deducoes`, `mora_multa`, `outros_acrescimos` e `valor_cobrado` são

@@ -15,7 +15,12 @@ def test_bancos_lista_capacidades_reais(client):
     assert "bolepix" not in bancos["sicoob"]["capacidades"]  # exclusivo C6
     assert "extrato" in bancos["sicoob"]["capacidades"]      # paridade nova
     assert "carne" in bancos["pycobranca"]["capacidades"]
-    assert len(bancos["pycobranca"]["bancos_cnab"]) == 18
+    # Contra o registro da engine, não contra um literal: o total foi de 18 para
+    # 19 quando o Inter entrou na 1.1.1, e o número escrito à mão só atrasaria a
+    # descoberta.
+    from app.core import pycob
+    assert sorted(bancos["pycobranca"]["bancos_cnab"]) == pycob.bancos_suportados()
+    assert "inter" in bancos["pycobranca"]["bancos_cnab"]
 
     # mecanismo da API é único (bapi_); o ESQUEMA de credenciais é próprio por banco
     assert "bapi_" in data["autenticacao_api"]["cadastro"]

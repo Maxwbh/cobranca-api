@@ -10,14 +10,19 @@ import pytest
 from pypdf import PdfReader
 
 from app.core import pycob
+from pycobranca.render.marcas import logo_do_banco
 
 BASE = {"valor": 150.0, "data_vencimento": "2026-12-31", "sacado": "Joao da Silva",
         "sacado_documento": "52998224725", "nosso_numero": "123",
         "cedente": "M&S DO BRASIL LTDA", "documento_cedente": "05230380000174",
         "agencia": "3073", "conta_corrente": "12345", "convenio": "1234567"}
 
-# O Citibank (745) não tem PNG empacotado na engine — cai na sigla, como antes.
-SEM_LOGO = {"citibank"}
+#: Quem não tem PNG empacotado na engine — cai na sigla em texto. Derivado, não
+#: escrito à mão: era `{"citibank"}` e a 1.1.1 empacotou o 745 (e o 077 do Inter,
+#: que nem existia). Hoje o conjunto está vazio, e o dia em que a engine ganhar
+#: um banco sem logo o teste continua valendo sem edição.
+SEM_LOGO = {slug for slug in pycob.bancos_suportados()
+            if logo_do_banco(pycob.CODIGO_POR_SLUG[slug]) is None}
 
 
 def _imagens(pdf: bytes) -> int:
@@ -30,7 +35,7 @@ def test_boleto_sai_com_a_marca_do_banco():
 
 
 def test_todos_os_bancos_com_logo_empacotado_recebem_o_seu():
-    """Vale para os 18 — o logo entra em `construir_boleto`, por onde passam
+    """Vale para os 19 — o logo entra em `construir_boleto`, por onde passam
     boleto avulso, lote, carnê e fatura. Sem massa de render por banco, que tem
     regra própria de convênio e carteira."""
     faltando = []
@@ -42,11 +47,21 @@ def test_todos_os_bancos_com_logo_empacotado_recebem_o_seu():
     assert not faltando, f"logo divergente do esperado: {faltando}"
 
 
-def test_banco_sem_logo_nao_herda_o_de_outro():
+def test_nenhum_banco_herda_o_logo_de_outro():
     """Cair no logo errado é pior que não ter logo: o boleto passaria a
-    identificar uma instituição que não é a emissora."""
-    boleto = pycob.construir_boleto("citibank", BASE)
-    assert boleto.logo is None
+    identificar uma instituição que não é a emissora.
+
+    Era provado pelo Citibank, o único sem PNG empacotado — e a prova evaporou
+    quando a 1.1.1 lhe deu um. Conferir o logo de CADA banco contra o do seu
+    código não depende de existir um banco sem imagem.
+    """
+    trocados = []
+    for slug in pycob.bancos_suportados():
+        codigo = pycob.CODIGO_POR_SLUG[slug]
+        boleto = pycob.construir_boleto(slug, BASE)
+        if boleto.logo != logo_do_banco(codigo):
+            trocados.append((slug, codigo))
+    assert not trocados, f"logo de outra instituição no boleto: {trocados}"
 
 
 def test_logo_do_chamador_manda():

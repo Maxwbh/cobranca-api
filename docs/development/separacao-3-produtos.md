@@ -11,7 +11,7 @@ a v1.5.0.
 
 | # | Produto | Onde vive | Papel | Versão |
 |---|---|---|---|---|
-| 1 | **PyCobrança** (engine) | [repositório próprio](https://github.com/Maxwbh/pyCobranca) | **Renderização e formato**: boleto PDF, carnê 3 vias, remessa/retorno CNAB 240/400, PIX-QR — 18 bancos, offline | própria; a versão em uso aparece em `GET /api/metadata` |
+| 1 | **PyCobrança** (engine) | [repositório próprio](https://github.com/Maxwbh/pyCobranca) | **Renderização e formato**: boleto PDF, carnê 3 vias, remessa/retorno CNAB 240/400, PIX-QR — 19 bancos, offline | própria; a versão em uso aparece em `GET /api/metadata` |
 | 2 | **Cobranca-API** (Python/FastAPI) | **este repositório**, em `gateway/` | O **serviço**: gateway online (C6, Sicoob, Inter, Itaú), cofre de credenciais multi-tenant, jobs em lote, webhooks — e a superfície offline `/api/*`, servida **in-process** | `app.version` (ver `VERSION`) |
 | 3 | **Consumidor da API** | fora deste repositório | Quem chama o serviço por HTTP: SDK, app, job, PL/SQL — qualquer linguagem | própria |
 

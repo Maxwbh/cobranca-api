@@ -91,6 +91,8 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
             linha_digitavel=res.get("linhaDigitavel"),
             codigo_barras=res.get("codigoBarras"),
             pix_copia_cola=res.get("pixCopiaECola") or res.get("qrCode"),  # boleto híbrido
+            # QR dinâmico do banco: liquida o título. Ver a nota em `c6.py`.
+            pix_vinculado=True if (res.get("pixCopiaECola") or res.get("qrCode")) else None,
             pdf_base64=res.get("pdfBoleto"),
             raw=data,
         )
@@ -111,6 +113,7 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
             status=_map_status(res.get("situacaoBoleto") or res.get("situacao")) or Status.pendente,
             linha_digitavel=res.get("linhaDigitavel"),
             pix_copia_cola=res.get("pixCopiaECola"),
+            pix_vinculado=True if res.get("pixCopiaECola") else None,
             raw=data,
         )
 

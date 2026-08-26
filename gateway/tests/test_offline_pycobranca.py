@@ -38,7 +38,11 @@ def test_health_e_info_da_engine(client):
     assert r.status_code == 200 and r.json()["status"] == "OK"
     info = client.get("/api/info").json()
     assert info["engine"] == "pycobranca"
-    assert len(info["supported_banks"]) == 18
+    # Contra o registro da engine, não contra um número escrito à mão: o total
+    # mudou de 18 para 19 quando o Inter entrou, e um literal aqui só teria
+    # atrasado a descoberta.
+    assert sorted(info["supported_banks"]) == pycob.bancos_suportados()
+    assert "inter" in info["supported_banks"]
 
 
 def test_metadata_expoe_versao_do_pycobranca(client):
@@ -49,8 +53,21 @@ def test_metadata_expoe_versao_do_pycobranca(client):
 
 def test_bancos_offline(client):
     b = client.get("/api/bancos").json()
-    assert b["total"] == 18
+    assert b["total"] == len(pycob.bancos_suportados())
     assert {"slug", "codigo", "boleto", "cnab"} <= set(b["bancos"][0])
+
+
+def test_o_inter_e_o_19o_banco_offline(client):
+    """A engine não tinha o layout 077 e o caminho `off` do Inter era recusado.
+
+    A 1.1.1 implementou boleto, remessa e retorno CNAB 400 do Inter — só a
+    carteira 110, porque na 112 quem numera é o banco e o nosso número só existe
+    no retorno.
+    """
+    b = client.get("/api/bancos").json()
+    inter = [x for x in b["bancos"] if x["slug"] == "inter"]
+    assert inter, "Inter ausente do catálogo offline"
+    assert inter[0]["codigo"] == "077"
 
 
 def test_validate_ok_e_erro(client, q):
@@ -428,7 +445,12 @@ def test_segundo_e_terceiro_desconto_so_no_cnab240():
 # coisa do pagador, entao a API recusa.
 
 @pytest.mark.parametrize("campo,v1,v2,fixos", [
-    ("codigo_multa", "1", "2", {"percentual_multa": 2.0}),
+    # `codigo_multa='1'` (valor fixo) saiu daqui: a 1.1.1 passou a exigir
+    # `valor_multa` junto, e esse campo não tem posição em layout 240 nenhum
+    # (medido A/B) — a combinação virou irrepresentável, não só inconveniente.
+    # `0` (isento) contra `2` (percentual) prova a mesma coisa: o código É
+    # gravado, e é dele que o banco tira a unidade.
+    ("codigo_multa", "0", "2", {"percentual_multa": 2.0}),
     ("tipo_mora", "1", "2", {"valor_mora": 1.0, "percentual_mora": 1.0}),
     # 1.0.1: desconto com codigo exige valor E data (validacao mais estrita)
     ("cod_desconto", "1", "2", {"valor_desconto": 50.0, "data_desconto": "2027-12-20"}),
@@ -644,21 +666,36 @@ DADOS_SICREDI = {
     ("/api/boleto/nosso_numero", {}),
 ])
 def test_boleto_invalido_na_formatacao_vira_400(client, rota, params):
+    """O que esta prova protege é o CÓDIGO, não a frase: falha de FORMATAÇÃO —
+    descoberta depois de `validar()` dizer que estava tudo certo — não pode
+    escapar como 500. O Sicredi é o caso limite porque o ano do nosso número sai
+    de `data_documento`.
+    """
     import json as _json
+    dados = {**DADOS_SICREDI, "byte_idt": "2"}   # senão para antes, em `validar()`
     r = client.get(rota, params={"bank": "sicredi",
-                                 "data": _json.dumps(DADOS_SICREDI), **params})
+                                 "data": _json.dumps(dados), **params})
     assert r.status_code == 400, f"{rota} devolveu {r.status_code}: {r.text[:200]}"
     erros = r.json()["validation_errors"]
     assert any("data_documento" in e for e in erros), erros
 
 
 def test_mensagem_do_banco_chega_ate_o_consumidor(client):
-    """O erro seguinte da cadeia também: um 400 de cada vez, sempre com o campo."""
+    """A mensagem da engine chega inteira ao chamador, em vez de virar 500 com o
+    motivo no log do servidor.
+
+    A 1.1.1 passou a pegar `byte_idt` já em `validar()` (o campo ganhou regra de
+    tamanho) e a nomeá-lo pelo rótulo amigável — *"byte de identificação"* — e
+    não mais pelo atributo. Para quem lê um traceback é melhor; para quem manda
+    JSON é um passo a mais, porque a chave do payload é `byte_idt`. O Swagger
+    faz a ponte, e a lista de campos aceitos vai no erro de campo desconhecido.
+    """
     import json as _json
-    dados = {**DADOS_SICREDI, "data_documento": "2026/08/19"}
-    r = client.get("/api/boleto/data", params={"bank": "sicredi", "data": _json.dumps(dados)})
+    r = client.get("/api/boleto/data", params={
+        "bank": "sicredi", "data": _json.dumps(DADOS_SICREDI)})
     assert r.status_code == 400, r.text
-    assert any("byte_idt" in e for e in r.json()["validation_errors"])
+    erros = r.json()["validation_errors"]
+    assert any("byte de identificação" in e for e in erros), erros
 
 
 # Débito não pode ser contado como crédito.

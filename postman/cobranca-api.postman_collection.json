@@ -799,9 +799,14 @@
                   "    pm.expect(['on', 'off'], x.id).to.include(x.caminho_efetivo);",
                   "  });",
                   "});",
-                  "// O Inter não tem layout 077 na engine: o catálogo diz que não há para onde cair.",
+                  "// O Inter não tinha layout 077 na engine e o catálogo dizia que não havia para",
+                  "// onde cair. A pyCobrança 1.1.1 implementou o 077: ele passa a existir nos dois",
+                  "// caminhos, como C6, Sicoob e Itaú.",
                   "const inter = b.bancos.find((x) => x.id === 'inter');",
-                  "pm.test('Inter sem fallback offline', () => pm.expect(inter.fallback_offline).to.be.null);"
+                  "pm.test('Inter cai no próprio layout offline', () =>",
+                  "  pm.expect(inter.fallback_offline).to.eql('inter'));",
+                  "pm.test('Inter existe nos dois caminhos', () =>",
+                  "  pm.expect(inter.caminhos).to.eql(['on', 'off']));"
                 ]
               }
             }
@@ -7744,7 +7749,7 @@
           ]
         },
         {
-          "name": "NEG-009 · caminho off no Inter → 422",
+          "name": "BC-090 · Inter no caminho off (19º banco) → 201",
           "request": {
             "method": "POST",
             "header": [
@@ -7762,13 +7767,13 @@
                 "cobranca"
               ]
             },
-            "description": "A engine não tem o layout 077. Emitir por outro banco seria registrar a cobrança no lugar errado — falha silenciosa e cara.",
+            "description": "O Inter era o único banco com caminho `on` e sem `off`, porque a engine não tinha o layout 077 — e a recusa era o certo: cair em outro banco registraria a cobrança no lugar errado. A pyCobrança 1.1.1 implementou o 077 (boleto, remessa e retorno CNAB 400), então o `off` passa a existir. Conta literal e não variável de ambiente: a carteira do Inter é a 110 e o nosso número tem 10 dígitos — as variáveis `*_offline` são do Banco do Brasil.",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"inter\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"inter\",\n  \"account_config\": {\n    \"agencia\": \"0001\",\n    \"conta_corrente\": \"123456\",\n    \"convenio\": \"123456\",\n    \"carteira\": \"110\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"1234567890\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -7784,9 +7789,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "pm.test('status 422', () => pm.response.to.have.status(422));",
-                  "pm.test('não emite por outro banco', () =>",
-                  "  pm.expect(pm.response.json().detail).to.include(\"caminho 'off'\"));"
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('emitiu pelo layout DO INTER', () =>",
+                  "  pm.expect(b.codigo_barras).to.be.a('string').and.to.match(/^077/));",
+                  "pm.test('linha digitável do 077', () =>",
+                  "  pm.expect(b.linha_digitavel).to.be.a('string').and.to.match(/^0779/));"
                 ]
               }
             }

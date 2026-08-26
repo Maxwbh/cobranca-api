@@ -38,6 +38,10 @@ class PyCobrancaProvider(BankProvider):
             # impresso e nao ter o texto para pôr ao lado dele — e pagador de
             # celular nao escaneia a propria tela.
             pix_copia_cola=info.get("pix_copia_cola"),
+            # Offline o QR pode ser um dos dois, e a diferença é dinheiro: o
+            # montado a partir de `chave_pix` credita a chave e NÃO baixa o
+            # título. Quem integra precisa saber qual imprimiu.
+            pix_vinculado=info.get("pix_vinculado"),
             pdf_base64=base64.b64encode(pdf).decode(),
             raw=info,
         )

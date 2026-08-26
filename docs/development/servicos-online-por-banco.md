@@ -5,7 +5,7 @@ description: Catálogo completo de serviços online de cada uma das 18 institui�
 
 # Serviços online, banco a banco
 
-O caminho `off` atende 18 bancos por CNAB. **Quais deles poderiam ser `on`?**
+O caminho `off` atende 19 bancos por CNAB. **Quais deles poderiam ser `on`?**
 Esta página responde uma por uma: primeiro o resumo, depois o catálogo completo
 de cada instituição, com o que cabe no produto e o que não cabe.
 

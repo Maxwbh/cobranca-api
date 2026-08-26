@@ -200,6 +200,17 @@ class CobrancaOut(BaseModel):
     linha_digitavel: str | None = None
     codigo_barras: str | None = None
     pix_copia_cola: str | None = Field(default=None, description="PIX copia-e-cola (EMV), quando híbrido")
+    pix_vinculado: bool | None = Field(
+        default=None,
+        description=(
+            "O QR **liquida o título**? `true` = Bolepix: QR dinâmico registrado "
+            "no banco, e pagar por ele dá baixa. `false` = QR **avulso**, montado "
+            "a partir de `chave_pix`: credita a chave e deixa o título **em "
+            "aberto** — risco de segunda cobrança ou de protesto de boleto já "
+            "pago. `null` = boleto sem PIX. O caminho `on` sempre devolve `true`; "
+            "no `off` depende de você mandar `pix_copia_cola` (do banco) ou "
+            "`chave_pix`."),
+        examples=[True])
     pdf_base64: str | None = Field(default=None, description="PDF do boleto em base64, quando disponível")
     raw: dict[str, Any] | None = Field(default=None, description="Resposta crua do banco (debug)")
 

@@ -368,12 +368,17 @@ def _boleto_out(data: dict[str, Any], *, default_status: Status) -> CobrancaOut:
 def _bolepix_out(data: dict[str, Any], *, default_status: Status) -> CobrancaOut:
     slip = (data.get("payment_method") or {}).get("bank_slip") or {}
     pix = (data.get("payment_method") or {}).get("pix") or {}
+    # EMV devolvido pelo BANCO no registro: QR dinâmico, vinculado ao título, com
+    # baixa automática — Bolepix de verdade. Só o caminho offline, que monta o
+    # payload a partir de uma chave, pode produzir um QR que não liquida.
+    emv = pix.get("qr_code") or pix.get("emv") or pix.get("copy_and_paste")
     return CobrancaOut(
         id=data.get("external_reference_id") or slip.get("number") or data.get("id"),
         status=_map_status(data.get("status")) or default_status,
         linha_digitavel=slip.get("digitable_line") or data.get("digitable_line"),
         codigo_barras=slip.get("bar_code") or data.get("bar_code"),
-        pix_copia_cola=pix.get("qr_code") or pix.get("emv") or pix.get("copy_and_paste"),
+        pix_copia_cola=emv,
+        pix_vinculado=True if emv else None,
         pdf_base64=data.get("base64_pdf_file"),
         raw=data,
     )

@@ -121,7 +121,7 @@ app = FastAPI(
     openapi_tags=TAGS,
     description=(
         "Serviço único de cobrança **100% Python** — **4 bancos ON** "
-        "(**C6** 336 · **Sicoob** 756 · **Inter** 077 · **Itaú** 341) **e 18 OFF** "
+        "(**C6** 336 · **Sicoob** 756 · **Inter** 077 · **Itaú** 341) **e 19 OFF** "
         "pela engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) embutida.\n\n"
         "O Itaú entra com o provider REST implementado e **desligado por padrão** "
         "(`ITAU_REGISTERED_READY`): sem a flag, ele emite pela engine, que tem o "
@@ -138,7 +138,7 @@ app = FastAPI(
         "`caminho_efetivo`) — capacidade do banco e caminho da instalação são "
         "coisas diferentes. Pedir ao banco algo que ele não oferece "
         "responde `422` dizendo **para onde ir**, nunca `500`.\n\n"
-        "**Superfície offline (`/api/*`):** boleto/CNAB/OFX de **18 bancos** sem banco online, gerada "
+        "**Superfície offline (`/api/*`):** boleto/CNAB/OFX de **19 bancos** sem banco online, gerada "
         "**nativamente** pela pyCobrança no próprio processo (sem sidecar) e sem "
         "autenticação — doc própria em [**Swagger Offline → `/api/docs`**](/api/docs) "
         "([spec](/api/openapi.yaml)).\n\n"
@@ -580,7 +580,7 @@ def swagger_ui() -> HTMLResponse:
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Gateway (Swagger)",
         superficie="Gateway REST · multi-banco",
-        pill="4 bancos ON · 18 OFF",
+        pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
                ("Offline / pyCobrança →", "/api/docs", True)],
@@ -594,7 +594,7 @@ def redoc_ui() -> HTMLResponse:
     return HTMLResponse(pagina_redoc(
         titulo="Cobranca-API — Gateway (Redoc)",
         superficie="Gateway REST · referência",
-        pill="4 bancos ON · 18 OFF",
+        pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · leitura linear da mesma spec",
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
                ("Swagger →", "/docs", True)],

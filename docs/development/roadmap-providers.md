@@ -4,7 +4,7 @@
 > (`provider=on`), que fala com a API do banco. Estado atual: **quatro**
 > instituições com provider REST — **C6** e **Inter** validados ponta a ponta em
 > sandbox, **Sicoob** validado em contrato (o sandbox dele é mock) e **Itaú**
-> implementado como esqueleto e **desligado por flag**. Mais **18 bancos** pelo
+> implementado como esqueleto e **desligado por flag**. Mais **19 bancos** pelo
 > caminho offline (`provider=off`, engine pyCobrança) — 19 instituições
 > distintas no total, porque C6, Sicoob e Itaú contam nos dois caminhos.
 > Salvo o que está marcado ✅, cada linha aqui é **planejada**, não implementada.
@@ -71,7 +71,7 @@ bancos integrados e não existe aqui.
 | Sicoob (756) | Banco REST | boleto v3, Pix, extrato, Pix Automático — sandbox é **mock de schema**: valida contrato, não comportamento |
 | Banco Inter (077) | Banco REST | boleto híbrido (QR Pix no mesmo documento), Pix, extrato, webhook — **validado sandbox**, 13 casos em 2xx, zero falhas |
 | **Itaú (341)** | Banco REST | **esqueleto**: emissão, instrução e consulta escritas com paths e payload **a confirmar** (o catálogo exige login). **Desligado** por `ITAU_REGISTERED_READY` — sem a flag, `banco=itau` emite pela engine, que tem o layout 341. Não devolve PDF, e **não tem Pix Automático**: as rotas respondem `422` |
-| 18 bancos CNAB | Offline | via engine pyCobrança |
+| 19 bancos CNAB | Offline | via engine pyCobrança |
 
 ### 🎯 Fase 1 — Bancos self-service (próximos)
 

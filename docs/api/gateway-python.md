@@ -73,7 +73,7 @@ curl http://localhost:8000/bancos
 #      {"id": "sicoob", "codigo_banco": "756", "tipo": "rest", ...},
 #      {"id": "inter",  "codigo_banco": "077", "tipo": "rest",
 #       "caminhos": ["on"], "fallback_offline": null, ...},
-#      {"id": "pycobranca", "tipo": "offline", "bancos_cnab": [18 bancos]}]}
+#      {"id": "pycobranca", "tipo": "offline", "bancos_cnab": [19 bancos]}]}
 ```
 
 **`capacidades` fala do banco; os quatro campos novos falam desta instalação.**
@@ -937,7 +937,7 @@ curl -s -X PUT $GW/pix-automatico/cobrancas/TXID2026080100000000000001 \
 # no vencimento o banco debita sozinho; o webhook avisa liquidação/falha
 ```
 
-### Boleto offline (CNAB, 18 bancos) — sem credenciais de banco
+### Boleto offline (CNAB, 19 bancos) — sem credenciais de banco
 
 ```bash
 # provider omitido/vazio → engine pyCobrança (Ruby); bancos: GET /bancos

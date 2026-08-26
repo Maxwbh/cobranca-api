@@ -67,6 +67,10 @@ CONTAS = {
                  "convenio": "123456789012", "nosso_numero": "1234567890"},
     "sicoob": {"agencia": "3069", "conta_corrente": "12345", "carteira": "1",
                "convenio": "1234567", "variacao": "01", "nosso_numero": "1234567"},
+    # 19º banco offline, a partir da pyCobrança 1.1.1. Só a carteira 110: na 112
+    # quem numera é o Inter, e o nosso número só existe no retorno.
+    "inter": {"agencia": "0001", "conta_corrente": "123456", "carteira": "110",
+              "convenio": "123456", "nosso_numero": "1234567890"},
 }
 
 FAIXA = {"logo_empresa": "EXEMPLO", "cor_marca": "1B4F8A",
@@ -74,7 +78,15 @@ FAIXA = {"logo_empresa": "EXEMPLO", "cor_marca": "1B4F8A",
 #: Desconto, multa e juros NAO vao no boleto — dependem da data do pagamento e
 #: a faixa FEBRABAN e' preenchida pelo caixa. A regra vai impressa, como texto,
 #: nas `instrucoes` acima; os valores vao na remessa CNAB.
-BOLEPIX = {"chave_pix": "11222333000181", "txid": "PEDIDO000000000042"}
+#: Bolepix de verdade: o EMV **do banco**, devolvido ao registrar a cobrança.
+#: A imagem saía de `chave_pix`, que monta um BR Code ESTÁTICO — credita a chave
+#: e deixa o título em aberto. Chamar aquilo de Bolepix numa imagem pública era
+#: ensinar o oposto do produto; o gerador confere `pix_vinculado` antes de
+#: escrever o arquivo.
+BOLEPIX = {"pix_copia_cola": (
+    "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com.br/pix/v2/cobv/"
+    "9d36b84f-c70b-478f-b95c-12729bd97542520400005303986540515.005802BR"
+    "5924EMPRESA EXEMPLO SERVICOS6014BELO HORIZONTE62070503***6304A1B2")}
 
 
 def _dados(banco: str, **extra) -> dict:
@@ -103,14 +115,18 @@ def main() -> int:
     SAIDA.mkdir(parents=True, exist_ok=True)
 
     # Galeria por banco: o desenho padrão, que é o que a API entrega sem pedir nada.
-    for banco in ("banco_brasil", "itau", "santander", "caixa", "banco_c6", "sicoob"):
+    for banco in ("banco_brasil", "itau", "santander", "caixa", "banco_c6",
+                  "sicoob", "inter"):
         pdf, _ = pycob.emitir_boleto(banco, _dados(banco))
         _png(banco, pdf)
 
-    # Bolepix: o QR entra a partir da chave, e o copia-e-cola volta na resposta.
+    # Bolepix: o QR do BANCO, que dá baixa no título. `pix_vinculado` é o que
+    # separa este boleto de um com QR avulso — sem a asserção, a imagem voltaria
+    # a mostrar um QR que não liquida nada com o nome de Bolepix.
     pdf, info = pycob.emitir_boleto("banco_brasil", _dados("banco_brasil", **BOLEPIX))
-    _png("bolepix", pdf)
     assert info["pix_copia_cola"], "Bolepix sem copia-e-cola"
+    assert info["pix_vinculado"] is True, "o QR desta imagem não liquida o título"
+    _png("bolepix", pdf)
 
     # Carnê: 3 vias por A4.
     parcelas = [

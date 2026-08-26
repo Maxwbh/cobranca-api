@@ -455,7 +455,8 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
 @router.post("/api/retorno", include_in_schema=False)
 async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
     try:
-        return pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type)
+        return pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type,
+                                   bank=bank)
     except ArquivoGrandeDemais as e:
         return e.resposta()
     except pycob.DadosInvalidos as e:
@@ -546,6 +547,9 @@ async def render_boleto(body: dict) -> Any:
     return {"nosso_numero": info["nosso_numero"], "linha_digitavel": info["linha_digitavel"],
             "codigo_barras": info["codigo_barras"],
             "pix_copia_cola": info["pix_copia_cola"],
+            # Sem isto quem recebe o QR nao sabe se ele LIQUIDA o titulo ou so
+            # credita a chave e deixa o boleto em aberto.
+            "pix_vinculado": info["pix_vinculado"],
             "pdf_base64": base64.b64encode(pdf).decode()}
 
 
@@ -630,6 +634,9 @@ async def render_fatura(body: dict) -> Any:
     return {"nosso_numero": info["nosso_numero"], "linha_digitavel": info["linha_digitavel"],
             "codigo_barras": info["codigo_barras"],
             "pix_copia_cola": info["pix_copia_cola"],
+            # Sem isto quem recebe o QR nao sabe se ele LIQUIDA o titulo ou so
+            # credita a chave e deixa o boleto em aberto.
+            "pix_vinculado": info["pix_vinculado"],
             "pdf_base64": base64.b64encode(pdf).decode()}
 
 
@@ -669,7 +676,7 @@ def api_docs(request: Request) -> HTMLResponse:
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Offline (Swagger)",
         superficie="Offline · pyCobrança",
-        pill="18 bancos · sem convênio",
+        pill="19 bancos · sem convênio",
         detalhe=f"v{request.app.version} · pycobranca {pycob.versao()}",
         links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
                ("Gateway REST →", "/docs", True)],

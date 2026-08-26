@@ -215,6 +215,8 @@ def _boleto_out(cobranca_id: str, data: dict[str, Any]) -> CobrancaOut:
         linha_digitavel=boleto.get("linhaDigitavel"),
         codigo_barras=boleto.get("codigoBarras"),
         pix_copia_cola=pix.get("pixCopiaECola"),
+        # QR dinâmico do banco: liquida o título. Ver a nota em `c6.py`.
+        pix_vinculado=True if pix.get("pixCopiaECola") else None,
         raw=data,
     )
 

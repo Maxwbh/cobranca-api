@@ -9,6 +9,7 @@ import io
 import inspect
 import os
 import re
+import warnings
 from contextlib import contextmanager
 from datetime import date
 from difflib import get_close_matches
@@ -20,7 +21,8 @@ from pycobranca.bancos import Bancos
 from pycobranca.contracts import (NOMES_DO_CONTRATO, SLUG_POR_CODIGO,
                                   TEMA_DO_CONTRATO, tema_de_api)
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
-                                   OFXInvalido, PyCobrancaError, RetornoInvalido)
+                                   LayoutGenerico, OFXInvalido, PyCobrancaError,
+                                   RetornoInvalido)
 from pycobranca.pix import PixInvalido
 from pycobranca.render import (emite_boleto, render_boleto_pdf, render_carne_pdf,
                                render_fatura_pdf)
@@ -683,6 +685,10 @@ def _dados_do_boleto(bank: str, boleto, contexto: dict[str, Any] | None = None
             "codigo_barras": contexto.get("codigo_barras") or boleto.codigo_barras,
             "linha_digitavel": contexto.get("linha_digitavel") or boleto.linha_digitavel,
             "pix_copia_cola": pix.get("copia_cola") if pix.get("habilitado") else None,
+            # `True` = QR do banco, liquida o título (Bolepix). `False` = QR
+            # montado da chave, credita e deixa o título em aberto. `None` = sem
+            # PIX. Ver a nota em `emitir_boleto`.
+            "pix_vinculado": pix.get("vinculado") if pix.get("habilitado") else None,
         }
 
 
@@ -721,6 +727,14 @@ def emitir_boleto(bank: str, data: dict[str, Any], template: str = "moderno"
         "codigo_barras": emitido.codigo_barras,
         "linha_digitavel": emitido.linha_digitavel,
         "pix_copia_cola": emitido.pix_copia_cola,
+        # Os dois QR não são a mesma coisa e a diferença é dinheiro. Bolepix é o
+        # QR DINÂMICO que o banco devolve ao registrar (`pix_copia_cola` no
+        # payload): pagar por ele LIQUIDA o título. O montado a partir de
+        # `chave_pix` é estático — credita a chave e deixa o título EM ABERTO,
+        # com risco de segunda cobrança ou protesto de boleto já pago.
+        # A engine 1.1.1 passou a dizer qual dos dois está no papel; sem repassar
+        # aqui, quem integra não tem como saber o que imprimiu.
+        "pix_vinculado": emitido.pix_vinculado,
     }
 
 
@@ -928,28 +942,78 @@ _DICA_ENCARGO = {
 
 
 
-#: Combinacoes que o layout CNAB 400 NAO consegue expressar.
+#: Onde cada campo de encargo TEM posicao no arquivo.
 #:
-#: No 400 o codigo/tipo do encargo NAO e gravado no arquivo (verificado byte a
-#: byte): a unidade e fixa pelo layout — multa sempre PERCENTUAL, mora sempre
-#: VALOR/dia. Entao mandar `codigo_multa="1"` (valor fixo) faria o banco cobrar
-#: o numero como PORCENTAGEM: quem quis R$ 50 de multa levaria 50%.
-#: Falhar e obrigatorio; aceitar calado seria cobrar errado do pagador.
-def _valida_encargos_400(pagamentos_raw: list[dict[str, Any]]) -> None:
+#: `campo -> {layout: bancos que gravam}`; `None` = todos os bancos daquele
+#: layout. Fora dali o campo entra, nao e' gravado e some — o descarte silencioso
+#: que esta guarda existe para impedir. Pior ainda quando a unidade muda: mandar
+#: multa em VALOR onde o campo e' PERCENTUAL faria o banco cobrar R$ 50 como 50%
+#: — R$ 750 num titulo de R$ 1.500.
+#:
+#: Medido A/B em todos os layouts da engine: gerar o arquivo com dois valores
+#: diferentes do campo e comparar byte a byte.
+#:
+#: - **CNAB 400**: so o **Inter** grava os tres. Ele tem os dois campos de cada
+#:   encargo (itens 10/11, 14/15 e 30/31 do registro tipo 1) e escolhe pelo
+#:   codigo. O **Safra** recusa a multa em valor sozinho, com mensagem propria
+#:   (nota 6.1.8). Os outros 12 aceitam e descartam calados.
+#: - **CNAB 240**: `percentual_mora` e' o normal e vale para todos;
+#:   `valor_multa` e `percentual_desconto` nao tem posicao em layout nenhum.
+#:
+#: `percentual_mora` no 400 ja era barrado. `valor_multa` e `percentual_desconto`
+#: entraram no `Pagamento` da engine 1.1.1 — chegaram aceitos pela assinatura e
+#: passavam calados nos dois layouts ate aqui.
+_ENCARGO_COM_POSICAO: dict[str, tuple[dict[str, frozenset[str] | None], str]] = {
+    "valor_multa": (
+        {"cnab400": frozenset({"inter"}), "cnab240": frozenset()},
+        "a multa é percentual (use codigo_multa='2' + percentual_multa)"),
+    "percentual_mora": (
+        {"cnab400": frozenset({"inter"}), "cnab240": None},
+        "a mora é valor ao dia (use tipo_mora='1' + valor_mora)"),
+    "percentual_desconto": (
+        {"cnab400": frozenset({"inter"}), "cnab240": frozenset()},
+        "o desconto é em valor (use cod_desconto + valor_desconto)"),
+}
+
+#: Codigo/tipo do encargo que pede um campo de valor especifico. Sem esta
+#: checagem o codigo entraria coerente e o VALOR sumiria — o banco cobraria pela
+#: regra errada sem que nada no arquivo denunciasse.
+_CODIGO_PEDE_CAMPO: dict[tuple[str, str], str] = {
+    ("codigo_multa", "1"): "valor_multa",
+    ("tipo_mora", "2"): "percentual_mora",
+    ("cod_desconto", "4"): "percentual_desconto",
+}
+
+
+def _grava(campo: str, cnab_type: str, bank: str) -> bool:
+    bancos = _ENCARGO_COM_POSICAO[campo][0].get(cnab_type)
+    return bancos is None or bank in bancos
+
+
+def _onde_grava(campo: str, cnab_type: str) -> str:
+    bancos = _ENCARGO_COM_POSICAO[campo][0].get(cnab_type)
+    if bancos is None:
+        return "todos"
+    return ", ".join(sorted(bancos)) if bancos else "nenhum banco neste layout"
+
+
+def _valida_encargos(pagamentos_raw: list[dict[str, Any]], bank: str,
+                     cnab_type: str) -> None:
     erros: list[str] = []
     for i, p in enumerate(pagamentos_raw):
-        if str(p.get("codigo_multa", "")) == "1":
+        for campo, (_, alternativa) in _ENCARGO_COM_POSICAO.items():
+            if _grava(campo, cnab_type, bank) or p.get(campo) in (None, ""):
+                continue
             erros.append(
-                f"pagamento[{i}]: codigo_multa='1' (valor fixo) não existe no CNAB 400 — "
-                "a multa é sempre percentual (use codigo_multa='2' e percentual_multa)")
-        if str(p.get("tipo_mora", "")) == "2":
+                f"pagamento[{i}]: `{campo}` não tem posição no {cnab_type} de {bank!r} e "
+                f"seria ignorado — {alternativa}. Gravam este campo: "
+                + _onde_grava(campo, cnab_type))
+        for (campo, codigo), pedido in _CODIGO_PEDE_CAMPO.items():
+            if _grava(pedido, cnab_type, bank) or str(p.get(campo, "")) != codigo:
+                continue
             erros.append(
-                f"pagamento[{i}]: tipo_mora='2' (taxa mensal %) não existe no CNAB 400 — "
-                "a mora é valor ao dia (use tipo_mora='1' e valor_mora)")
-        if p.get("percentual_mora") not in (None, "") and p.get("valor_mora") in (None, ""):
-            erros.append(
-                f"pagamento[{i}]: percentual_mora não tem posição no CNAB 400 e seria "
-                "ignorado — use valor_mora (R$/dia)")
+                f"pagamento[{i}]: {campo}={codigo!r} pede `{pedido}`, que não tem posição "
+                f"no {cnab_type} de {bank!r} — " + _ENCARGO_COM_POSICAO[pedido][1])
     if erros:
         raise DadosInvalidos(erros)
 
@@ -964,8 +1028,7 @@ def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = 
     pagamentos_raw = dados.get("pagamentos") or []
     if not pagamentos_raw:
         raise DadosInvalidos(["Campo 'pagamentos' é obrigatório no payload da remessa"])
-    if cnab_type == "cnab400":
-        _valida_encargos_400(pagamentos_raw)
+    _valida_encargos(pagamentos_raw, bank, cnab_type)
     # Remessa com PIX carrega campos por pagamento que so existem no
     # PagamentoPix (txid, tipo_pagamento_pix, limites). Usar Pagamento nos dois
     # casos descartaria esses campos sem avisar.
@@ -1004,23 +1067,58 @@ def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = 
         raise DadosInvalidos(_erros(e)) from e
 
 
-def parse_retorno(conteudo: bytes, layout_hint: str | None = None) -> list[dict[str, Any]]:
+def parse_retorno(conteudo: bytes, layout_hint: str | None = None,
+                  bank: str | None = None) -> list[dict[str, Any]]:
     """Lê o retorno CNAB direto dos bytes do upload.
 
     Escrevia num `NamedTemporaryFile` porque `Retorno.ler` só aceitava caminho.
     A engine passou a aceitar `bytes` — como `Extrato.ler` já fazia —, então o
     arquivo do banco deixa de tocar o disco: um retorno traz nome, documento e
     valor de cada pagador, e o melhor lugar para esse dado é nenhum.
+
+    O BANCO sai do header do arquivo, não do `bank` do request: o arquivo é a
+    fonte, e é dele que dependem o layout e o sentido de cada ocorrência.
+    Quando os dois discordam, o request está errado e isso vira 400 — antes o
+    `bank` era exigido e nunca lido, então subir o retorno do banco errado
+    devolvia 200 com dados de outro banco.
     """
     try:
-        retorno = Retorno.ler(conteudo)
+        with warnings.catch_warnings(record=True) as capturados:
+            warnings.simplefilter("always")
+            retorno = Retorno.ler(conteudo)
+            registros = list(retorno.registros)
     except RetornoInvalido as e:
         raise DadosInvalidos([f"Arquivo de retorno inválido: {e}"]) from e
     except (PyCobrancaError, ValueError) as e:
         raise DadosInvalidos(_erros(e)) from e
+
+    codigo = getattr(retorno, "codigo_banco", None) or None
+    if bank and codigo:
+        esperado = CODIGO_POR_SLUG.get(bank)
+        if esperado and esperado != codigo:
+            do_arquivo = SLUG_POR_CODIGO.get(codigo, codigo)
+            raise DadosInvalidos([
+                f"O arquivo é retorno do banco {do_arquivo!r} ({codigo}), mas o request "
+                f"pediu {bank!r} ({esperado}). Cada banco põe os campos em posições "
+                "diferentes: ler com o layout errado devolveria valores plausíveis e "
+                "errados. Confira o `bank` ou o arquivo."])
+
     layout = getattr(retorno, "layout", None) or layout_hint or "400"
     layout = str(layout).replace("cnab", "")
-    return [retorno_item_para_api(r, layout=layout) for r in retorno.registros]
+    # `banco` decide o SENTIDO da ocorrência, não só a posição: o `40` é "baixa
+    # por liquidação" no mapa geral e "baixa de título protestado" no Safra;
+    # o `07` do Inter é "cancelado" e não "liquidação parcial". Sem passá-lo, a
+    # conciliação lia o oposto do que o banco quis dizer.
+    itens = [retorno_item_para_api(r, layout=layout, banco=codigo) for r in registros]
+
+    # A engine avisa quando não tem o mapa do banco e leu com o layout de
+    # reserva. É a falha mais perigosa do parsing porque a saída é plausível —
+    # o item sai completo, com campos que podem ter vindo de outras posições.
+    # Engolir o aviso era devolver 200 sem dizer que os números são suspeitos.
+    generico = any(issubclass(a.category, LayoutGenerico) for a in capturados)
+    for item in itens:
+        item["layout_generico"] = generico
+    return itens
 
 
 def versao() -> str:

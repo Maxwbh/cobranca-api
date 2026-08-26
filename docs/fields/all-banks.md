@@ -31,7 +31,7 @@ carteira '1' não suportada (use uma de: 10, 20)
 | Citibank | 745 | `3` |
 | CrediSIS | 097 | `18` |
 | C6 Bank | 336 | `10`, `20` |
-| HSBC | 399 | `CNR`, `CSB` |
+| HSBC | 399 | `CNR` |
 | Itaú | 341 | `104`, `109`, `112`, `115`, `175`, `177`, `188` |
 | Safra | 422 | `1`, `2` |
 | Santander | 033 | `101`, `102`, `121` |
@@ -70,10 +70,15 @@ carteira '1' não suportada (use uma de: 10, 20)
 | HSBC | 399 | ✅ layout ativo — **o banco é que não existe mais** (incorporado pelo Bradesco em 2016) |
 | Citibank | 745 | ✅ layout ativo — o banco opera só no **atacado** desde a venda do varejo |
 
-> Os dois últimos **funcionam** na engine: HSBC emite com carteira `CNR`/`CSB` e
+> Os dois últimos **funcionam** na engine: HSBC emite com carteira `CNR` e
 > Citibank com `3`. Versões anteriores desta página os marcavam
 > "⚠️ descontinuado", o que se lia como "não emite" — e emite. O que acabou foi
 > o banco de varejo, não o layout.
+>
+> A carteira **`CSB` do HSBC saiu** na pyCobrança 1.1.1: o campo livre dela
+> montava 27 posições onde cabem 25, então ela **nunca** produziu um boleto
+> válido — anunciá-la era promessa que sempre falhava. Corrigi-la depende do
+> manual do HSBC, que o banco não publica mais.
 
 ---
 

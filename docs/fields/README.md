@@ -13,7 +13,7 @@
 - [Banco C6 (336)](#banco-c6-336)
 - [Diferenças Importantes](#diferenças-importantes)
 - [Nosso Numero — Guia Completo](./nosso-numero.md) — Entrada vs saida, tamanhos, conciliacao
-- [Todos os Bancos](./all-banks.md) — Lista completa com todos os 18 bancos suportados
+- [Todos os Bancos](./all-banks.md) — Lista completa com todos os 19 bancos suportados
 
 ## 🎯 Legenda
 

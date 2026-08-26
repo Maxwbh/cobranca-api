@@ -7,11 +7,13 @@ cryptography>=42.0
 psycopg[binary]>=3.1
 # Engine offline (100% Python) — PyPI, não git: build reprodutível.
 #
-# Piso na 1.1.0 porque é dela para cima que existe o que o gateway consome:
-# `emite_boleto`, `tema_de_api`, os cinco totalizadores FEBRABAN,
-# `Retorno.ler(bytes)` e a hierarquia de erros fechada. Com a 1.0.x a API
-# prometeria no schema o que a engine instalada não faz.
-pycobranca>=1.1.0,<2
+# Piso na 1.1.1 porque é dela para cima que existe o que o gateway consome:
+# o Inter (077) no contrato REST — sem ele o 19º banco offline não existe —,
+# `pix_vinculado` (que separa Bolepix de QR avulso), `pix_copia_cola` e
+# `pix_observacao` no `BoletoData`, o aviso `LayoutGenerico`, o `banco` em
+# `retorno_item_para_api` e os campos `valor_multa`/`percentual_desconto` do
+# `Pagamento`. Com a 1.1.0 a API prometeria no schema o que a engine não faz.
+pycobranca>=1.1.1,<2
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
 pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)

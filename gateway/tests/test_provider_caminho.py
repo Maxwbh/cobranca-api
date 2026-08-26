@@ -91,11 +91,16 @@ def test_on_em_banco_sem_api_recusa(client):
     assert "não tem caminho 'on'" in r.json()["detail"]
 
 
-def test_off_no_inter_recusa(client):
-    """A engine não tem o layout 077. Sem recusa, o fallback emitiria pelo banco errado."""
+def test_off_no_inter_emite(client):
+    """O Inter era o único banco com `on` e sem `off`, porque a engine não tinha
+    o layout 077 — e ser recusado ali era o certo: cair noutro banco emitiria um
+    boleto registrado no lugar errado.
+
+    A pyCobrança 1.1.1 implementou o Inter, então o caminho `off` passa a
+    existir e a recusa deixa de fazer sentido.
+    """
     r = client.post("/cobranca", json=_corpo("off", "inter"))
-    assert r.status_code == 422
-    assert "não tem caminho 'off'" in r.json()["detail"]
+    assert r.status_code == 201, r.text
 
 
 def test_banco_desconhecido_no_account_config_recusa(client):
@@ -192,10 +197,11 @@ def test_catalogo_diz_o_caminho_efetivo_da_instalacao(client, monkeypatch):
     assert itau["caminho_efetivo"] == "off", "sem a flag, `on` emite pela engine"
     assert itau["flag"] == "ITAU_REGISTERED_READY"
 
-    # Inter não tem para onde cair: o catálogo diz isso em vez de deixar o
-    # integrador supor que existe fallback como nos outros.
-    assert bancos["inter"]["fallback_offline"] is None
-    assert bancos["inter"]["caminhos"] == ["on"]
+    # O Inter não tinha para onde cair enquanto a engine não tinha o layout 077.
+    # Com a 1.1.1 ele passa a existir nos dois caminhos, como o C6, o Sicoob e
+    # o Itaú — e o catálogo é onde isso aparece para quem integra.
+    assert bancos["inter"]["fallback_offline"] == "inter"
+    assert bancos["inter"]["caminhos"] == ["on", "off"]
 
 
 # --- credencial pertence ao BANCO, não ao caminho ----------------------------

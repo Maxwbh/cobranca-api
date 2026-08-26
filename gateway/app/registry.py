@@ -37,12 +37,14 @@ _REST_POR_BANCO: dict[Banco, type[BankProvider]] = {
 # contrato.
 _SLUG_ENGINE: dict[Banco, str] = {
     Banco.c6: "banco_c6",
-    **{b: b.value for b in Banco if b not in (Banco.c6, Banco.inter)},
+    **{b: b.value for b in Banco if b is not Banco.c6},
 }
-# O Inter NÃO está aqui de propósito: a engine não tem o layout 077. Sem
-# caminho OFF, `provider=off&banco=inter` é recusado com a lista de quem tem —
-# cair em outro banco emitiria boleto REGISTRADO NO LUGAR ERRADO, que é falha
-# silenciosa e cara.
+# O Inter ficou de fora daqui enquanto a engine não tinha o layout 077, e o
+# `provider=off&banco=inter` era recusado — cair em outro banco emitiria boleto
+# REGISTRADO NO LUGAR ERRADO. A pyCobrança 1.1.1 implementou o Inter (boleto,
+# remessa e retorno CNAB 400, só a carteira 110), então ele passa a ser o 19º
+# banco offline e o único, com o C6, o Sicoob e o Itaú, a existir nos dois
+# caminhos.
 
 # Compatibilidade: o roteador antigo mapeava Provider→classe. Mantido porque
 # testes e rotas ainda referenciam, e porque `build_rest_provider` usa.
