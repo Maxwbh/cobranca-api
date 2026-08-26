@@ -590,33 +590,6 @@ def _logo_texto(valor: str) -> str:
     return valor
 
 
-#: REMENDO TEMPORÁRIO — o defeito é da engine, e a correção certa é lá.
-#:
-#: Achado varrendo as 55 carteiras dos 19 bancos: o Sicoob declara
-#: `("1", "3", "9", "09")` e trata `"9"` e `"09"` como a mesma carteira ao
-#: escolher o identificador — mas `campo_livre()` faz `so_digitos(carteira)[:1]`,
-#: que fica com o PRIMEIRO caractere. `"09"` gravava `0` na posição 1 do campo
-#: livre, e não existe carteira 0 no Sicoob.
-#:
-#: O boleto saía ESTRUTURALMENTE VÁLIDO — o DV geral é calculado depois, sobre
-#: os dígitos já errados —, então nenhum verificador de estrutura pega. Nem a
-#: varredura da própria engine, que troca a carteira e confere a estrutura sem
-#: comparar as duas grafias entre si.
-#:
-#: A correção foi feita na pyCobrança (`_carteira_no_campo_livre` normaliza em
-#: vez de truncar, com teste que compara as grafias em todos os bancos). Este
-#: mapa fica porque o pin aceita `>=1.1.1`, e a **1.1.1 tem o defeito**: sem ele
-#: a API emitiria boleto errado numa versão que ela própria permite instalar.
-#:
-#: SAI quando o piso do pin passar da versão que traz a correção da engine.
-#:
-#: Não vale generalizar "tirar o zero à esquerda": no Bradesco as carteiras
-#: `03`, `06`, `09`… são de dois dígitos de verdade, e normalizar destruiria o
-#: campo livre delas. Por isso a tabela é por banco e medida, e o teste que a
-#: prende re-mede em vez de reler.
-_CARTEIRA_EQUIVALENTE: dict[str, dict[str, str]] = {"sicoob": {"09": "9"}}
-
-
 def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = None):
     """Constrói a instância do banco a partir do payload do contrato REST.
 
@@ -639,10 +612,6 @@ def construir_boleto(bank: str, data: dict[str, Any], *, modelo: str | None = No
     # construtor e imprimiria o valor.
     for campo in _TOTALIZADORES_DO_CAIXA:
         data.pop(campo, None)
-
-    equivalente = _CARTEIRA_EQUIVALENTE.get(bank, {}).get(str(data.get("carteira", "")))
-    if equivalente:
-        data["carteira"] = equivalente
 
     # Saem antes da engine: são conferência, não dado do título. A comparação
     # acontece em `_conferir_com_o_banco`, depois do cálculo.

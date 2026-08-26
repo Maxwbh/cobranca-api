@@ -127,12 +127,17 @@ def test_o_pdf_sai_e_imprime_a_mesma_linha_do_json(client, slug, carteira):
 def test_duas_grafias_da_mesma_carteira_dao_o_mesmo_boleto():
     """`09` no Sicoob virava `0` na primeira posição do campo livre.
 
-    A engine declara `("1", "3", "9", "09")` e trata `9` e `09` como a mesma
-    carteira ao escolher o identificador — mas o campo livre faz
+    A engine declarava `("1", "3", "9", "09")` e tratava `9` e `09` como a mesma
+    carteira ao escolher o identificador — mas o campo livre fazia
     `so_digitos(carteira)[:1]`, que trunca em vez de normalizar. Não existe
     carteira 0 no Sicoob, e o boleto saía estruturalmente válido: o DV é
     recalculado sobre os dígitos errados, então nenhum verificador de estrutura
     pega. Só comparando as duas grafias da MESMA carteira.
+
+    Corrigido na pyCobrança 1.1.1 (`_carteira_no_campo_livre` normaliza). O
+    gateway teve um remendo enquanto a correção não chegava à versão do pin;
+    ele saiu quando esta varredura passou a dar o mesmo resultado sem ele — e
+    este caso é o que autoriza a remoção, porque re-mede em vez de reler.
 
     Varre todos os bancos porque a próxima ocorrência não vai avisar. O Bradesco
     é o contra-exemplo que impede a regra ingênua: lá `03`, `06` e `09` são
