@@ -18,7 +18,8 @@ from app.core.swagger_tema import VENDOR_SWAGGER, pagina_redoc, pagina_swagger
 from app.providers.c6 import ProcessamentoPendente
 from app.routers import (
     bancos, bolepix, carne, checkout, cobranca, conciliacao, credenciais,
-                         extrato, jobs, offline, pix, pix_automatico, webhook_banco,
+                         cobrancas, extrato, jobs, offline, pix, pix_automatico,
+                         webhook_banco,
                          webhooks)
 
 # Portais oficiais (linkados nas descrições — o Swagger UI renderiza markdown)
@@ -413,6 +414,7 @@ app.include_router(bolepix.router)
 app.include_router(checkout.router)
 app.include_router(conciliacao.router)
 app.include_router(extrato.router)
+app.include_router(cobrancas.router)
 app.include_router(pix_automatico.router)
 app.include_router(webhook_banco.router)
 app.include_router(webhook_banco.pix_router)

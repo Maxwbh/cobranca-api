@@ -46,6 +46,11 @@ _CAPACIDADES = {
     "consultar_pix": "pix_consulta",
     "listar_transacoes": "conciliacao_transacoes",
     "normalizar_webhook": "webhook_entrada",
+    # Coleção e sumário de cobranças: hoje só o Inter publica — C6 e Sicoob
+    # emitem, consultam e baixam um título por vez. Pelo mesmo argumento acima:
+    # sem estas linhas a rota existiria e o catálogo não a mencionaria.
+    "listar_cobrancas": "cobranca_listagem",
+    "sumario_cobrancas": "cobranca_sumario",
 }
 
 # `consultar` fica DE FORA de propósito, e o motivo é o limite do método: a

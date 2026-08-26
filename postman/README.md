@@ -159,7 +159,8 @@ segue valendo como apelido; é o que a maior parte da coleção usa, de propósi
 | `BC-004` | o catálogo responde `caminhos`, e cada banco REST diz `registrado_pronto`, `fallback_offline` e `caminho_efetivo` |
 | `BC-090` | mesma emissão do `BC-018`, na forma nova (`provider=off` + `banco`) — se as duas divergirem, a migração quebra quem já integrou |
 | `NEG-008` | `on` em banco sem API REST → `422` com a lista de quem tem |
-| `NEG-009` | `off` no Inter → `422` (a engine não tem o layout 077; cair em outro banco registraria no lugar errado) |
+| `BC-092/093` | coleção e sumário no Inter — `provider=inter` com token próprio (`bapi_token_inter`, do `BC-094`), porque a auth da coleção aponta para o banco ativo |
+| `NEG-012` | coleção em banco que não a tem → `422` nomeando quem tem, nunca `500` |
 | `NEG-010` | caminho sem `banco` → `422`: a API não escolhe banco sozinha |
 
 ## Webhook de entrada: `webhook_token`
@@ -235,6 +236,9 @@ Cobertura = esta matriz completa. Endpoint novo ⇒ nova linha com ID ⇒ novo r
 | ID | Funcionalidade | Endpoint | Cobre |
 |---|---|---|---|
 | BC-088 | Revisar cobranças dentro do lote de cobv | `PATCH /pix/lote/{id}` | `P_03_02` do roteiro C6 — encadeia no `lote_id`/`txid_lote1` do BC-052 |
+| BC-092 | Coleção de cobranças do período | `GET /cobrancas` | só o Inter publica; `pagina` 1-based aqui, 0-based no banco |
+| BC-093 | Sumário do período por situação | `GET /cobrancas/sumario` | o Inter devolve array na raiz; o gateway embrulha em `sumario` |
+| BC-094 | Cadastrar credenciais Inter → `bapi_` | `POST /credenciais` | par `.crt`+`.key` ou PKCS12 — é o que destrava BC-092/093 |
 
 > **BC-088 fechou uma ausência de homologação, não só uma linha de matriz.**
 > `revisar_lote_cobv` existia no mixin BACEN e o router não expunha, então
@@ -257,8 +261,16 @@ Cobertura = esta matriz completa. Endpoint novo ⇒ nova linha com ID ⇒ novo r
 | NEG-005 | OFX inválido no upload | 400 |
 | NEG-006 | Extrato Sicoob multi-mês | 422 |
 | NEG-007 | Pix no caminho offline (`provider=off`) | 422 |
+| NEG-012 | Coleção de cobranças em banco que não a publica | 422 nomeando quem publica |
+| NEG-013 | Período invertido na coleção | 422 **antes** de ir ao banco |
 
 > NEG-003 cobre o **T6**: propagação do erro de validação.
+>
+> **NEG-013 não é formalidade.** No banco, período invertido volta lista vazia
+> com `200`: quem chama lê como "não houve movimento" e concilia um mês que
+> nunca foi consultado. O caso roda sem credencial do Inter justamente porque a
+> conferência acontece antes da ida ao banco — se um dia deixar de acontecer, é
+> o teste que cai, não a conciliação de alguém.
 
 ### Critérios de aceite T1–T10
 

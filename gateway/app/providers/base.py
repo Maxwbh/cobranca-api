@@ -63,6 +63,20 @@ class BankProvider(ABC):
     def consultar_pix(self, txid: str) -> PixCobrancaOut:
         raise NotImplementedError
 
+    def listar_cobrancas(self, *, inicio: str, fim: str, pagina: int, tamanho: int,
+                         filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Coleção de boletos do período, no formato do banco (passthrough).
+
+        Capacidade opcional: hoje só o Inter publica coleção e sumário de
+        cobranças. C6 e Sicoob emitem, consultam e baixam um título por vez.
+        """
+        raise NotImplementedError
+
+    def sumario_cobrancas(self, *, inicio: str, fim: str,
+                          filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Totais do período por situação — o mesmo recorte da coleção."""
+        raise NotImplementedError
+
     def listar_recebiveis(self, *, start_date: str, end_date: str, page: int, size: int) -> ConciliacaoOut:
         raise NotImplementedError
 

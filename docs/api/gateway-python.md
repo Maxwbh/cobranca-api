@@ -382,6 +382,38 @@ Baixa/cancela. O verbo muda por banco e o gateway absorve: C6 `PUT
 > porque identifica pelo id — foi por isso que ele passou despercebido até a
 > homologação do Sicoob.
 
+### `GET /cobrancas?tenant_id=&provider=inter&inicio=&fim=`
+Os boletos do período — a coleção que a API não sabia devolver. Antes, quem
+precisava da lista guardava os ids da emissão e paginava por conta própria, ou
+caía no arquivo de retorno.
+
+| Parâmetro | Para que serve |
+|---|---|
+| `inicio`, `fim` | Período (obrigatórios). Máximo **90 dias**, e período invertido é `422` — no banco ele volta lista vazia, que se lê como "não houve movimento" |
+| `pagina`, `tamanho` | `pagina` começa em **1**, como no resto da API (o Inter conta de 0 e o gateway converte); `tamanho` até 1000, default 50 |
+| `situacao` | `RECEBIDO`, `A_RECEBER`, `MARCADO_RECEBIDO`, `ATRASADO`, `CANCELADO`, `EXPIRADO`, `FALHA_EMISSAO`, `EM_PROCESSAMENTO`, `PROTESTO` |
+| `tipo_cobranca` | `SIMPLES`, `PARCELADO`, `RECORRENTE` |
+| `filtrar_data_por` | `VENCIMENTO` (default), `EMISSAO`, `PAGAMENTO` |
+| `ordenar_por` / `tipo_ordenacao` | Campo de ordenação e `ASC`/`DESC` |
+| `seu_numero`, `pagador`, `documento_pagador` | Busca pelo identificador da emissão ou pelo pagador |
+
+Valor fora dessas listas para **aqui**, com `422` dizendo quais valem: mandado
+ao banco, ele responde `400` genérico, que parece falha da integração.
+
+O corpo é passthrough, com os nomes do banco (`totalPaginas`, `totalElementos`,
+`cobrancas[]`).
+
+### `GET /cobrancas/sumario?tenant_id=&provider=inter&inicio=&fim=`
+Os totais do período por situação — "quanto está em aberto" sem baixar a
+coleção inteira para somar no cliente. Mesmos filtros da coleção, **sem**
+paginação e sem ordenação (o banco não as aceita aqui). Os totais vêm em
+`sumario`: o Inter devolve array na raiz, e array na raiz não tem onde crescer.
+
+> **Só o Inter publica coleção e sumário.** C6 e Sicoob tratam um título por
+> vez; nesses bancos a rota responde `422` dizendo quem oferece. No caminho
+> offline não há coleção: o estado vem do arquivo de retorno
+> (`POST /api/retorno`) ou do OFX.
+
 ---
 
 ## 📚 Carnê

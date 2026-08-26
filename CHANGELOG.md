@@ -17,6 +17,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **`GET /cobrancas` e `GET /cobrancas/sumario` — a coleção de boletos do
+  período.** Antes só se consultava um título por vez: quem queria a lista
+  guardava os ids da emissão ou caía no arquivo de retorno. Filtros por
+  situação, tipo, pagador e `seu_numero`; janela máxima de **90 dias**; `pagina`
+  começa em 1, como no resto da API. O sumário devolve os totais por situação em
+  `sumario`. Hoje só o **Inter** publica as duas — nos demais bancos a rota
+  responde `422` dizendo quem publica.
 - **`GET /credenciais` — quando a integração para de funcionar.** O certificado
   mTLS dos bancos vale um ano e não tem renovação in-place: vence e toda chamada
   falha no handshake, de uma vez. A rota diz a validade, os dias restantes, o

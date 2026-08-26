@@ -7858,6 +7858,761 @@
         ]
       }
     },
+    "/cobrancas": {
+      "get": {
+        "tags": [
+          "cobranca"
+        ],
+        "summary": "Listar",
+        "description": "Boletos do período — a coleção que a API não sabia devolver.\n\n`pagina` começa em **1**, como no resto da API. O Inter pagina a partir de\nzero e o provider converte: repassar a página crua devolveria a segunda\npara quem pediu a primeira, sem erro nenhum.",
+        "operationId": "listar_cobrancas_get",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Data inicial (YYYY-MM-DD)",
+              "examples": [
+                "2027-01-01"
+              ],
+              "title": "Inicio"
+            },
+            "description": "Data inicial (YYYY-MM-DD)"
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Data final (YYYY-MM-DD; no máximo 90 dias após a inicial)",
+              "examples": [
+                "2027-01-31"
+              ],
+              "title": "Fim"
+            },
+            "description": "Data final (YYYY-MM-DD; no máximo 90 dias após a inicial)"
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Provider",
+              "description": "**Caminho**: `on` = API do banco · `off` = engine pyCobrança. Diz por onde, não qual banco — a instituição é o `banco`. Nome de banco aqui (`c6`) é apelido legado de `on` + `banco`, e sai na 3.0.0.",
+              "default": "c6"
+            },
+            "description": "**Caminho**: `on` = API do banco · `off` = engine pyCobrança. Diz por onde, não qual banco — a instituição é o `banco`. Nome de banco aqui (`c6`) é apelido legado de `on` + `banco`, e sai na 3.0.0."
+          },
+          {
+            "name": "banco",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Banco"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Instituição (`c6`, `sicoob`, `inter`, `itau`…). Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve.",
+              "title": "Banco"
+            },
+            "description": "Instituição (`c6`, `sicoob`, `inter`, `itau`…). Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve."
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página, a partir de 1",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página, a partir de 1"
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Itens por página",
+              "default": 50,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página"
+          },
+          {
+            "name": "situacao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Situação do título (vocabulário do banco)",
+              "examples": [
+                "A_RECEBER"
+              ],
+              "title": "Situacao"
+            },
+            "description": "Situação do título (vocabulário do banco)"
+          },
+          {
+            "name": "seu_numero",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seu número, como enviado na emissão",
+              "title": "Seu Numero"
+            },
+            "description": "Seu número, como enviado na emissão"
+          },
+          {
+            "name": "pagador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nome do pagador (busca parcial no banco)",
+              "title": "Pagador"
+            },
+            "description": "Nome do pagador (busca parcial no banco)"
+          },
+          {
+            "name": "documento_pagador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "CPF/CNPJ do pagador (só dígitos)",
+              "title": "Documento Pagador"
+            },
+            "description": "CPF/CNPJ do pagador (só dígitos)"
+          },
+          {
+            "name": "filtrar_data_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Qual data o período filtra (vocabulário do banco)",
+              "examples": [
+                "VENCIMENTO"
+              ],
+              "title": "Filtrar Data Por"
+            },
+            "description": "Qual data o período filtra (vocabulário do banco)"
+          },
+          {
+            "name": "tipo_cobranca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tipo da cobrança (vocabulário do banco)",
+              "examples": [
+                "SIMPLES"
+              ],
+              "title": "Tipo Cobranca"
+            },
+            "description": "Tipo da cobrança (vocabulário do banco)"
+          },
+          {
+            "name": "ordenar_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Campo de ordenação (vocabulário do banco)",
+              "examples": [
+                "DATA_VENCIMENTO"
+              ],
+              "title": "Ordenar Por"
+            },
+            "description": "Campo de ordenação (vocabulário do banco)"
+          },
+          {
+            "name": "tipo_ordenacao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sentido da ordenação (vocabulário do banco)",
+              "examples": [
+                "DESC"
+              ],
+              "title": "Tipo Ordenacao"
+            },
+            "description": "Sentido da ordenação (vocabulário do banco)"
+          },
+          {
+            "name": "X-Bank-Credentials",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Credenciais do banco (JSON em base64) — só memória, nunca persistidas.",
+              "title": "X-Bank-Credentials"
+            },
+            "description": "Credenciais do banco (JSON em base64) — só memória, nunca persistidas."
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bearer bapi_... (token do /credenciais)",
+              "title": "Authorization"
+            },
+            "description": "Bearer bapi_... (token do /credenciais)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Listar Cobrancas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado no banco.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso é transitório e a mesma chamada funciona em instantes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "424": {
+            "description": "Credenciais: ausentes no cofre para o par tenant/**banco** (a credencial é da instituição, não do caminho), ou rejeitadas pelo banco. Todo erro no endpoint de **token** responde `424`, qualquer que seja o status do banco — o Inter, por exemplo, devolve `400` para `client_credentials` inválido, e chamar aquilo de payload inválido manda procurar defeito no lugar errado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requisições do banco atingido. O `Retry-After` é repassado quando o banco o envia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha do banco (`5xx` ou status não mapeado) — re-tentar com backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Banco indisponível ou tempo esgotado (rede/timeout).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "TokenBapi": []
+          }
+        ]
+      }
+    },
+    "/cobrancas/sumario": {
+      "get": {
+        "tags": [
+          "cobranca"
+        ],
+        "summary": "Sumario",
+        "description": "Totais do período por situação — o mesmo recorte da coleção, sem paginar.\n\nResponde \"quanto está em aberto\" sem baixar a coleção inteira para somar no\ncliente, que é o que fazia quem precisava do número.\n\nOs totais vêm em `sumario`: o Inter devolve array na raiz, e array na raiz\nnão tem onde crescer. Os itens seguem passthrough, com os nomes do banco.\n\nOrdenação não entra aqui — o banco não a aceita no sumário, e aceitá-la na\nrota só para descartar prometeria um recorte que não acontece.",
+        "operationId": "sumario_cobrancas_sumario_get",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Data inicial (YYYY-MM-DD)",
+              "examples": [
+                "2027-01-01"
+              ],
+              "title": "Inicio"
+            },
+            "description": "Data inicial (YYYY-MM-DD)"
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Data final (YYYY-MM-DD; no máximo 90 dias após a inicial)",
+              "examples": [
+                "2027-01-31"
+              ],
+              "title": "Fim"
+            },
+            "description": "Data final (YYYY-MM-DD; no máximo 90 dias após a inicial)"
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Provider",
+              "description": "**Caminho**: `on` = API do banco · `off` = engine pyCobrança. Diz por onde, não qual banco — a instituição é o `banco`. Nome de banco aqui (`c6`) é apelido legado de `on` + `banco`, e sai na 3.0.0.",
+              "default": "c6"
+            },
+            "description": "**Caminho**: `on` = API do banco · `off` = engine pyCobrança. Diz por onde, não qual banco — a instituição é o `banco`. Nome de banco aqui (`c6`) é apelido legado de `on` + `banco`, e sai na 3.0.0."
+          },
+          {
+            "name": "banco",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Banco"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Instituição (`c6`, `sicoob`, `inter`, `itau`…). Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve.",
+              "title": "Banco"
+            },
+            "description": "Instituição (`c6`, `sicoob`, `inter`, `itau`…). Use com `provider=on`. Omitido, o `provider` legado (nome do banco) resolve."
+          },
+          {
+            "name": "situacao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Situação do título (vocabulário do banco)",
+              "examples": [
+                "A_RECEBER"
+              ],
+              "title": "Situacao"
+            },
+            "description": "Situação do título (vocabulário do banco)"
+          },
+          {
+            "name": "seu_numero",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seu número, como enviado na emissão",
+              "title": "Seu Numero"
+            },
+            "description": "Seu número, como enviado na emissão"
+          },
+          {
+            "name": "pagador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nome do pagador (busca parcial no banco)",
+              "title": "Pagador"
+            },
+            "description": "Nome do pagador (busca parcial no banco)"
+          },
+          {
+            "name": "documento_pagador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "CPF/CNPJ do pagador (só dígitos)",
+              "title": "Documento Pagador"
+            },
+            "description": "CPF/CNPJ do pagador (só dígitos)"
+          },
+          {
+            "name": "filtrar_data_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Qual data o período filtra (vocabulário do banco)",
+              "examples": [
+                "VENCIMENTO"
+              ],
+              "title": "Filtrar Data Por"
+            },
+            "description": "Qual data o período filtra (vocabulário do banco)"
+          },
+          {
+            "name": "tipo_cobranca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tipo da cobrança (vocabulário do banco)",
+              "examples": [
+                "SIMPLES"
+              ],
+              "title": "Tipo Cobranca"
+            },
+            "description": "Tipo da cobrança (vocabulário do banco)"
+          },
+          {
+            "name": "X-Bank-Credentials",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Credenciais do banco (JSON em base64) — só memória, nunca persistidas.",
+              "title": "X-Bank-Credentials"
+            },
+            "description": "Credenciais do banco (JSON em base64) — só memória, nunca persistidas."
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bearer bapi_... (token do /credenciais)",
+              "title": "Authorization"
+            },
+            "description": "Bearer bapi_... (token do /credenciais)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Sumario Cobrancas Sumario Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Três origens, distinguíveis pelo corpo:\n\n1. **Validação do contrato** (`detail` em lista) — o corpo ou a query não batem com o schema;\n2. **Capacidade ausente** (`detail` em texto) — o banco não oferece a operação; a mensagem diz para onde ir. Confira em `GET /bancos`;\n3. **O banco recusou os dados** (`400`/`422`/`405` no upstream) — traz `upstream` com a resposta original. Re-tentar igual não resolve.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token `bapi_` ausente do cofre, inválido ou revogado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "O token não é deste par tenant+**banco**. O `bapi_` amarra os dois: token do C6 numa rota do Sicoob é recusado de propósito, e o mesmo vale para o token de outro tenant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso não encontrado no banco.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflito no banco: já existe, ou o estado não permite. Inclui o **registro assíncrono na CIP ainda em curso** (`ProcessamentoPendente`) — nesse caso é transitório e a mesma chamada funciona em instantes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "424": {
+            "description": "Credenciais: ausentes no cofre para o par tenant/**banco** (a credencial é da instituição, não do caminho), ou rejeitadas pelo banco. Todo erro no endpoint de **token** responde `424`, qualquer que seja o status do banco — o Inter, por exemplo, devolve `400` para `client_credentials` inválido, e chamar aquilo de payload inválido manda procurar defeito no lugar errado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requisições do banco atingido. O `Retry-After` é repassado quando o banco o envia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha do banco (`5xx` ou status não mapeado) — re-tentar com backoff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Banco indisponível ou tempo esgotado (rede/timeout).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroDoBanco"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "TokenBapi": []
+          }
+        ]
+      }
+    },
     "/pix-automatico/recorrencias": {
       "post": {
         "tags": [
