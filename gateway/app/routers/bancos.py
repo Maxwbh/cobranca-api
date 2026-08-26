@@ -13,7 +13,7 @@ from app.providers.inter import InterProvider
 from app.providers.itau import ItauProvider
 from app.providers.sicoob import SicoobProvider
 from app.registry import _REST_POR_BANCO, _SLUG_ENGINE, registered_ready
-from app.routers._capacidades import implementa
+from app.routers._capacidades import disponivel, implementa, nao_confirmadas
 from app.schemas import Banco
 
 router = APIRouter(prefix="/bancos", tags=["bancos"])
@@ -125,10 +125,15 @@ _CAMINHOS = {
 }
 
 
-def _capacidades(klass: type) -> list[str]:
+def _capacidades(klass: type, banco: str | None = None) -> list[str]:
     # Mesmo critério que o `exige_capacidade` aplica na requisição — uma função
     # só, para o catálogo não voltar a discordar do que a rota faz.
-    return sorted(cap for metodo, cap in _CAPACIDADES.items() if implementa(klass, metodo))
+    #
+    # `banco` entra porque capacidade herdada de mixin não é a mesma coisa que
+    # capacidade confirmada no banco: o Inter herda o dialeto de Pix Automático
+    # e ninguém verificou se o banco expõe as rotas. Ver `_NAO_CONFIRMADO`.
+    return sorted(cap for metodo, cap in _CAPACIDADES.items()
+                  if disponivel(klass, metodo, banco))
 
 
 def _caminho_do_banco(banco: Banco) -> dict:
@@ -186,8 +191,17 @@ _SCHEMA_BANCO = {
         "capacidades": {"type": "array", "items": {"type": "string"},
                         "description": "Introspectadas das classes de provider — método "
                                        "sobrescrito = capacidade real, então a lista não "
-                                       "envelhece com o código.",
+                                       "envelhece com o código. Capacidade herdada de mixin "
+                                       "só entra aqui depois de CONFIRMADA no banco; até lá "
+                                       "aparece em `capacidades_nao_confirmadas`.",
                         "example": ["boleto", "pix", "pix_consulta", "webhook_entrada"]},
+        "capacidades_nao_confirmadas": {
+            "type": "object", "additionalProperties": {"type": "string"},
+            "description": "`capacidade -> variável que a libera`. O provider tem o "
+                           "dialeto e ninguém confirmou que ESTE banco expõe as rotas — "
+                           "dizer que ele não oferece seria outra afirmação sem lastro. "
+                           "Confirme com credencial real e ligue a variável.",
+            "example": {"pix_automatico": "INTER_PIX_AUTOMATICO_READY"}},
         "credentials": {"type": "object",
                         "description": "Esquema de credenciais DESTE banco, para o "
                                        "`POST /credenciais`. O mecanismo é um só; os campos "
@@ -236,7 +250,7 @@ def listar() -> dict:
                 "nome": "C6 Bank",
                 "codigo_banco": "336",
                 "tipo": "rest",
-                "capacidades": _capacidades(C6Provider),
+                "capacidades": _capacidades(C6Provider, "c6"),
                 "credentials": _ESQUEMA_C6,
                 "sandbox": "https://baas-api-sandbox.c6bank.info (seg-sex 7h-23h; mTLS + OAuth)",
                 "documentacao": "docs/development/c6-rest.md",
@@ -247,7 +261,7 @@ def listar() -> dict:
                 "nome": "Sicoob",
                 "codigo_banco": "756",
                 "tipo": "rest",
-                "capacidades": _capacidades(SicoobProvider),
+                "capacidades": _capacidades(SicoobProvider, "sicoob"),
                 "credentials": _ESQUEMA_SICOOB,
                 "sandbox": "https://sandbox.sicoob.com.br/sicoob/sandbox (token estático do portal)",
                 "documentacao": "docs/development/sicoob-rest.md",
@@ -258,12 +272,14 @@ def listar() -> dict:
                 "nome": "Banco Inter",
                 "codigo_banco": "077",
                 "tipo": "rest",
-                "capacidades": _capacidades(InterProvider),
+                "capacidades": _capacidades(InterProvider, "inter"),
+                "capacidades_nao_confirmadas": nao_confirmadas("inter"),
                 "credentials": _ESQUEMA_INTER,
                 "sandbox": "https://cdpj-sandbox.partners.uatinter.co (OAuth + mTLS)",
                 "documentacao": "docs/development/inter-rest.md",
-                "observacao": ("sem fallback offline: a engine pyCobrança não tem o layout do "
-                               "077, e cair em outro banco emitiria boleto errado"),
+                "observacao": ("existe nos dois caminhos desde a pyCobrança 1.1.1, que "
+                               "implementou o layout 077 — o fallback offline cai no "
+                               "layout DO PRÓPRIO Inter. Só a carteira 110 no boleto"),
             },
             {
                 **_caminho_do_banco(Banco.itau),
@@ -271,7 +287,7 @@ def listar() -> dict:
                 "nome": "Itaú Unibanco",
                 "codigo_banco": "341",
                 "tipo": "rest",
-                "capacidades": _capacidades(ItauProvider),
+                "capacidades": _capacidades(ItauProvider, "itau"),
                 "credentials": _ESQUEMA_ITAU,
                 "sandbox": "sem mTLS e fora do OAuth 2.0 — o dialeto do sandbox NÃO é o de produção",
                 "documentacao": "docs/development/itau-rest.md",

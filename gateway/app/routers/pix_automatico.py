@@ -17,7 +17,7 @@ from app.registry import (
     credentials_from_header,
     resolver_caminho,
 )
-from app.routers._capacidades import exige_capacidade
+from app.routers._capacidades import disponivel, exige_capacidade
 from app.routers._credentials import resolve_request_credentials
 from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
 from app.core.url_webhook import validar_url_webhook
@@ -133,10 +133,17 @@ def _creds_get(credentials, authorization, tenant_id, provider, banco=None):
 
 # Quem oferece Pix Automático é quem herda o mixin BACEN — perguntado à classe,
 # não a uma lista escrita à mão, que envelheceria no primeiro provider novo.
-_COM_PIX_AUTOMATICO = sorted(b.value for b, klass in _REST_POR_BANCO.items()
-                             if hasattr(klass, "criar_recorrencia"))
-_ALTERNATIVA = ("Pix Automático exige o dialeto BACEN de recorrência, que este banco "
-                f"não expõe — use `banco=` um destes: {', '.join(_COM_PIX_AUTOMATICO)}")
+#
+# Herdar o mixin, porém, prova só que temos o DIALETO. Que o banco exponha
+# `rec`/`solicrec` é outra afirmação, e é do sandbox que ela vem: C6 (15 casos
+# em 4 jornadas) e Sicoob (`PA_01`) confirmados; o **Inter** não. Mandar o
+# integrador para um banco não confirmado é o mesmo defeito, com a agravante de
+# ser uma sugestão nossa.
+_COM_PIX_AUTOMATICO = sorted(
+    b.value for b, klass in _REST_POR_BANCO.items()
+    if disponivel(klass, "criar_recorrencia", b.value))
+_ALTERNATIVA = ("Pix Automático exige o dialeto BACEN de recorrência, confirmado "
+                f"nestes bancos: {', '.join(_COM_PIX_AUTOMATICO)}")
 
 
 def _cap(provider_obj, metodo: str, provider: Provider, banco: Banco | None):

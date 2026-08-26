@@ -39,6 +39,15 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   campos podem ter vindo de outras posições. Antes esse aviso era engolido.
 
 ### Corrigido
+- ⚠️ **`pix_automatico` deixa de ser anunciado no Inter.** O provider herda o
+  dialeto BACEN de recorrência, e a introspecção do catálogo lia isso como
+  "o banco tem" — mas `rec`/`solicrec` não constam no SDK oficial do Inter e não
+  foram exercitados no sandbox. `GET /bancos` passa a trazer
+  `capacidades_nao_confirmadas: {"pix_automatico": "INTER_PIX_AUTOMATICO_READY"}`
+  e a rota responde `422` dizendo *não foi confirmado* — diferente de *não
+  oferece*, reservado a quem sabidamente não tem. Ligue a variável depois de
+  confirmar com credencial real. **C6 e Sicoob não mudam:** os dois têm o
+  recurso confirmado em sandbox.
 - ⚠️ **O QR montado de `chave_pix` não é Bolepix.** Ele é **estático**: credita
   a chave, mas o banco não sabe que aquele PIX quitou o título, que fica **em
   aberto** — risco de segunda cobrança ou de protesto de boleto já pago. O

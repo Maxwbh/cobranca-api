@@ -106,13 +106,23 @@
                               "type": "string"
                             },
                             "type": "array",
-                            "description": "Introspectadas das classes de provider — método sobrescrito = capacidade real, então a lista não envelhece com o código.",
+                            "description": "Introspectadas das classes de provider — método sobrescrito = capacidade real, então a lista não envelhece com o código. Capacidade herdada de mixin só entra aqui depois de CONFIRMADA no banco; até lá aparece em `capacidades_nao_confirmadas`.",
                             "example": [
                               "boleto",
                               "pix",
                               "pix_consulta",
                               "webhook_entrada"
                             ]
+                          },
+                          "capacidades_nao_confirmadas": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object",
+                            "description": "`capacidade -> variável que a libera`. O provider tem o dialeto e ninguém confirmou que ESTE banco expõe as rotas — dizer que ele não oferece seria outra afirmação sem lastro. Confirme com credencial real e ligue a variável.",
+                            "example": {
+                              "pix_automatico": "INTER_PIX_AUTOMATICO_READY"
+                            }
                           },
                           "credentials": {
                             "type": "object",
@@ -14683,7 +14693,7 @@
     },
     {
       "name": "pix-automatico",
-      "description": "Débito recorrente via Pix (BACEN): recorrência, autorização do pagador, cobranças do ciclo e retentativa. O agendamento de cada cobrança fica no produto consumidor. Docs: [spec BACEN](https://bacen.github.io/pix-api/) · [C6 Pix Automático](https://developers.c6bank.com.br/apis/pix-automatico)."
+      "description": "Débito recorrente via Pix (BACEN): recorrência, autorização do pagador, cobranças do ciclo e retentativa. O agendamento de cada cobrança fica no produto consumidor.\n\n**Confirmado em C6 e Sicoob**, no sandbox de cada um. O **Inter** herda o mesmo dialeto, mas ninguém verificou se o banco expõe `rec`/`solicrec` — enquanto isso ele responde `422` dizendo *não foi confirmado* (diferente de *não oferece*), e `GET /bancos` o traz em `capacidades_nao_confirmadas` em vez de anunciá-lo. Quem tiver credencial real confirma e liga `INTER_PIX_AUTOMATICO_READY=true`.\n\nDocs: [spec BACEN](https://bacen.github.io/pix-api/) · [C6 Pix Automático](https://developers.c6bank.com.br/apis/pix-automatico)."
     },
     {
       "name": "conciliacao",

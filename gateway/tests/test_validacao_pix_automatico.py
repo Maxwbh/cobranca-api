@@ -141,8 +141,20 @@ def test_catalogo_e_rota_dizem_a_mesma_coisa(client, monkeypatch):
         promete = "pix_automatico" in banco["capacidades"]
         assert (r.status_code == 201) is promete, (
             f"{bid}: catálogo diz {promete}, rota respondeu {r.status_code} — {r.text[:200]}")
-        if not promete:
-            assert "não oferece Pix Automático" in r.json()["detail"]
+        if promete:
+            continue
+        # A recusa tem DOIS motivos e eles não são a mesma frase. "Não oferece"
+        # vale para quem não herda o dialeto (Itaú) — sabemos que não tem. Para
+        # quem herda e ninguém confirmou no banco (Inter), dizer "não oferece"
+        # trocaria uma promessa sem lastro por uma negativa sem lastro; ali o
+        # erro diz "não foi confirmado" e nomeia a flag que libera.
+        detalhe = r.json()["detail"]
+        nao_confirmadas = banco.get("capacidades_nao_confirmadas") or {}
+        if "pix_automatico" in nao_confirmadas:
+            assert "não foi confirmado" in detalhe, f"{bid}: {detalhe}"
+            assert nao_confirmadas["pix_automatico"] in detalhe, f"{bid}: {detalhe}"
+        else:
+            assert "não oferece Pix Automático" in detalhe, f"{bid}: {detalhe}"
 
 
 # --- revisao de /pix-automatico -----------------------------------------------------

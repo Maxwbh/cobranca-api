@@ -65,7 +65,8 @@ a validação vale integração ponta a ponta.
 
 ## Serviços do banco × Cobranca-API
 
-> Legenda: ✅ disponível · 🔜 planejado · ⛔ fora de escopo do produto (cobrança).
+> Legenda: ✅ disponível · 🔜 planejado · ❓ dialeto pronto e **não confirmado**
+> no banco · ⛔ fora de escopo do produto (cobrança).
 
 | ID | Serviço no Inter | Endpoint do banco | Status | Uso na Cobranca-API |
 |---|---|---|:---:|---|
@@ -79,11 +80,12 @@ a validação vale integração ponta a ponta.
 | INT-S08 | Banking v2 — extrato | `GET /banking/v2/extrato` | ✅ | `GET /extrato` |
 | INT-S09 | Banking v2 — saldo | `GET /banking/v2/saldo` | 🔜 | Sem rota hoje (idem `SIC-S06`) |
 | INT-S10 | Banking v2 — pagamentos, DARF, lote, Pix pagamento | `/banking/v2/pagamento*` | ⛔ | Saída de dinheiro |
+| INT-S11 | Pix Automático (`rec`/`solicrec`/`cobr`) | `/pix/v2/rec`, `/solicrec`, `/cobr` | ❓ | Dialeto pronto pelo mixin; **não confirmado no banco** — ver *O que falta* |
 
-> **Pix Automático não consta no SDK oficial.** A versão anterior deste
-> documento o listava como planejado; não há `rec`/`solicrec`/`cobr` em
-> `pj-sdk-java`. Confirmar no portal antes de prometer — pode ser ausência do
-> SDK, não da API.
+> **Pix Automático não consta no SDK oficial.** Não há `rec`/`solicrec`/`cobr`
+> em `pj-sdk-java` — pode ser ausência do SDK, não da API. Enquanto não se
+> confirma, o catálogo **não anuncia** a capacidade: ver *O que falta*, item 1.
+> C6 (15 casos em 4 jornadas) e Sicoob (`PA_01`) estão confirmados no sandbox.
 
 ## Mapeamento — onde está o trabalho real
 
@@ -211,9 +213,28 @@ boleto sem Pix pede `formas_recebimento: "BOLETO"` explicitamente.
 
 ## O que falta
 
-1. **Pix Automático:** confirmar no portal se o Inter expõe `rec`/`solicrec`.
-2. **Alarme de vencimento do certificado** — o de sandbox vale 30 dias.
-2. **Confirmar no portal se o Pix Automático existe** — o provider herda o
-   mixin, então o dialeto está pronto, mas o SDK oficial não cobre `rec`.
-3. **Alarme de vencimento do certificado.** Vale 1 ano, sem renovação
-   in-place: vence e a integração para. É risco de operação.
+1. **Confirmar o Pix Automático no portal.** O provider herda o mixin BACEN, o
+   dialeto está pronto — mas `rec`/`solicrec` não constam no SDK oficial e não
+   foram exercitados no sandbox (`PA_01`).
+
+   Até a confirmação, a capacidade **não é anunciada**: `GET /bancos` deixou de
+   listar `pix_automatico` para o Inter e passou a trazer
+
+   ```json
+   "capacidades_nao_confirmadas": {"pix_automatico": "INTER_PIX_AUTOMATICO_READY"}
+   ```
+
+   e a rota responde `422` dizendo *não foi confirmado* — que é diferente de
+   *não oferece*, a frase reservada a quem sabidamente não tem (Itaú). Quem
+   tiver credencial real confirma, liga `INTER_PIX_AUTOMATICO_READY=true` e usa,
+   sem esperar por versão nossa. Confirmado: some da lista e volta às
+   capacidades — o teste que prende isso lê a própria evidência de homologação.
+
+2. **`INT-S05` — listar/sumário de cobranças.** Sem rota hoje; avaliar.
+
+3. **`INT-S09` — saldo.** Lacuna de superfície, não do Inter: o gateway não
+   expõe saldo para banco nenhum (idem `SIC-S06`).
+
+4. **Alarme de vencimento do certificado.** Vale 1 ano, sem renovação in-place:
+   vence e a integração para. É risco de operação, e vale para C6 e Sicoob
+   também.
