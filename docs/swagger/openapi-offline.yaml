@@ -694,9 +694,9 @@ paths:
 
         | Encargo | Código/tipo | Valor | Data |
         |---|---|---|---|
-        | Multa | `codigo_multa` (`0` isento, `1` valor fixo, `2` percentual) | `percentual_multa` | `data_multa` |
-        | Juros/Mora | `tipo_mora` (`1` valor/dia, `2` taxa mensal %, `3` isento) | `valor_mora` (400) · `percentual_mora` (240) | `data_mora` |
-        | Desconto 1º/2º/3º | `cod_desconto` … | `valor_desconto` … | `data_desconto` … |
+        | Multa | `codigo_multa` (`0` isento, `1` valor fixo, `2` percentual) | `percentual_multa` · `valor_multa` (só Inter) | `data_multa` |
+        | Juros/Mora | `tipo_mora` (`1` valor/dia, `2` taxa mensal %, `3` isento) | `valor_mora` (400) · `percentual_mora` (240 e Inter) | `data_mora` |
+        | Desconto 1º/2º/3º | `cod_desconto` (`4` = percentual, só Inter) | `valor_desconto` · `percentual_desconto` (só Inter) | `data_desconto` … |
         | IOF | — | `valor_iof` | — |
         | Abatimento | — | `valor_abatimento` | — |
         | Protesto | `codigo_protesto` | `dias_protesto` | — |
@@ -710,6 +710,14 @@ paths:
         > `tipo_mora=2` e `percentual_mora` sozinho respondem **400** (seriam
         > cobrados na unidade errada — R\$ 50 lido como 50%). Bancos onde a
         > multa vai por instrução (BB e Itaú no 400) não têm posição de multa.
+        >
+        > **O Inter (077) é a exceção nos três eixos.** O layout dele tem os
+        > **dois** campos de cada encargo (itens 10/11, 14/15 e 30/31 do registro
+        > tipo 1) e escolhe pelo código, então `valor_multa`, `percentual_mora` e
+        > `percentual_desconto` valem lá — e **só lá**, no CNAB 400. Medido A/B
+        > em todos os layouts: nos outros o campo entra, não é gravado e some.
+        > Por isso a API recusa em vez de deixar o encargo sumir; o erro diz quem
+        > grava o campo.
 
         📖 **Guia completo com a matriz por banco:** [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/encargos.md)
 
@@ -811,6 +819,25 @@ paths:
       responses:
         '200':
           description: Arquivo de remessa gerado
+          headers:
+            X-Remessa-Avisos:
+              description: |
+                ⚠️ Presente **só quando há aviso** — JSON com o que o layout
+                **não gravou** do que você mandou.
+
+                `carteira` está na base de toda remessa, mas **oito layouts não
+                têm esse campo**: a CrediSIS e o Santander no CNAB 400, e seis
+                dos sete no 240, onde a FEBRABAN separa o *código da carteira*
+                (posição 58 do segmento P) da *modalidade* do banco.
+
+                Quem monta a remessa com o mesmo dicionário do boleto — o
+                caminho natural — acreditava ter escolhido a carteira, e o
+                arquivo saía com a do padrão. **O arquivo está correto**; o que
+                faltava era o sinal. O aviso nomeia o campo que aquele layout
+                grava de verdade (`codigo_carteira`, `modalidade_carteira`…).
+              schema:
+                type: string
+              example: '[{"aviso": "RemessaSicoob240: `carteira` não é gravada neste layout (use ''modalidade_carteira'')"}]'
           content:
             text/plain:
               schema:
@@ -1501,7 +1528,13 @@ components:
         - citibank
         - hsbc
         - ailos
-      description: Código do banco suportado (19 bancos brasileiros)
+        - inter
+      description: |
+        Código do banco suportado (19 bancos brasileiros).
+
+        O **Inter** (077) entrou na pyCobrança 1.1.1 e é o 19º. Só a carteira
+        `110` no boleto: nas `112` e `121` quem numera é o banco, e o nosso
+        número só existe no arquivo retorno.
 
     OutputType:
       type: string

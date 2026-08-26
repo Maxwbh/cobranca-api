@@ -280,8 +280,19 @@ curl -X POST http://localhost:8000/cobranca \
 # Location: /cobranca/01J3...?tenant_id=empresa_123&provider=c6
 # → {"id": "01J3...", "status": "registrado",
 #    "linha_digitavel": "33690.00009 ...", "codigo_barras": "3369...",
-#    "pix_copia_cola": null, "pdf_base64": null, "raw": {...}}
+#    "pix_copia_cola": null, "pix_vinculado": null, "pdf_base64": null, "raw": {...}}
 ```
+
+> **`pix_vinculado` — o QR liquida o título?** `true` é **Bolepix**: QR dinâmico
+> registrado no banco, e pagar por ele dá baixa. `false` é QR **avulso**, montado
+> a partir de `chave_pix` no caminho `off`: credita a chave e deixa o título **em
+> aberto**, com risco de segunda cobrança ou de protesto de boleto já pago.
+> `null` quando o boleto não tem PIX.
+>
+> O caminho `on` sempre devolve `true` — o EMV vem do banco. No `off` depende do
+> que você mandou: `pix_copia_cola` (o EMV do banco) dá `true`, `chave_pix` dá
+> `false`. É assim que se fecha o ciclo entre os dois: registre no `on`, pegue o
+> `pix_copia_cola` da resposta e renderize o PDF no `off` com o QR que dá baixa.
 
 > ⚠️ **`201` não quer dizer "deu certo" no caminho `off`.** Falha de validação
 > da engine volta como **`201` com `status: "erro"`** e os motivos em

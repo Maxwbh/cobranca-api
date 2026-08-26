@@ -176,3 +176,25 @@ def test_o_exemplo_do_request_body_e_aceito_pela_rota(client):
         if r.status_code >= 400:
             recusados.append(f"POST {caminho} -> {r.status_code} {r.text[:160]}")
     assert not recusados, recusados
+
+
+def test_o_enum_de_bancos_da_spec_bate_com_o_registro_da_engine():
+    """O `BankCode` é escrito à mão e envelhece calado.
+
+    Ele ficou com 18 entradas e a descrição dizendo "19 bancos" quando o Inter
+    entrou: o Swagger passava a recusar no try-it-out um banco que a API emite.
+    Nada quebra — só fica faltando, que é como a spec envelhece.
+    """
+    import yaml
+    from pathlib import Path
+
+    from app.core import pycob
+
+    spec = yaml.safe_load(
+        (Path(__file__).resolve().parents[2] / "docs" / "openapi.yaml")
+        .read_text(encoding="utf-8"))
+    do_enum = set(spec["components"]["schemas"]["BankCode"]["enum"])
+    do_registro = set(pycob.bancos_suportados())
+    assert do_enum == do_registro, (
+        f"faltam na spec: {sorted(do_registro - do_enum)}; "
+        f"sobram na spec: {sorted(do_enum - do_registro)}")

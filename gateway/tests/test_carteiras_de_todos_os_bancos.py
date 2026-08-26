@@ -186,3 +186,52 @@ def test_o_verificador_febraban_reprova_boleto_corrompido():
     linha_ruim = corpo["linha_digitavel"].replace(" ", "")[:-1] + "0"
     assert fb.confere_linha(linha_ruim, barras) or linha_ruim.endswith(
         corpo["linha_digitavel"].replace(" ", "")[-1]), "linha corrompida passou"
+
+
+# --- a doc acompanha o registro ----------------------------------------------
+#
+# Foi a omissão que deixou o Inter de fora: ele entrou como 19º banco e as duas
+# tabelas de campos seguiram com 18 linhas. Nada quebrou — só ficou faltando, que
+# é como a doc envelhece de verdade.
+
+DOCS = [
+    ("docs/fields/all-banks.md", "Carteiras aceitas"),
+    ("docs/api/validacao-campos.md", "Validação de campos"),
+]
+
+
+def _texto(caminho: str) -> str:
+    from pathlib import Path
+    return (Path(__file__).resolve().parents[2] / caminho).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(("caminho", "assunto"), DOCS, ids=[d[0] for d in DOCS])
+def test_a_tabela_de_campos_cita_todo_banco_do_registro(caminho, assunto):
+    texto = _texto(caminho)
+    faltando = [slug for slug in pycob.bancos_suportados()
+                if pycob.CODIGO_POR_SLUG[slug] not in texto]
+    assert not faltando, (
+        f"{caminho} ({assunto}) não cita o código FEBRABAN de: {faltando}")
+
+
+@pytest.mark.parametrize(("caminho", "assunto"), DOCS, ids=[d[0] for d in DOCS])
+def test_a_doc_nao_oferece_carteira_que_o_banco_nao_tem(caminho, assunto):
+    """Carteira retirada do código não pode continuar anunciada.
+
+    A `CSB` do HSBC saiu na 1.1.1 — o campo livre dela montava 27 posições onde
+    cabem 25, então nunca produziu boleto válido — e as duas tabelas seguiam
+    oferecendo. Anunciar carteira que não emite é promessa que sempre falha.
+
+    Olha só as LINHAS DE TABELA do HSBC: o texto corrido explica que a carteira
+    saiu, e citá-la ali é o certo. Uma busca solta pelo nome reprovaria a própria
+    explicação — foi o que aconteceu na primeira versão desta prova.
+    """
+    codigo_hsbc = pycob.CODIGO_POR_SLUG["hsbc"]
+    do_hsbc = [linha for linha in _texto(caminho).splitlines()
+               if linha.lstrip().startswith("|") and codigo_hsbc in linha]
+    assert do_hsbc, f"{caminho} não tem linha de tabela para o HSBC ({codigo_hsbc})"
+    aceitas = pycob._classe_banco("hsbc").carteiras
+    assert "CSB" not in aceitas, "a CSB voltou ao código — reveja esta prova"
+    oferecendo = [linha for linha in do_hsbc if "CSB" in linha]
+    assert not oferecendo, (
+        f"{caminho} oferece a carteira CSB, que saiu do código: {oferecendo}")

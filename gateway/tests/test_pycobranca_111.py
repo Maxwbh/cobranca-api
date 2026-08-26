@@ -245,3 +245,46 @@ def test_a_carteira_112_do_inter_e_recusada():
             **BASE, "agencia": "0001", "conta_corrente": "123456", "convenio": "123456",
             "carteira": "112", "nosso_numero": "1234567890"})
     assert "110" in exc.value.erros[0]
+
+
+# --- campo aceito que o layout não grava -------------------------------------
+
+CONTA_CREDISIS = {"empresa_mae": "E", "documento_cedente": "11222333000181",
+                  "agencia": "1234", "conta_corrente": "12345678",
+                  "codigo_cedente": "1234", "digito_conta": "5",
+                  "convenio": "1234567", "sequencial_remessa": 1}
+
+
+def test_carteira_que_o_layout_nao_grava_vira_aviso(client):
+    """`carteira` está na base, então TODA remessa a aceita — e oito layouts não
+    têm o campo. Quem monta a remessa com o mesmo dicionário do boleto — o
+    caminho natural — acreditava ter escolhido a carteira, e o arquivo saía com
+    a do padrão. 200, arquivo correto, escolha silenciosamente ignorada.
+
+    Recusar seria mais duro do que o defeito justifica: o arquivo ESTÁ certo.
+    O que faltava era o sinal, e ele vai no header porque a resposta é o arquivo.
+    """
+    import json as _json
+
+    corpo = {**CONTA_CREDISIS, "carteira": "18",
+             "pagamentos": _pagamento("123456")}
+    r = client.post("/api/remessa?bank=credisis&type=cnab400",
+                    files={"data": ("r.json", _json.dumps(corpo).encode())})
+    assert r.status_code == 200, r.text
+    assert r.text.splitlines(), "o arquivo continua sendo entregue"
+    aviso = r.headers.get("X-Remessa-Avisos")
+    assert aviso and "carteira" in aviso, "o campo ignorado não chegou ao chamador"
+
+
+def test_layout_que_grava_a_carteira_nao_avisa_atoa(client):
+    """Aviso que aparece sempre vira ruído e deixa de ser lido."""
+    import json as _json
+
+    corpo = {"empresa_mae": "E", "documento_cedente": "11222333000181",
+             "agencia": "1234", "conta_corrente": "12345", "convenio": "1234567",
+             "variacao_carteira": "019", "carteira": "18", "sequencial_remessa": 1,
+             "pagamentos": _pagamento("12345678")}
+    r = client.post("/api/remessa?bank=banco_brasil&type=cnab400",
+                    files={"data": ("r.json", _json.dumps(corpo).encode())})
+    assert r.status_code == 200, r.text
+    assert "X-Remessa-Avisos" not in r.headers

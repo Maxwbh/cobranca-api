@@ -435,10 +435,11 @@ async def boleto_multi(data: UploadFile = File(...), type: str = "pdf",
 @router.post("/api/remessa", include_in_schema=False)
 async def remessa(bank: str, type: str, data: UploadFile = File(...),
                   pix: str = "false") -> Any:
+    avisos: list[str] = []
     try:
         com_pix = _bool_param("pix", pix)
         valores = _objeto(json.loads(await _ler_upload(data, "data")), "data")
-        conteudo = pycob.gerar_remessa(bank, type, valores, pix=com_pix)
+        conteudo = pycob.gerar_remessa(bank, type, valores, pix=com_pix, avisos=avisos)
     except ArquivoGrandeDemais as e:
         return e.resposta()
     except json.JSONDecodeError as e:
@@ -448,8 +449,16 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
         return JSONResponse(status_code=400, content={
             "error": "Erro ao gerar remessa", "validation_errors": e.erros})
     sufixo = "-pix" if com_pix else ""
-    return Response(content=conteudo, media_type="text/plain", headers={
-        "Content-Disposition": f"attachment; filename=remessa-{bank}-{type}{sufixo}.rem"})
+    cabecalho = {
+        "Content-Disposition": f"attachment; filename=remessa-{bank}-{type}{sufixo}.rem"}
+    if avisos:
+        # A resposta é o ARQUIVO, então o aviso vai no header — que é onde o
+        # resto da superfície já põe metadado de download (`X-Boletos-*`).
+        # Sem isto o campo que o layout ignorou some em silêncio: o arquivo sai
+        # certo, mas com a carteira do padrão em vez da que foi pedida.
+        cabecalho["X-Remessa-Avisos"] = _json_cabecalho(
+            [{"aviso": a} for a in avisos], "X-Remessa-Avisos-Truncado", cabecalho)
+    return Response(content=conteudo, media_type="text/plain", headers=cabecalho)
 
 
 @router.post("/api/retorno", include_in_schema=False)

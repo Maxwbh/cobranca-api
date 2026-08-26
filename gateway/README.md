@@ -34,7 +34,7 @@ docker compose up --build   # (na raiz do repo)
 ## Por que a engine é uma biblioteca (e não um serviço)
 - No caminho **registrado** (C6, Sicoob, Inter) o **banco devolve** linha digitável/PDF/QR →
   o serviço só orquestra OAuth+mTLS+JSON. **Não usa a engine.**
-- No caminho **offline/CNAB/carnê** (18 bancos) → `core/pycob.py` chama a engine
+- No caminho **offline/CNAB/carnê** (19 bancos) → `core/pycob.py` chama a engine
   **pyCobrança** no próprio processo (sem HTTP, sem sidecar).
 
 Um processo, uma imagem, um deploy. À medida que a adoção da API registrada

@@ -17,6 +17,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **`X-Remessa-Avisos` em `POST /api/remessa`.** Header presente só quando há
+  aviso: diz o que o layout **não gravou** do que você mandou. `carteira` está
+  na base de toda remessa, mas oito layouts não têm esse campo — quem monta a
+  remessa com o mesmo dicionário do boleto acreditava ter escolhido a carteira,
+  e o arquivo saía com a do padrão. O arquivo está correto; faltava o sinal.
 - **Inter (077) é o 19º banco offline.** A engine passou a ter o layout, então
   `provider=off&banco=inter` emite boleto, remessa e retorno CNAB 400 — só a
   **carteira 110** (na 112 quem numera é o banco). Antes o caminho `off` do Inter
@@ -51,6 +56,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   só o **Inter** os grava; nos demais entravam e sumiam, e o título ia ao banco
   sem o encargo pedido. `percentual_mora` segue válido no CNAB 240 e recusado
   no 400 (exceto Inter). O erro diz quem grava o campo e qual é a alternativa.
+- **Sicoob: a carteira `09` gerava um boleto diferente da `9`.** São a mesma
+  carteira, e o campo livre ficava com o primeiro caractere — gravava `0`, que
+  não existe no Sicoob. O boleto saía estruturalmente válido, então nenhuma
+  conferência de estrutura pegava. Corrigido na engine; a API normaliza enquanto
+  o pin aceitar a versão com o defeito.
 - **Carteira `CSB` do HSBC saiu**: o campo livre dela montava 27 posições onde
   cabem 25 — nunca produziu boleto válido. Resta a `CNR`.
 

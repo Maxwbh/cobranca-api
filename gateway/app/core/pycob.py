@@ -21,8 +21,8 @@ from pycobranca.bancos import Bancos
 from pycobranca.contracts import (NOMES_DO_CONTRATO, SLUG_POR_CODIGO,
                                   TEMA_DO_CONTRATO, tema_de_api)
 from pycobranca.exceptions import (BancoNaoRegistrado, BoletoInvalido,
-                                   LayoutGenerico, OFXInvalido, PyCobrancaError,
-                                   RetornoInvalido)
+                                   CampoIgnorado, LayoutGenerico, OFXInvalido,
+                                   PyCobrancaError, RetornoInvalido)
 from pycobranca.pix import PixInvalido
 from pycobranca.render import (emite_boleto, render_boleto_pdf, render_carne_pdf,
                                render_fatura_pdf)
@@ -1049,7 +1049,20 @@ def _valida_encargos(pagamentos_raw: list[dict[str, Any]], bank: str,
         raise DadosInvalidos(erros)
 
 
-def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = False) -> str:
+def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = False,
+                  avisos: list[str] | None = None) -> str:
+    """Gera a remessa CNAB. `avisos` recebe o que o layout ignorou, se houver.
+
+    Lista de saída em vez de valor de retorno porque a rota devolve o ARQUIVO —
+    e o aviso é sobre o pedido, não sobre o conteúdo. Quem não passa a lista
+    continua chamando como antes.
+    """
+    avisos = avisos if avisos is not None else []
+    return _gerar_remessa(bank, cnab_type, dados, pix, avisos)
+
+
+def _gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool,
+                   avisos: list[str]) -> str:
     klass = _REMESSAS.get((bank, cnab_type, pix))
     if klass is None:
         combos = sorted({f"{b}/{t}{'+pix' if p else ''}" for b, t, p in _REMESSAS})
@@ -1092,10 +1105,22 @@ def gerar_remessa(bank: str, cnab_type: str, dados: dict[str, Any], pix: bool = 
     kwargs = {k: v for k, v in dados.items() if k in aceitos and k != "pagamentos" and v not in (None, "")}
     kwargs["pagamentos"] = pagamentos
     try:
-        remessa = klass(**kwargs)
-        return remessa.gera_arquivo()
+        # A engine avisa quando um campo informado NÃO é gravado por aquele
+        # layout — `carteira` em oito remessas, porque o campo está na base e
+        # nem todo layout o tem. O arquivo sai correto; o que faltava era o
+        # sinal de que a escolha do chamador não teve efeito. Engolir o aviso
+        # devolveria 200 com um arquivo que usa a carteira do padrão, e quem
+        # monta a remessa com o mesmo dicionário do boleto — o caminho natural —
+        # não teria como saber.
+        with warnings.catch_warnings(record=True) as capturados:
+            warnings.simplefilter("always")
+            remessa = klass(**kwargs)
+            arquivo = remessa.gera_arquivo()
     except (PyCobrancaError, ValueError, TypeError) as e:
         raise DadosInvalidos(_erros(e)) from e
+    avisos.extend(str(a.message) for a in capturados
+                  if issubclass(a.category, CampoIgnorado))
+    return arquivo
 
 
 def parse_retorno(conteudo: bytes, layout_hint: str | None = None,

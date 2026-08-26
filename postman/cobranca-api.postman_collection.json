@@ -813,7 +813,7 @@
           ]
         },
         {
-          "name": "BC-005 · Catálogo offline (18 bancos CNAB)",
+          "name": "BC-005 · Catálogo offline (19 bancos CNAB)",
           "request": {
             "method": "GET",
             "header": [],

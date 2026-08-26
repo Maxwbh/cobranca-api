@@ -32,6 +32,7 @@ carteira '1' não suportada (use uma de: 10, 20)
 | CrediSIS | 097 | `18` |
 | C6 Bank | 336 | `10`, `20` |
 | HSBC | 399 | `CNR` |
+| Inter | 077 | `110` |
 | Itaú | 341 | `104`, `109`, `112`, `115`, `175`, `177`, `188` |
 | Safra | 422 | `1`, `2` |
 | Santander | 033 | `101`, `102`, `121` |
@@ -40,7 +41,21 @@ carteira '1' não suportada (use uma de: 10, 20)
 | Unicred | 136 | `21` |
 
 > A lista sai da engine, e a mensagem de erro é a fonte viva: se um layout
-> ganhar carteira nova, ela aparece no erro antes de aparecer aqui.
+> ganhar carteira nova, ela aparece no erro antes de aparecer aqui. Um teste
+> varre as **55 carteiras dos 19 bancos** e confere cada boleto contra um
+> verificador FEBRABAN independente, então a tabela não fica sozinha.
+>
+> **Inter:** só a `110`. Nas `112` e `121` quem numera é o banco e o nosso
+> número só existe no arquivo retorno — não há como imprimir o boleto antes
+> disso. As duas valem na **remessa**, onde o nosso número vai zerado.
+>
+> **Sicoob:** `9` e `09` são a mesma carteira, e a API garante que produzem o
+> mesmo boleto. Até a pyCobrança 1.1.1 a grafia `09` gravava `0` no campo livre
+> — carteira que o Sicoob não tem — e o título saía estruturalmente válido.
+>
+> **Safra** (`1`/`2`) e **Banestes** (`11`/`13`): a carteira **não** entra no
+> campo livre nesses dois layouts, então as duas produzem o mesmo código de
+> barras. É o layout, não defeito — no Safra a posição 25 é fixa em `2`.
 
 ## 📋 Bancos Testados e Validados
 
@@ -53,6 +68,7 @@ carteira '1' não suportada (use uma de: 10, 20)
 | **Caixa Econômica** | 104 | ✅ | ✅ | CNAB240 | Carteira **só `14` ou `24`**; convênio obrigatório |
 | **Santander** | 033 | ✅ | ✅ | CNAB400 + CNAB240 | `nosso_numero` até **12** dígitos |
 | **Banco C6** | 336 | ✅ | ✅ | CNAB400 | Carteira `10`/`20`; remessa exige `codigo_beneficiario` |
+| **Inter** | 077 | ✅ | ✅ | CNAB400 | Só a carteira `110` no boleto; a remessa aceita `110`, `112` e `121` |
 
 ### Outros Bancos Suportados
 

@@ -185,7 +185,7 @@ Cobertura = esta matriz completa. Endpoint novo ⇒ nova linha com ID ⇒ novo r
 | BC-002 | Health da engine offline | `GET /api/health` | engine offline | Fase 1 |
 | BC-003 | Info do engine | `GET /api/info` | engine offline | — |
 | BC-004 | Catálogo com capacidades/esquemas | `GET /bancos` | Gateway | T10 |
-| BC-005 | Catálogo offline (18 bancos CNAB) | `GET /api/bancos` | engine offline | — |
+| BC-005 | Catálogo offline (19 bancos CNAB) | `GET /api/bancos` | engine offline | — |
 | BC-006 | Cadastrar credenciais C6 → `bapi_` | `POST /credenciais` | Gateway | — |
 | BC-007 | Cadastrar credenciais Sicoob → `bapi_` | `POST /credenciais` | Gateway | — |
 | BC-008 | Revogar token | `DELETE /credenciais` | Gateway | — |
