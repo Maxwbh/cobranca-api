@@ -94,6 +94,13 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),
+            # O C6 entrega PEM separado (.crt + .key) no certificado de
+            # PRODUÇÃO — não PKCS12. O cliente HTTP já aceitava os dois; o
+            # provider só repassava o PFX, então o material que o banco manda
+            # era inutilizável aqui e obrigava a converter com openssl antes da
+            # primeira chamada. Mesma correção já feita no Inter.
+            cert_pem=self.credentials.get("cert_pem", ""),
+            key_pem=self.credentials.get("key_pem", ""),
             default_headers=C6_PARTNER_HEADERS,
             static_token=self.credentials.get("access_token", ""),  # contrato unificado c/ Sicoob
         )

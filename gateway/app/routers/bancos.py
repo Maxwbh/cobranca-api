@@ -73,8 +73,10 @@ _MECANISMO_API = {
 _ESQUEMA_C6 = {
     "client_id": "obrigatório (portal C6)",
     "client_secret": "obrigatório",
-    "pfx_base64": "certificado mTLS do portal (PKCS12 em base64) — obrigatório",
-    "pfx_password": "senha do certificado",
+    "cert_pem": "certificado da aplicação (.crt em PEM ou base64) — é o que o C6 entrega em produção",
+    "key_pem": "chave privada (.key em PEM ou base64)",
+    "pfx_base64": "alternativa ao par acima: o mesmo material em PKCS12/base64",
+    "pfx_password": "senha do certificado, quando houver",
 }
 _ESQUEMA_SICOOB = {
     "client_id": "obrigatório (portal Sicoob; vai também no header de toda request)",
