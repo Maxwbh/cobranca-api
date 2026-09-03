@@ -204,9 +204,9 @@ gateway/app/
 ├── providers/         # um dialeto por banco
 ├── core/              # cofre, jobs, artefatos, engine, eventos
 └── clients/           # OAuth+mTLS e acesso à engine
-gateway/tests/         # 441 testes
+gateway/tests/         # suíte pytest — o build verifica a cobertura
 docs/openapi.yaml      # spec da superfície offline (OAS 3.0)
-postman/               # 129 requests com IDs de rastreabilidade
+postman/               # requests com IDs de rastreabilidade (BC-xxx)
 ```
 
 ---

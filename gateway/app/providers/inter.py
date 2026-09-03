@@ -19,8 +19,11 @@
 #     mixins; aqui só muda PIX_BASE.
 #   - Banking v2: /banking/v2/extrato
 #
-# Pix Automático NÃO consta no SDK oficial — o mixin é herdado porque o dialeto
-# é o mesmo, mas nada garante que o Inter exponha as rotas. Ver inter-rest.md.
+# Pix Automático: não consta no SDK oficial, mas o banco EXPÕE. A spec OpenAPI
+# publicada (swagger-api-pix-automatico) usa a mesma base /pix/v2 e traz /rec,
+# /solicrec, /cobr, /locrec e os dois webhooks — as 17 chamadas do mixin batem
+# uma a uma. Inventário em docs/homologacao/evidencia-pix-automatico-inter.json.
+# Restrição do BACEN: só para CNPJ com 6+ meses de atividade.
 #
 # Validado no sandbox em 04/08/2026: emissão, consulta, PDF, cancelamento,
 # webhook e extrato fecham em 2xx, e o banco ECOA o que foi enviado (seuNumero,
@@ -45,6 +48,14 @@ INTER_SCOPES = [
     "lotecobv.read", "lotecobv.write", "pix.read", "pix.write",
     "payloadlocation.read", "payloadlocation.write",
     "webhook.read", "webhook.write", "extrato.read",
+    # Pix Automático. Sem eles os paths certos morriam na AUTORIZAÇÃO: o token
+    # sai sem o escopo e toda chamada volta 403 — falha que não se parece com
+    # "faltou escopo". Os nomes saem da spec do próprio banco, versionada em
+    # `docs/homologacao/evidencia-pix-automatico-inter.json`.
+    "rec.read", "rec.write", "solicrec.read", "solicrec.write",
+    "cobr.read", "cobr.write", "webhookrec.read", "webhookrec.write",
+    "webhookcobr.read", "webhookcobr.write",
+    "payloadlocationrec.read", "payloadlocationrec.write",
 ]
 # Pagamentos (pagamento-boleto.*, pagamento-darf.*, pagamento-lote.*,
 # pagamento-pix.*, webhook-banking.*) ficam de fora do token de propósito: são
@@ -69,7 +80,7 @@ class InterProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMix
         return OAuthMtlsClient(
             base_url=INTER_BASE,
             auth_url=INTER_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),
@@ -138,6 +149,78 @@ class InterProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMix
         data = self._client().request(
             "POST", f"{_BILLING}/{cobranca_id}/cancelar", json={"motivoCancelamento": motivo})
         return CobrancaOut(id=cobranca_id, status=Status.baixado, raw=data or None)
+
+    # --- coleção e sumário (Cobrança v3) ---------------------------------------
+    #
+    # `GET /cobrancas` e `/cobrancas/sumario` existem no Inter e em mais nenhum
+    # dos bancos com caminho ON: C6 e Sicoob emitem, consultam e baixam um
+    # título por vez. Os nomes dos filtros são os da spec do banco
+    # (swagger-cobranca-bolepix), não uma tradução nossa — o corpo é passthrough
+    # e traduzir só a entrada faria a resposta falar outro vocabulário.
+
+    #: Filtro do nosso contrato -> nome na API do Inter.
+    FILTROS_COBRANCA = {
+        "situacao": "situacao",
+        "tipo_cobranca": "tipoCobranca",
+        "seu_numero": "seuNumero",
+        "pagador": "pessoaPagadora",
+        "documento_pagador": "cpfCnpjPessoaPagadora",
+        "filtrar_data_por": "filtrarDataPor",
+        "ordenar_por": "ordenarPor",
+        "tipo_ordenacao": "tipoOrdenacao",
+    }
+
+    #: Vocabulário fechado da spec do Inter. Está aqui, e não no roteador,
+    #: porque é vocabulário DO BANCO: a rota é a mesma para quem vier depois.
+    #: Sem esta conferência o valor errado vai ao banco e volta `400` genérico,
+    #: que quem chama lê como falha da integração — e não como "escrevi ABERTO
+    #: onde o Inter chama A_RECEBER".
+    VALORES_DE_FILTRO = {
+        "situacao": ("RECEBIDO", "A_RECEBER", "MARCADO_RECEBIDO", "ATRASADO", "CANCELADO",
+                     "EXPIRADO", "FALHA_EMISSAO", "EM_PROCESSAMENTO", "PROTESTO"),
+        "tipo_cobranca": ("SIMPLES", "PARCELADO", "RECORRENTE"),
+        "filtrar_data_por": ("VENCIMENTO", "EMISSAO", "PAGAMENTO"),
+        "ordenar_por": ("PESSOA_PAGADORA", "TIPO_COBRANCA", "CODIGO_COBRANCA", "IDENTIFICADOR",
+                        "DATA_EMISSAO", "DATA_VENCIMENTO", "VALOR", "STATUS"),
+        "tipo_ordenacao": ("ASC", "DESC"),
+    }
+
+    def _filtros(self, filtros: dict[str, Any] | None) -> dict[str, Any]:
+        fora = {}
+        for campo, valor in (filtros or {}).items():
+            if campo not in self.FILTROS_COBRANCA or valor in (None, ""):
+                continue
+            aceitos = self.VALORES_DE_FILTRO.get(campo)
+            if aceitos and valor not in aceitos:
+                raise ValueError(
+                    f"{campo}={valor!r} não existe no Inter; use um de: {', '.join(aceitos)}")
+            fora[self.FILTROS_COBRANCA[campo]] = valor
+        return fora
+
+    def listar_cobrancas(self, *, inicio: str, fim: str, pagina: int, tamanho: int,
+                         filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        params = {"dataInicial": inicio, "dataFinal": fim,
+                  # A paginação do Inter é 0-based e o resto da API é 1-based:
+                  # repassar a página crua devolveria a segunda para quem pediu
+                  # a primeira, sem erro nenhum.
+                  "paginacao.paginaAtual": max(pagina - 1, 0),
+                  "paginacao.itensPorPagina": tamanho,
+                  **self._filtros(filtros)}
+        return self._client().request("GET", _BILLING, params=params)
+
+    def sumario_cobrancas(self, *, inicio: str, fim: str,
+                          filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Totais por situação.
+
+        O Inter devolve **array na raiz** (`[{situacao, quantidade, valor}, ...]`);
+        aqui ele vira `{"sumario": [...]}`. Dois motivos: array na raiz não tem
+        onde crescer (nenhum campo novo cabe sem quebrar quem lê), e o método
+        promete `dict` — devolver lista fazia a rota estourar `500` com corpo
+        legítimo do banco, que foi como este caso apareceu.
+        """
+        params = {"dataInicial": inicio, "dataFinal": fim, **self._filtros(filtros)}
+        dados = self._client().request("GET", f"{_BILLING}/sumario", params=params)
+        return {"sumario": dados} if isinstance(dados, list) else dados
 
     # --- extrato (Banking v2) --------------------------------------------------
 
@@ -215,6 +298,8 @@ def _boleto_out(cobranca_id: str, data: dict[str, Any]) -> CobrancaOut:
         linha_digitavel=boleto.get("linhaDigitavel"),
         codigo_barras=boleto.get("codigoBarras"),
         pix_copia_cola=pix.get("pixCopiaECola"),
+        # QR dinâmico do banco: liquida o título. Ver a nota em `c6.py`.
+        pix_vinculado=True if pix.get("pixCopiaECola") else None,
         raw=data,
     )
 

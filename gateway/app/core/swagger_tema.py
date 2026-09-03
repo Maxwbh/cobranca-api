@@ -10,6 +10,8 @@ plataforma.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 # A marca em 64x64, geometria idêntica a docs/assets/marca-escura.svg.
 _MARCA = (
     '<svg class="cob-mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">'
@@ -20,16 +22,17 @@ _MARCA = (
     ' stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 )
 
-_PAGINA = """<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>__TITULO__</title>
-  <link rel="stylesheet" href="__ASSETS__/swagger-ui.css">
-  <link rel="icon" href="https://maxwbh.github.io/cobranca-api/assets/favicon.svg" type="image/svg+xml">
-  <style>
-    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
+# O favicon inline, pelo mesmo motivo dos assets do swagger-ui: buscá-lo no
+# GitHub Pages deixa a página esperando um terceiro que a rede do cliente pode
+# não alcançar. Desenho idêntico a docs/assets/favicon.svg, sem os comentários
+# — inclusive o `prefers-color-scheme`, que é o motivo de ele ser SVG.
+_FAVICON = (
+    "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2016%2016%22%20width=%2216%22%20height=%2216%22%20role=%22img%22%20aria-label=%22Cobranca-API%22%3E%3Cstyle%3E%20.barra%20%7B%20fill:%20#0F172A;%20%7D%20.seta%20%7B%20stroke:%20#0891B2;%20%7D%20@media%20(prefers-color-scheme:%20dark)%20%7B%20.barra%20%7B%20fill:%20#F8FAFC;%20%7D%20.seta%20%7B%20stroke:%20#06B6D4;%20%7D%20%7D%20%3C/style%3E%3Cg%20class=%22barra%22%3E%3Crect%20x=%221%22%20y=%223%22%20width=%223%22%20height=%2210%22%20rx=%220.5%22/%3E%3Crect%20x=%225.5%22%20y=%223%22%20width=%222.5%22%20height=%2210%22%20rx=%220.5%22/%3E%3C/g%3E%3Cpath%20class=%22seta%22%20d=%22M11.25%204.25%20L14%208%20L11.25%2011.75%22%20fill=%22none%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E"
+)
+
+#: CSS do cabeçalho, compartilhado pelas três páginas de documentação
+#: (`/docs`, `/api/docs` e `/redoc`) — uma identidade só, num lugar só.
+_CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
     body { margin: 0; background: #FFFFFF; }
     .cob-topbar {
       background: linear-gradient(120deg, #0F172A, #152449);
@@ -51,7 +54,18 @@ _PAGINA = """<!DOCTYPE html>
     .cob-topbar a:hover { border-color: #06B6D4; background: rgba(6,182,212,.15); }
     .cob-topbar a.primario { background: #06B6D4; border-color: #06B6D4; color: #0F172A; }
     .cob-topbar a.primario:hover { background: #22D3EE; border-color: #22D3EE; }
-    .cob-mark { flex: none; }
+    .cob-mark { flex: none; }"""
+
+_PAGINA = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__TITULO__</title>
+  <link rel="stylesheet" href="__ASSETS__/swagger-ui.css">
+  <link rel="icon" href="__FAVICON__" type="image/svg+xml">
+  <style>
+__CSS_TOPBAR__
 
     /* O topbar nativo do swagger-ui sai; o nosso assume. */
     .swagger-ui .topbar { display: none; }
@@ -187,27 +201,114 @@ _PAGINA = """<!DOCTYPE html>
 </html>"""
 
 
-# De onde vêm o CSS e o JS do swagger-ui. O serviço usa a CDN; a documentação
-# publicada no site aponta para os arquivos versionados ao lado dela — uma
-# página que existe para NÃO sair do ar não deve depender de um terceiro.
-CDN_SWAGGER = "https://unpkg.com/swagger-ui-dist@5"
+_PAGINA_REDOC = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__TITULO__</title>
+  <link rel="icon" href="__FAVICON__" type="image/svg+xml">
+  <!-- O bundle do Redoc traz o logo do rodape apontando para cdn.redoc.ly. Num
+       deploy sem saida para a internet isso vira um request morto no console —
+       a mesma classe de problema que tirou o renderizador da CDN. Nao da para
+       remover do bundle (ele e vendorizado SEM modificacao, e e assim que a
+       licenca de terceiro fica limpa), entao a pagina simplesmente nao permite
+       imagem de fora: o credito de texto continua, o request nao acontece. -->
+  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data:">
+  <style>
+__CSS_TOPBAR__
+    /* O HTML padrao do FastAPI puxa a fonte do Google. Aqui a pilha e a do
+       sistema, como no resto da plataforma — e sem buscar nada fora. */
+    redoc { font-family: -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif; }
+  </style>
+</head>
+<body>
+  <div class="cob-topbar">
+    __MARCA__
+    <h1>Cobranca<span>-API</span></h1>
+    <span class="surface">__SUPERFICIE__</span>
+    <span class="pill">__PILL__</span>
+    <small>__DETALHE__</small>
+    <div class="links">__LINKS__</div>
+  </div>
+  <redoc spec-url="__SPEC__"></redoc>
+  <script src="__ASSETS__/redoc.standalone.js"></script>
+</body>
+</html>"""
 
 
-def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
-                   links: list[tuple[str, str, bool]], spec_url: str,
-                   assets: str = CDN_SWAGGER) -> str:
-    """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
-    ancoras = "".join(
+# De onde vêm o CSS e o JS do swagger-ui.
+#
+# Da PRÓPRIA aplicação, quando os arquivos estão na imagem. A regra que valia
+# para a doc publicada — "uma página que existe para NÃO sair do ar não deve
+# depender de um terceiro" — vale igual aqui, e por um motivo mais concreto:
+# este produto é **self-hosted**, em rede que libera saída host a host (é o que
+# o `examples/oracle/acl_setup.sql` configura). Alcançar a API não implica
+# alcançar a unpkg.com: onde não alcança, `/docs` abre com o cabeçalho da
+# plataforma e o Swagger não renderiza — página em branco, sem erro.
+#
+# A CDN fica como plano B para quem roda do checkout sem os arquivos (eles vêm
+# de `docs/`, que o `.dockerignore` corta por padrão). Versão pinada: `@5`
+# flutuante deixaria a página mudar sozinha a cada release menor do upstream.
+CDN_SWAGGER = "https://unpkg.com/swagger-ui-dist@5.17.14"
+
+#: Onde os arquivos ficam — no repositório (dev) e na imagem (produção).
+VENDOR_SWAGGER = next(
+    (p for p in (Path(__file__).resolve().parents[3] / "docs" / "swagger" / "vendor",
+                 Path("/swagger-ui"))
+     if (p / "swagger-ui-bundle.js").is_file()),
+    None,
+)
+
+#: Prefixo servido pela aplicação, ou a CDN quando não há o que servir.
+ASSETS_SWAGGER = "/swagger-ui" if VENDOR_SWAGGER else CDN_SWAGGER
+
+
+def _ancoras(links: list[tuple[str, str, bool]]) -> str:
+    """`links` é (rótulo, href, primário?). Externo abre em aba nova."""
+    return "".join(
         f'<a href="{href}"{" class=\"primario\"" if primario else ""}'
         f'{" target=\"_blank\" rel=\"noopener\"" if href.startswith("http") else ""}>{rotulo}</a>'
         for rotulo, href, primario in links
     )
+
+
+def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
+                   links: list[tuple[str, str, bool]], spec_url: str,
+                   assets: str = ASSETS_SWAGGER) -> str:
+    """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
+    ancoras = _ancoras(links)
     return (_PAGINA
             .replace("__TITULO__", titulo)
+            .replace("__CSS_TOPBAR__", _CSS_TOPBAR)
             .replace("__MARCA__", _MARCA)
+            .replace("__FAVICON__", _FAVICON)
             .replace("__SUPERFICIE__", superficie)
             .replace("__PILL__", pill)
             .replace("__DETALHE__", detalhe)
             .replace("__LINKS__", ancoras)
+            .replace("__SPEC__", spec_url)
+            .replace("__ASSETS__", assets.rstrip("/")))
+
+
+def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
+                 links: list[tuple[str, str, bool]], spec_url: str,
+                 assets: str = ASSETS_SWAGGER) -> str:
+    """A mesma casca, com o Redoc no lugar do Swagger UI.
+
+    O `/redoc` vinha pronto do FastAPI e era a única pagina de documentacao sem
+    nada disto: sem o tema da plataforma, com o favicon do
+    `fastapi.tiangolo.com` e buscando renderizador, fonte e icone em tres
+    terceiros diferentes.
+    """
+    return (_PAGINA_REDOC
+            .replace("__TITULO__", titulo)
+            .replace("__CSS_TOPBAR__", _CSS_TOPBAR)
+            .replace("__MARCA__", _MARCA)
+            .replace("__FAVICON__", _FAVICON)
+            .replace("__SUPERFICIE__", superficie)
+            .replace("__PILL__", pill)
+            .replace("__DETALHE__", detalhe)
+            .replace("__LINKS__", _ancoras(links))
             .replace("__SPEC__", spec_url)
             .replace("__ASSETS__", assets.rstrip("/")))

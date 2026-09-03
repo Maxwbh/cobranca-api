@@ -28,7 +28,11 @@ VALIDO = {
     "banco_nordeste": {"agencia": "1234", "conta": "1234567", "carteira": "21", "digito_conta": "0"},
     "banestes": {"conta": "1234567890", "carteira": "11", "digito_conta": "0"},
     "banco_c6": {"agencia": "1234", "convenio": "123456789012", "carteira": "10"},
-    "hsbc": {"agencia": "1234", "conta": "1234567", "carteira": "CSB"},
+    # `CSB` saiu de `carteiras` na 1.1.1: o campo livre dela montava 27 posições
+    # onde cabem 25, então nunca chegou a produzir um boleto válido. Corrigir
+    # exige o manual do HSBC, que o banco não publica mais. Sobra a `CNR`.
+    "hsbc": {"agencia": "1234", "conta": "1234567", "carteira": "CNR",
+             "data_vencimento": "2027-12-31"},
     "safra": {"agencia": "1234", "conta": "12345678", "carteira": "1",
               "digito_agencia": "0", "digito_conta": "0"},
 }

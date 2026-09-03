@@ -1,6 +1,8 @@
 # Sicoob — Integração REST (boleto v3, Pix BACEN)
 
-> Implementada no gateway Python (`gateway`), provider `sicoob`.
+> Implementada no gateway Python (`gateway`).
+> **Chamada:** `provider=on&banco=sicoob` (`provider=sicoob` segue valendo como
+> apelido legado até a 3.0.0).
 > Fontes: [Portal Developers Sicoob](https://developers.sicoob.com.br/portal/),
 > doc Postman oficial da Cobrança v3 e integrações de mercado. A documentação
 > oficial do Sicoob é notoriamente incompleta — itens "a confirmar" fecham na

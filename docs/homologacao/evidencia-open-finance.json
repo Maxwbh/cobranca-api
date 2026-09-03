@@ -1,0 +1,1923 @@
+{
+  "executado_em": "2026-08-18T22:34:36",
+  "fonte": "https://data.directory.openbankingbrasil.org.br/participants",
+  "funcionalidade": "open_finance",
+  "participantes_no_diretorio": 107,
+  "bancos": [
+    {
+      "banco": "ailos",
+      "organizacao": "CENTRAL AILOS",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "PAGTO"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 7,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/payments/v5/pix/payments",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/payments/v5/consents",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "AILOS",
+          "endpoints": [
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/enrollments/v2/enrollments",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls-auth.openfinance.ailos.coop.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        }
+      },
+      "faltando_de_interesse": [
+        "accounts",
+        "resources"
+      ]
+    },
+    {
+      "banco": "banco_brasil",
+      "organizacao": "BANCO DO BRASIL S.A.",
+      "status": "Active",
+      "papeis": [
+        "CCORR",
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 3,
+      "familias_total": 54,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/payments/v5/pix/payments",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/payments/v5/consents",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/payments/v5/consents/{consentId}",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/recurring-consents",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/recurring-consents",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/enrollments/v2/enrollments",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Banco do Brasil",
+          "endpoints": [
+            "https://customerdata-mtls.of.bb.com.br/bancodobrasil/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "banco_brasilia",
+      "organizacao": "BRB - BCO DE BRASILIA S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 2,
+      "familias_total": 39,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/payments/v5/pix/payments",
+            "https://mtls.brb.linaob.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/payments/v5/consents",
+            "https://mtls.brb.linaob.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/04/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/04/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/04/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/recurring-consents"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/04/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/automatic-payments/v2/recurring-consents"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/04/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls.brb.linaob.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration",
+            "https://mtls.brb.linaob.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "25/07/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://mtls.brb.linaob.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://mtls.brb.linaob.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Banco BRB",
+          "endpoints": [
+            "https://mtls.brb.linaob.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "banco_nordeste",
+      "organizacao": "BCO DO NORDESTE DO BRASIL S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 41,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/payments/v5/pix/payments",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/payments/v5/consents",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/enrollments/v2/enrollments",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "30/01/2027",
+          "marca": "Banco do Nordeste do Brasil S.A.",
+          "endpoints": [
+            "https://mtls-api.openfinance.bnb.gov.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "banestes",
+      "organizacao": "BCO BANESTES S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 10,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "08/06/2027",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/payments/v5/pix/payments",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "08/06/2027",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/payments/v5/consents",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/payments/v5/consents/{consentId}",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Banestes SA",
+          "endpoints": [
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/enrollments/v2/enrollments",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://matls-auth.openbanking.banestes.b.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        }
+      },
+      "faltando_de_interesse": [
+        "accounts",
+        "resources"
+      ]
+    },
+    {
+      "banco": "banrisul",
+      "organizacao": "BCO DO ESTADO DO RS S.A.",
+      "status": "Active",
+      "papeis": [
+        "CCORR",
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 56,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/payments/v5/pix/payments",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/payments/v5/consents",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/02/2027",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/enrollments/v2/enrollments",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://mtls-openbanking.banrisul.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Banrisul",
+          "endpoints": [
+            "https://mtls-openbanking.banrisul.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "bradesco",
+      "organizacao": "BANCO BRADESCO SA",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 5,
+      "familias_total": 49,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/payments/v5/pix/payments",
+            "https://api.bradesco.com/bradesco/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/payments/v5/consents",
+            "https://api.bradesco.com/bradesco/open-banking/payments/v5/consents/{consentId}",
+            "https://api.bradesco.com/bradesco/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/11/2026",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "11/11/2026",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api.bradesco.com/bradesco/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/enrollments/v2/enrollments",
+            "https://api.bradesco.com/bradesco/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://api.bradesco.com/bradesco/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://api.bradesco.com/bradesco/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://api.bradesco.com/bradesco/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Bradesco Pessoa Jurídica",
+          "endpoints": [
+            "https://api.bradesco.com/bradesco/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "c6",
+      "organizacao": "BCO C6 S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 22,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "02/06/2027",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/payments/v5/pix/payments",
+            "https://mtls.of.c6bank.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "02/06/2027",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/payments/v5/consents",
+            "https://mtls.of.c6bank.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls.of.c6bank.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/11/2026",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/11/2026",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/11/2026",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/11/2026",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://mtls.of.c6bank.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "12/02/2027",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/enrollments/v2/enrollments",
+            "https://mtls.of.c6bank.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls.of.c6bank.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "19/06/2027",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://mtls.of.c6bank.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://mtls.of.c6bank.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "C6 Bank",
+          "endpoints": [
+            "https://mtls.of.c6bank.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "caixa",
+      "organizacao": "CAIXA ECONOMICA FEDERAL",
+      "status": "Active",
+      "papeis": [
+        "CCORR",
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 3,
+      "familias_total": 55,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/payments/v5/pix/payments",
+            "https://api.openbanking.caixa.gov.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/payments/v5/consents",
+            "https://api.openbanking.caixa.gov.br/open-banking/payments/v5/consents/{consentId}",
+            "https://api.openbanking.caixa.gov.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api.openbanking.caixa.gov.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/enrollments/v2/enrollments",
+            "https://api.openbanking.caixa.gov.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://api.openbanking.caixa.gov.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://api.openbanking.caixa.gov.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://api.openbanking.caixa.gov.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "CAIXA",
+          "endpoints": [
+            "https://api.openbanking.caixa.gov.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "citibank",
+      "organizacao": "BCO CITIBANK S.A.",
+      "status": "Active",
+      "papeis": [
+        "DADOS"
+      ],
+      "authorisation_servers": 3,
+      "familias_total": 26,
+      "familias_de_interesse": {
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "CITI",
+          "endpoints": [
+            "https://obbr-api.745.cipbanfico.com/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://obbr-api.745.cipbanfico.com/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://obbr-api.745.cipbanfico.com/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "CITI",
+          "endpoints": [
+            "https://obbr-api.745.cipbanfico.com/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": [
+        "payments-pix",
+        "payments-consents",
+        "payments-pix-recurring-payments",
+        "payments-pix-recurring-payments-automatic",
+        "payments-recurring-consents",
+        "payments-recurring-consents-automatic",
+        "enrollments"
+      ]
+    },
+    {
+      "banco": "credisis",
+      "status": "SEM_ENTRADA_NO_DIRETORIO",
+      "motivo": "não localizado no diretório sob a central do sistema",
+      "familias_de_interesse": {},
+      "faltando_de_interesse": [
+        "payments-pix",
+        "payments-consents",
+        "payments-pix-recurring-payments",
+        "payments-pix-recurring-payments-automatic",
+        "payments-recurring-consents",
+        "payments-recurring-consents-automatic",
+        "enrollments",
+        "accounts",
+        "resources"
+      ]
+    },
+    {
+      "banco": "hsbc",
+      "status": "SEM_ENTRADA_NO_DIRETORIO",
+      "motivo": "não opera mais no Brasil (operação incorporada pelo Bradesco em 2016)",
+      "familias_de_interesse": {},
+      "faltando_de_interesse": [
+        "payments-pix",
+        "payments-consents",
+        "payments-pix-recurring-payments",
+        "payments-pix-recurring-payments-automatic",
+        "payments-recurring-consents",
+        "payments-recurring-consents-automatic",
+        "enrollments",
+        "accounts",
+        "resources"
+      ]
+    },
+    {
+      "banco": "inter",
+      "organizacao": "BANCO INTER",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 4,
+      "familias_total": 48,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "12/08/2027",
+          "marca": "Banco Inter PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/payments/v5/pix/payments",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "12/08/2027",
+          "marca": "Banco Inter PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/payments/v5/consents",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Inter Pagamentos PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "26/11/2026",
+          "marca": "Banco Inter Pagamentos PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/pix/recurring-payments"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Inter Pagamentos PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/recurring-consents"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "26/11/2026",
+          "marca": "Banco Inter Pagamentos PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/automatic-payments/v2/recurring-consents"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "16/03/2027",
+          "marca": "Banco Inter Pagamentos PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "04/08/2027",
+          "marca": "Banco Inter PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "30/01/2027",
+          "marca": "Banco Inter PF",
+          "endpoints": [
+            "https://mtls-auth-openfinance.bancointer.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "itau",
+      "organizacao": "ITAU UNIBANCO S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 12,
+      "familias_total": 55,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "25/05/2027",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/payments/v5/pix/payments",
+            "https://secure.opf.api.itau/itau-itau/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "25/05/2027",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/payments/v5/consents",
+            "https://secure.opf.api.itau/itau-itau/open-banking/payments/v5/consents/{consentId}",
+            "https://secure.opf.api.itau/itau-itau/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/recurring-consents",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/recurring-consents",
+            "https://secure.opf.api.itau/itau-itau/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/itau-itau/open-banking/enrollments/v2/enrollments",
+            "https://secure.opf.api.itau/itau-itau/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://secure.opf.api.itau/itau-itau/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://secure.opf.api.itau/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://secure.opf.api.itau/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Itaú",
+          "endpoints": [
+            "https://secure.opf.api.itau/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "safra",
+      "organizacao": "BCO SAFRA S.A.",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 3,
+      "familias_total": 54,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "19/05/2027",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/payments/v5/pix/payments",
+            "https://api-mtls.safra.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "19/05/2027",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/payments/v5/consents",
+            "https://api-mtls.safra.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://api-mtls.safra.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "15/04/2026",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "15/04/2026",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "15/04/2026",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "15/04/2026",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://api-mtls.safra.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "04/02/2027",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/enrollments/v2/enrollments",
+            "https://api-mtls.safra.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://api-mtls.safra.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "24/07/2027",
+          "marca": "Safra Empresas",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://api-mtls.safra.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://api-mtls.safra.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/04/2025",
+          "marca": "Safra Financeira Veículos",
+          "endpoints": [
+            "https://api-mtls.safra.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "santander",
+      "organizacao": "BCO SANTANDER (BRASIL) S.A.",
+      "status": "Active",
+      "papeis": [
+        "CCORR",
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 7,
+      "familias_total": 53,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/payments/v5/pix/payments",
+            "https://trust-openbanking.api.santander.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/payments/v5/consents",
+            "https://trust-openbanking.api.santander.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://trust-openbanking.api.santander.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://trust-openbanking.api.santander.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/enrollments/v2/enrollments",
+            "https://trust-openbanking.api.santander.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://trust-openbanking.api.santander.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://trust-openbanking.api.santander.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://trust-openbanking.api.santander.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Banco Santander Pessoa Física",
+          "endpoints": [
+            "https://trust-openbanking.api.santander.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "sicoob",
+      "organizacao": "Confederacao Nacional das Cooperativas do Sicoob",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 51,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/payments/v5/pix/payments",
+            "https://openfinance.sicoob.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "20/05/2027",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/payments/v5/consents",
+            "https://openfinance.sicoob.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://openfinance.sicoob.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://openfinance.sicoob.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/enrollments/v2/enrollments",
+            "https://openfinance.sicoob.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://openfinance.sicoob.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://openfinance.sicoob.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://openfinance.sicoob.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Sicoob",
+          "endpoints": [
+            "https://openfinance.sicoob.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "sicredi",
+      "organizacao": "CONFEDERACAO DAS COOPERATIVAS DO SICREDI - CONFEDERACAO SICREDI",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 2,
+      "familias_total": 51,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/payments/v5/pix/payments",
+            "https://matls-api.sicredi.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/payments/v5/consents",
+            "https://matls-api.sicredi.com.br/open-banking/payments/v5/consents/{consentId}",
+            "https://matls-api.sicredi.com.br/open-banking/payments/v5/consents/{consentId}/pix/payments"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-api.sicredi.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "enrollments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "06/02/2027",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/enrollments/v2/enrollments",
+            "https://matls-api.sicredi.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}",
+            "https://matls-api.sicredi.com.br/open-banking/enrollments/v2/enrollments/{enrollmentId}/fido-registration-options"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.1",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "27/07/2027",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/accounts/v2/accounts",
+            "https://matls-api.sicredi.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://matls-api.sicredi.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Sicredi",
+          "endpoints": [
+            "https://matls-api.sicredi.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": []
+    },
+    {
+      "banco": "unicred",
+      "organizacao": "COOPERATIVA CENTRAL DE CREDITO UNICRED DO BRASIL - UNICRED DO BRASIL",
+      "status": "Active",
+      "papeis": [
+        "CONTA",
+        "DADOS",
+        "PAGTO"
+      ],
+      "authorisation_servers": 1,
+      "familias_total": 37,
+      "familias_de_interesse": {
+        "payments-pix": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/payments/v5/pix/payments/consents/{consentId}",
+            "https://matls-auth.unicred.com.br/open-banking/payments/v5/pix/payments",
+            "https://matls-auth.unicred.com.br/open-banking/payments/v5/pix/payments/{paymentId}"
+          ]
+        },
+        "payments-consents": {
+          "versao": "5.0.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "21/05/2027",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/payments/v5/consents",
+            "https://matls-auth.unicred.com.br/open-banking/payments/v5/consents/{consentId}"
+          ]
+        },
+        "payments-pix-recurring-payments": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-pix-recurring-payments-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{recurringPaymentId}",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/pix/recurring-payments/{originalRecurringPaymentId}/retry"
+          ]
+        },
+        "payments-recurring-consents": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "payments-recurring-consents-automatic": {
+          "versao": "2.2.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "03/11/2026",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/recurring-consents",
+            "https://matls-auth.unicred.com.br/open-banking/automatic-payments/v2/recurring-consents/{recurringConsentId}"
+          ]
+        },
+        "accounts": {
+          "versao": "2.5.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "08/06/2027",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/accounts/v2/accounts/{accountId}/transactions-current",
+            "https://matls-auth.unicred.com.br/open-banking/accounts/v2/accounts/{accountId}/overdraft-limits",
+            "https://matls-auth.unicred.com.br/open-banking/accounts/v2/accounts"
+          ]
+        },
+        "resources": {
+          "versao": "3.1.0",
+          "status": "Active",
+          "certificacao": "Self-Certified",
+          "certificacao_expira": "29/01/2027",
+          "marca": "Unicred",
+          "endpoints": [
+            "https://matls-auth.unicred.com.br/open-banking/resources/v3/resources"
+          ]
+        }
+      },
+      "faltando_de_interesse": [
+        "enrollments"
+      ]
+    }
+  ]
+}

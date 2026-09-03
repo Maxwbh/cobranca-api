@@ -1,7 +1,8 @@
 # Banco do Brasil (001) — Integração REST · **PLANEJADO**
 
 > **Status:** roadmap (não implementado). Ver [roadmap-providers.md](./roadmap-providers.md).
-> Prioridade **2ª** — maior alcance de mercado.
+> Prioridade **1ª da Fase 1** — maior alcance de mercado.
+> Quando entrar, a chamada é `provider=on&banco=banco_brasil`.
 
 ## Onde baixar a documentação oficial
 

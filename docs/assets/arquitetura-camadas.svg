@@ -95,7 +95,7 @@
   <!-- engine -->
   <rect x="330" y="542" width="490" height="60" rx="11" fill="#06B6D4"/>
   <text x="575" y="568" text-anchor="middle" class="t h w">PyCobrança — engine in-process</text>
-  <text x="575" y="590" text-anchor="middle" class="t" font-size="12" fill="#083344">boleto · CNAB 240/400 · carnê · QR Pix · PDF — 18 bancos</text>
+  <text x="575" y="590" text-anchor="middle" class="t" font-size="12" fill="#083344">boleto · CNAB 240/400 · carnê · QR Pix · PDF — 19 bancos</text>
 
   <!-- conector: providers REST -> APIs dos bancos -->
   <path d="M200,496 L200,520 L1000,520 L1000,536" fill="none" stroke="#94A3B8"

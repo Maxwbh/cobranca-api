@@ -1,6 +1,11 @@
 # Troubleshooting — Cobranca-API
 
-> **Versão:** 1.5.0
+> Versão do serviço: `GET /api/metadata`.
+> 🕒 Revisado em 2026-08-19 **provocando cada erro** desta página contra a API e
+> colando a resposta real. Onde a página antiga previa um corpo de erro que o
+> serviço não devolve mais, o corpo foi substituído pelo verdadeiro — errar o
+> formato do erro é pior do que não documentá-lo, porque o cliente escreve
+> tratamento para uma chave que nunca chega.
 
 Este guia ajuda a resolver problemas comuns ao usar a API.
 
@@ -16,18 +21,22 @@ Este guia ajuda a resolver problemas comuns ao usar a API.
 
 ## Logging
 
-A API produz logs estruturados em JSON via `RequestLogger` middleware:
-
-```json
-{"event":"request_start","method":"POST","path":"/api/ofx/parse","timestamp":"2026-04-09T12:00:00.000+0000"}
-{"event":"request_end","method":"POST","path":"/api/ofx/parse","status":201,"duration_ms":4.69,"timestamp":"..."}
-```
-
-Erros são logados via `ErrorHandler`:
+O log é o **access log do uvicorn**, no formato padrão dele:
 
 ```
-2026-04-09T12:00:00.000+0000 [ERROR] [400] ValidationError: Parâmetro inválido - file is missing
+INFO:     127.0.0.1:52344 - "POST /api/ofx/parse HTTP/1.1" 201 Created
+INFO:     127.0.0.1:52346 - "GET /api/boleto HTTP/1.1" 400 Bad Request
 ```
+
+O nível sai de `LOG_LEVEL` (`critical`, `error`, `warning`, `info`, `debug`,
+`trace`; a caixa não importa). Valor inválido **não derruba o serviço**: o
+container avisa e assume `info`.
+
+> ⚠️ A versão anterior desta página descrevia log estruturado em JSON, com um
+> middleware `RequestLogger` e um `ErrorHandler` emitindo linhas
+> `[ERROR] [400] ValidationError: ...`. Nada disso existe no serviço Python —
+> era o formato do Banking Core Ruby. Quem montasse alerta em cima de
+> `event: "request_end"` não veria evento nenhum.
 
 ## Deploy no Render.com
 
@@ -104,19 +113,24 @@ response = session.get('https://SEU-SERVICO.onrender.com/api/health', timeout=60
 
 ## Erros Comuns — Boletos
 
-### 1. `type is missing`
+### 1. Parâmetros do `/api/boleto`
 
-**Causa:** Endpoint `/api/boleto` (GET) requer 3 parâmetros obrigatórios:
-- `bank` — Nome do banco (`banco_brasil`, `sicoob`, etc)
-- `type` — Formato de saída (`pdf`, `jpg`, `png`, `tif`)
-- `data` — JSON com os dados do boleto
+| Parâmetro | Obrigatório? | Valores |
+|-----------|:---:|---|
+| `bank` | **sim** | `banco_brasil`, `sicoob`, … (18 slugs; veja `GET /api/bancos`) |
+| `data` | **sim** | JSON com os dados do boleto |
+| `type` | não | só **`pdf`** — e é o default, então dá para omitir |
 
-**Response (400):**
-```json
-{"error": "Parâmetro inválido", "details": "type is missing", "type": "ValidationError"}
-```
+> ⚠️ **`jpg`, `png` e `tif` foram descontinuados.** A página antiga os listava
+> como formatos válidos; hoje qualquer um deles responde:
+>
+> ```json
+> {"error": "Formato 'jpg' descontinuado — a engine pyCobranca gera PDF"}
+> ```
+>
+> E `type` **não é obrigatório**: sem ele a rota devolve PDF do mesmo jeito.
 
-**Solução:**
+**Chamada completa:**
 ```python
 response = requests.get(
     f"{API_URL}/api/boleto",
@@ -128,38 +142,55 @@ response = requests.get(
 )
 ```
 
-### 2. JSON inválido
+### 2. JSON inválido no parâmetro `data`
 
-**Response (400):**
+**Response (400)** — o erro do JSON vem **dentro** de `validation_errors`, não
+numa chave `details`:
 ```json
-{"error": "JSON inválido", "details": "unexpected token at '{'", "type": "JSON::ParserError"}
+{
+  "error": "Dados do boleto inválidos",
+  "validation_errors": [
+    "JSON inválido no parâmetro data: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+  ],
+  "hint": "Verifique se todos os campos obrigatórios estão preenchidos"
+}
 ```
 
 **Solução:** Use aspas duplas no JSON. Em Python, use `json.dumps()`.
 
 ### 3. Campos obrigatórios ausentes
 
-**Response (400):**
+**Response (400)** — `validation_errors` é uma **lista de frases**, não um
+dicionário por campo:
 ```json
 {
   "error": "Dados do boleto inválidos",
-  "validation_errors": {
-    "nosso_numero": ["não pode ficar em branco"],
-    "agencia": ["não é um número"]
-  },
+  "validation_errors": ["valor deve ser positivo", "data_vencimento é obrigatória"],
   "hint": "Verifique se todos os campos obrigatórios estão preenchidos"
 }
 ```
 
+> ⚠️ A página antiga mostrava `{"nosso_numero": ["não pode ficar em branco"]}` —
+> formato de dicionário que a API nunca devolveu. Código que fizesse
+> `erros["nosso_numero"]` quebra com `TypeError`.
+
 **Solução:** Use `/api/boleto/validate` antes de gerar o PDF. Veja [fields/all-banks.md](../fields/all-banks.md) para campos obrigatórios por banco.
 
-### 4. `numero_documento` vs `documento_numero`
+### 4. `numero_documento` — e o `documento_numero` que some em silêncio
 
-- **`nosso_numero`** — Obrigatório, faz parte do código de barras
-- **`numero_documento`** — Nome usado pela API (controle interno da empresa)
-- **`documento_numero`** — Nome interno da engine (**não usar** diretamente na API)
+- **`nosso_numero`** — faz parte do código de barras
+- **`numero_documento`** — o nome do campo, na API **e** na engine
+- **`documento_numero`** — nome antigo, da gem Ruby: **não é convertido**
 
-A API converte `numero_documento` → `documento_numero` automaticamente.
+> ⚠️ **Não há conversão automática.** A página antiga afirmava que a API
+> traduzia `numero_documento` → `documento_numero`; hoje é o contrário, e nem
+> há tradução: `documento_numero` é **descartado sem erro** e o boleto sai com
+> o campo vazio.
+>
+> ```
+> enviando numero_documento  -> numero_documento no boleto: 'NF-1'
+> enviando documento_numero  -> numero_documento no boleto: ''
+> ```
 
 ```python
 # ✅ Correto
@@ -169,9 +200,19 @@ boleto_data = {
 }
 ```
 
-### 5. Linha digitável vazia
+### 5. Linha digitável "vazia" — quase sempre é outra coisa
 
-**Causa:** Falta `nosso_numero` ou outros campos obrigatórios.
+Sem `nosso_numero`, a engine **não** deixa a linha vazia nem dá erro: ela gera
+o boleto com o campo zerado.
+
+```
+com nosso_numero=123  -> 00190.00009 01234.567004 00000.123182 8 16770000150000
+sem nosso_numero      -> 00190.00009 01234.567004 00000.000182 3 16770000150000
+```
+
+O documento sai com cara de válido e o banco não concilia. Se a linha "parece
+errada", compare o trecho do nosso número antes de procurar defeito na
+renderização.
 
 **Debug:**
 ```python
@@ -187,7 +228,7 @@ print(validate.json())
 
 **Comportamento:** campos com valor padrão (`aceite`, `especie_documento`,
 `especie`, `moeda`, `local_pagamento`) enviados **em branco** (`""`) caem
-automaticamente no default do brcobrança (`aceite='S'`, `especie_documento='DM'`,
+automaticamente no default da engine pyCobrança (`aceite='S'`, `especie_documento='DM'`,
 `especie='R$'`, `moeda='9'`). Não é mais necessário omitir o campo — vazio e
 ausente têm o mesmo efeito. Para usar outro valor, basta enviá-lo preenchido.
 
@@ -195,12 +236,21 @@ ausente têm o mesmo efeito. Para usar outro valor, basta enviá-lo preenchido.
 
 ### 1. Formato CNAB incorreto
 
-**Response (400):**
+**Response (400)** — a mensagem lista **todas** as combinações banco/formato
+suportadas, o que já responde a próxima pergunta:
 ```json
-{"error": "Erro ao gerar remessa", "validation_errors": ["Formato '240' não suportado. Use: cnab240, cnab400"]}
+{
+  "error": "Erro ao gerar remessa",
+  "validation_errors": [
+    "Remessa 240 não suportada para 'banco_brasil'. Suportadas: ailos/cnab240, banco_brasil/cnab240, banco_brasil/cnab240+pix, banco_brasil/cnab400, …"
+  ]
+}
 ```
 
 **Solução:** Use `cnab240` ou `cnab400` (não apenas `240` ou `400`) no parâmetro `type`.
+
+> A remessa vai como **multipart** (campo `data`), não como corpo JSON — corpo
+> JSON responde `422 Field required: data`.
 
 ### 2. Pagamentos devem ser objetos
 
@@ -210,12 +260,17 @@ ausente têm o mesmo efeito. Para usar outro valor, basta enviá-lo preenchido.
 ```json
 {
   "nosso_numero": "123456789",
-  "data_vencimento": "2025/12/31",
+  "data_vencimento": "2026/12/31",
   "valor": 1500.00,
-  "sacado": "João da Silva",
-  "sacado_documento": "12345678900"
+  "nome_sacado": "João da Silva",
+  "documento_sacado": "11144477735"
 }
 ```
+
+> **`sacado`/`sacado_documento` também funcionam** — a engine aceita as duas
+> grafias no pagamento, e o nome sai igual no arquivo (conferido gerando os dois
+> e comparando o CNAB). O par `nome_sacado`/`documento_sacado` é o preferido por
+> ser o que a documentação de remessa usa.
 
 ### 3. Campos obrigatórios no cabeçalho da remessa
 
@@ -246,7 +301,7 @@ Para usar o layout alternativo onde o cliente calcula o DV, envie no payload da 
 {"versao_layout_arquivo_opcao": "810", ...}
 ```
 
-O valor padrão é `"081"`. O campo passa direto para a gem sem necessidade de configuração adicional na API.
+O valor padrão é `"081"`. O campo passa direto para a engine, sem configuração adicional na API.
 
 ### 6. Campos não suportados pela classe de remessa são ignorados
 
@@ -283,9 +338,13 @@ Arquivos CNAB 400 têm linhas de 400 caracteres; CNAB 240 tem 240 caracteres.
 
 ### 1. Arquivo OFX inválido
 
-**Response (400):**
+**Response (400)** — note a chave `erro` (sem "r" no fim), diferente do `error`
+das rotas de boleto:
 ```json
-{"erro": "Arquivo OFX inválido ou não reconhecido: <detalhes>"}
+{
+  "erro": "Arquivo OFX inválido",
+  "validation_errors": ["Arquivo OFX inválido: conteúdo não parece um OFX (faltam <OFX>/OFXHEADER)"]
+}
 ```
 
 **Causa:** Arquivo não é um OFX válido ou está corrompido.
@@ -295,14 +354,16 @@ Arquivos CNAB 400 têm linhas de 400 caracteres; CNAB 240 tem 240 caracteres.
 - Abra em um editor e verifique se começa com `OFXHEADER:` (v1) ou `<?xml` (v2)
 - Tente abrir em um visualizador OFX (Money, GnuCash, etc)
 
-### 2. `file is missing`
+### 2. Campo `file` ausente ou com nome errado
 
-**Response (400):**
+**Response (422)** — é o erro de validação do próprio FastAPI, com a chave
+`detail`, e **não** um 400 no formato das outras rotas:
 ```json
-{"error": "Parâmetro inválido", "details": "file is missing", "type": "ValidationError"}
+{"detail": [{"type": "missing", "loc": ["body", "file"], "msg": "Field required", "input": null}]}
 ```
 
-**Causa:** Campo `file` não enviado ou nome errado.
+**Causa:** Campo `file` não enviado ou nome errado — mandar `data=@extrato.ofx`
+(o nome usado na remessa) cai exatamente aqui.
 
 **Solução:**
 ```bash
@@ -350,7 +411,7 @@ Se ainda assim houver problemas, reporte um issue com arquivo de exemplo.
 
 ### Boleto não gera
 
-1. [ ] Todos os 3 parâmetros (`bank`, `type`, `data`) estão sendo enviados?
+1. [ ] `bank` e `data` estão sendo enviados? (`type` é opcional e só aceita `pdf`)
 2. [ ] JSON é válido (use `json.dumps()`)?
 3. [ ] Usou `/api/boleto/validate` primeiro?
 4. [ ] Campo `nosso_numero` está presente?
@@ -361,8 +422,9 @@ Se ainda assim houver problemas, reporte um issue com arquivo de exemplo.
 
 1. [ ] `type` é `cnab240` ou `cnab400` (não apenas números)?
 2. [ ] Array `pagamentos` tem pelo menos 1 item?
-3. [ ] Cada pagamento tem `nosso_numero`, `data_vencimento`, `valor`, `sacado`, `sacado_documento`?
-4. [ ] Banco suporta o tipo CNAB? (Bradesco não suporta CNAB240)
+3. [ ] Cada pagamento tem `nosso_numero`, `data_vencimento`, `valor`, `nome_sacado`, `documento_sacado`?
+4. [ ] Enviou como **multipart** no campo `data` (não como corpo JSON)?
+5. [ ] Banco suporta o tipo CNAB? **Bradesco, Itaú e C6 só têm CNAB400** — confira em `GET /api/bancos`, campo `cnab`
 
 ### OFX não parseia
 

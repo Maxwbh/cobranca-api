@@ -90,10 +90,17 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
         return OAuthMtlsClient(
             base_url=C6_BASE,
             auth_url=C6_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),
+            # O C6 entrega PEM separado (.crt + .key) no certificado de
+            # PRODUÇÃO — não PKCS12. O cliente HTTP já aceitava os dois; o
+            # provider só repassava o PFX, então o material que o banco manda
+            # era inutilizável aqui e obrigava a converter com openssl antes da
+            # primeira chamada. Mesma correção já feita no Inter.
+            cert_pem=self.credentials.get("cert_pem", ""),
+            key_pem=self.credentials.get("key_pem", ""),
             default_headers=C6_PARTNER_HEADERS,
             static_token=self.credentials.get("access_token", ""),  # contrato unificado c/ Sicoob
         )
@@ -223,15 +230,26 @@ class C6Provider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMixin,
 
     # --- webhooks no banco (/v1/webhooks) ------------------------------------------
 
+    #: Grafias do MESMO serviço em bancos diferentes -> a palavra do C6.
+    #: `COBRANCA` é como o Inter chama o webhook de boleto; repassada crua ao
+    #: C6 vira `400` do banco, que não se parece com "essa palavra é do outro".
+    _SERVICO_EQUIVALENTE = {"COBRANCA": "BANK_SLIP"}
+
+    def _servico(self, service: str) -> str:
+        return self._SERVICO_EQUIVALENTE.get(service, service)
+
     def cadastrar_webhook(self, *, url: str, service: str) -> dict[str, Any]:
         """Registra a URL de notificação no banco (service: BANK_SLIP | CHECKOUT)."""
-        return self._client().request("POST", "/v1/webhooks/", json={"url": url, "service": service})
+        return self._client().request(
+            "POST", "/v1/webhooks/", json={"url": url, "service": self._servico(service)})
 
     def consultar_webhook(self, *, service: str) -> dict[str, Any]:
-        return self._client().request("GET", "/v1/webhooks/", params={"service": service})
+        return self._client().request(
+            "GET", "/v1/webhooks/", params={"service": self._servico(service)})
 
     def remover_webhook(self, *, service: str) -> dict[str, Any]:
-        return self._client().request("DELETE", "/v1/webhooks/", params={"service": service})
+        return self._client().request(
+            "DELETE", "/v1/webhooks/", params={"service": self._servico(service)})
 
     # --- conciliação (C6 Pay /v1/c6pay/statement) -------------------------------
 
@@ -368,12 +386,17 @@ def _boleto_out(data: dict[str, Any], *, default_status: Status) -> CobrancaOut:
 def _bolepix_out(data: dict[str, Any], *, default_status: Status) -> CobrancaOut:
     slip = (data.get("payment_method") or {}).get("bank_slip") or {}
     pix = (data.get("payment_method") or {}).get("pix") or {}
+    # EMV devolvido pelo BANCO no registro: QR dinâmico, vinculado ao título, com
+    # baixa automática — Bolepix de verdade. Só o caminho offline, que monta o
+    # payload a partir de uma chave, pode produzir um QR que não liquida.
+    emv = pix.get("qr_code") or pix.get("emv") or pix.get("copy_and_paste")
     return CobrancaOut(
         id=data.get("external_reference_id") or slip.get("number") or data.get("id"),
         status=_map_status(data.get("status")) or default_status,
         linha_digitavel=slip.get("digitable_line") or data.get("digitable_line"),
         codigo_barras=slip.get("bar_code") or data.get("bar_code"),
-        pix_copia_cola=pix.get("qr_code") or pix.get("emv") or pix.get("copy_and_paste"),
+        pix_copia_cola=emv,
+        pix_vinculado=True if emv else None,
         pdf_base64=data.get("base64_pdf_file"),
         raw=data,
     )

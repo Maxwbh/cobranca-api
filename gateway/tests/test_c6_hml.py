@@ -309,3 +309,118 @@ def test_cancel_cip_resolve_apos_retry(c6_env, monkeypatch):
     p = C6Provider(account_config={}, credentials={"client_id": "c", "client_secret": "s"})
     assert p.baixar("X").status == Status.baixado
     assert tries["n"] == 3
+
+
+# --- revisao de /bolepix ----------------------------------------------------------
+
+_END_OK = {"street": "Av. X", "number": 100, "bairro": "Centro", "city": "SP",
+           "state": "SP", "zip_code": "01000000"}
+
+
+def _bp(**bolepix):
+    corpo = {"valor": "99.90", "vencimento": "2027-08-31", "descricao": "Pedido 42",
+             "pagador": {"nome": "Jose", "documento": "12345678909", "endereco": _END_OK}}
+    corpo.update(bolepix)
+    return {"tenant_id": "empresa1", "provider": "on", "banco": "c6",
+            "account_config": {"chave_pix": "evp-key"}, "bolepix": corpo}
+
+
+def test_bolepix_sem_chave_pix_nao_vira_boleto_comum_em_silencio(client, c6_env, monkeypatch):
+    """Sem chave o banco emite boleto SEM o segmento Pix: um "Bolepix" que nao e
+    bolepix, com 201 e nada avisando. Mesma familia do `emv` -- o nome do recurso
+    promete o QR, e quem quer boleto puro tem /cobranca."""
+    calls = _capture(monkeypatch, {"external_reference_id": "A" * 26})
+    corpo = _bp()
+    corpo["account_config"] = {}
+    r = client.post("/bolepix", json=corpo)
+    assert r.status_code == 422, r.text
+    assert "chave_pix" in r.json()["detail"] and "/cobranca" in r.json()["detail"]
+    assert calls == []
+
+
+@pytest.mark.parametrize("ext", [
+    "abc", "MINUSCULAminusculaMINUSC12", "COM-HIFEN-AQUI-1234567890X", "A" * 40])
+def test_external_reference_id_fora_do_padrao_nao_vai_ao_banco(client, c6_env, monkeypatch, ext):
+    """`^[A-Z0-9]{26}$` estava escrito em tres lugares e nao valia em nenhum: o
+    id ia ao banco e voltava como 400 dele."""
+    calls = _capture(monkeypatch, {"external_reference_id": "A" * 26})
+    r = client.post("/bolepix", json=_bp(external_reference_id=ext))
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+@pytest.mark.parametrize("rota", ["/bolepix/abc", "/bolepix/" + "A" * 40,
+                                  "/bolepix/abc/pdf"])
+def test_consulta_com_id_fora_do_padrao_nao_vai_ao_banco(client, c6_env, monkeypatch, rota):
+    calls = _capture(monkeypatch, {})
+    r = client.get(rota, params={"tenant_id": "empresa1", "provider": "on", "banco": "c6"})
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+@pytest.mark.parametrize("vazio", ["", "   "])
+def test_external_reference_id_vazio_vale_como_omitido(client, c6_env, monkeypatch, vazio):
+    """Template que substitui uma variavel nao preenchida produz `""`, e isso
+    sempre significou "gere um" — o `or _novo_ext_ref()` tratava assim. Com o
+    pattern aplicado, `""` virou 422: regressao que so a regressao do Postman
+    pegou (a colecao manda `{{external_reference_id}}` vazio). Vazio segue
+    valendo como ausente; qualquer valor NAO vazio continua tendo de casar."""
+    calls = _capture(monkeypatch, {"external_reference_id": "A" * 26, "status": "CREATED"})
+    r = client.post("/bolepix", json=_bp(external_reference_id=vazio))
+    assert r.status_code == 201, r.text
+    import re
+    assert re.fullmatch(r"[A-Z0-9]{26}", calls[0]["json"]["external_reference_id"])
+
+
+def test_id_gerado_volta_mesmo_quando_o_banco_nao_o_ecoa(client, c6_env, monkeypatch):
+    """O `id` saia da resposta do banco. Quando ela nao ecoa o
+    external_reference_id -- e a de criacao e minima -- o identificador GERADO
+    AQUI se perdia, e o boleto ficava inconsultavel: e o unico jeito de achar."""
+    calls = _capture(monkeypatch, {"status": "CREATED",
+                                   "payment_method": {"bank_slip": {"digitable_line": "336x"}}})
+    r = client.post("/bolepix", json=_bp())
+    assert r.status_code == 201, r.text
+    enviado = calls[0]["json"]["external_reference_id"]
+    assert r.json()["id"] == enviado
+
+
+def test_criacao_devolve_location_que_o_cliente_consegue_seguir(client, c6_env, monkeypatch):
+    calls = _capture(monkeypatch, {"external_reference_id": "B" * 26, "status": "CREATED"})
+    r = client.post("/bolepix", json=_bp())
+    assert r.status_code == 201, r.text
+    destino = r.headers["location"]
+    assert destino.startswith("/bolepix/" + "B" * 26 + "?")
+    seguido = client.get(destino)
+    assert seguido.status_code == 200, f"{destino} -> {seguido.status_code} {seguido.text}"
+    assert len(calls) == 2
+
+
+def test_location_segue_o_id_confirmado_pelo_banco(client, c6_env, monkeypatch):
+    """Se o banco devolver um id diferente do enviado, quem vale e o dele — e o
+    header tem de apontar para onde a consulta bate."""
+    _capture(monkeypatch, {"external_reference_id": "Z" * 26, "status": "CREATED"})
+    r = client.post("/bolepix", json=_bp(external_reference_id="Y" * 26))
+    assert r.headers["location"].startswith("/bolepix/" + "Z" * 26 + "?")
+
+
+@pytest.mark.parametrize("campo,valor", [("valor", "0"), ("valor", "-10.00"),
+                                          ("dias_apos_vencimento", -5)])
+def test_valor_e_tolerancia_sem_sentido_nao_vao_ao_banco(client, c6_env, monkeypatch,
+                                                         campo, valor):
+    calls = _capture(monkeypatch, {"external_reference_id": "A" * 26})
+    r = client.post("/bolepix", json=_bp(**{campo: valor}))
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+@pytest.mark.parametrize("banco", ["sicoob", "inter", "itau"])
+def test_mensagem_de_capacidade_diz_o_banco_e_nao_o_caminho(client, monkeypatch, banco):
+    """`exige_capacidade` recebia o `provider` nas quatro rotas: com o modelo de
+    dois eixos a mensagem saia "banco 'on' nao oferece"."""
+    monkeypatch.setenv(f"VAULT__empresa1__{banco}__client_id", "cid")
+    monkeypatch.setenv(f"VAULT__empresa1__{banco}__client_secret", "sec")
+    monkeypatch.setenv(f"{banco.upper()}_REGISTERED_READY", "true")
+    r = client.post("/bolepix", json={**_bp(), "banco": banco})
+    assert r.status_code == 422, r.text
+    assert f"banco '{banco}'" in r.json()["detail"]
+    assert "banco 'on'" not in r.json()["detail"]

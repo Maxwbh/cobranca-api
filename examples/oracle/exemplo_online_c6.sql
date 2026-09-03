@@ -38,7 +38,7 @@ BEGIN
   ------------------------------------------------------------------------
   l_token := cobranca_api.cadastrar_credenciais(
     p_tenant   => 'empresa_hml',
-    p_provider => 'c6',
+    p_provider => 'on', p_banco => 'c6',
     p_credenciais_json => TO_CLOB('{'
       || '"client_id":"'     || '&c6_client_id'     || '",'
       || '"client_secret":"' || '&c6_client_secret' || '",'
@@ -58,7 +58,7 @@ BEGIN
 
   l_cob := cobranca_api.registrar_cobranca(
     p_tenant   => 'empresa_hml',
-    p_provider => 'c6',
+    p_provider => 'on', p_banco => 'c6',
     p_boleto   => l_boleto,
     p_account_config_json => '{"agencia":"&agencia",'
                           || '"conta":"&conta",'

@@ -201,14 +201,23 @@ def test_webhook_do_inter_normaliza_a_situacao(client, monkeypatch, webhook_aber
     assert d["status"] == "liquidado"
 
 
-# --- fronteira: sem fallback offline ----------------------------------------------
+# --- fronteira: o fallback offline passou a existir -------------------------------
 
-def test_inter_sem_credencial_nao_cai_em_outro_banco(client, monkeypatch):
-    """A engine offline nao tem o layout do 077. Cair no fallback emitiria um
-    boleto REGISTRADO NO BANCO ERRADO — falha silenciosa e cara. Melhor 424."""
+def test_inter_sem_flag_cai_no_proprio_layout_e_nao_no_de_outro(client, monkeypatch):
+    """O Inter era o único banco `on` sem `off`: a engine não tinha o layout 077,
+    e cair no fallback teria emitido um boleto REGISTRADO NO BANCO ERRADO.
+
+    A pyCobrança 1.1.1 implementou o 077, então o fallback passa a cair no
+    layout **do próprio Inter** — o mesmo que o Itaú já fazia. O que continua
+    valendo é a fronteira: o boleto sai pela engine do Inter ou não sai.
+    """
     monkeypatch.delenv("INTER_REGISTERED_READY", raising=False)
     r = client.post("/cobranca", json=_corpo(tenant_id="fantasma"))
-    assert r.status_code == 424, r.text
+    assert r.status_code == 201, r.text
+    # tenant fantasma não tem conta configurada: a engine recusa, e o que volta
+    # são os erros do layout DO INTER — a carteira 110 é dele, e de mais nenhum.
+    erros = r.json()["raw"]["validation_errors"]
+    assert any("110" in e for e in erros), erros
 
 
 def test_boleto_puro_e_opt_in_nao_o_default(client, inter_env, monkeypatch):

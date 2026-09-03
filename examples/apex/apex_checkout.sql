@@ -56,7 +56,12 @@ BEGIN
   -- `external_reference_id` amarra o link à venda: é por ele que a conciliação
   -- e o webhook reencontram o registro daqui.
   APEX_JSON.write('external_reference_id', :P30_VENDA_ID);
+  -- ABSOLUTA, e por isso o HOST_URL na frente: `APEX_PAGE.get_url` sozinho
+  -- devolve `f?p=...` relativo, e quem publica essa URL e o BANCO, na pagina
+  -- dele -- caminho relativo la resolve para o dominio do banco, nao para o
+  -- seu. A API recusa o que nao comeca com http:// ou https:// (422).
   APEX_JSON.write('redirect_url',
+    APEX_UTIL.host_url(p_option => 'APEX_PATH') ||
     APEX_PAGE.get_url(p_application => :APP_ID, p_page => :APP_PAGE_ID,
                       p_items => 'P30_VENDA_ID', p_values => :P30_VENDA_ID));
   APEX_JSON.close_object;

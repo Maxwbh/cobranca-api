@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
 from app.routers._credentials import resolve_request_credentials
-from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON, FIM as _FIM, INICIO as _INICIO, TENANT as _TENANT
 from app.schemas import (
     Banco,
     LoteCobvIn,
@@ -72,14 +72,25 @@ def criar(
     if out.txid:
         extra = {"vencimento": "true"} if body.pix.data_vencimento else {}
         response.headers["Location"] = _location(
-            f"/pix/{out.txid}", body.tenant_id, body.provider, **extra)
+            f"/pix/{out.txid}", body.tenant_id, body.provider, body.banco, **extra)
     return out
 
 
-def _location(caminho: str, tenant_id: str, provider, **extra: str) -> str:
-    """Location que o cliente consegue seguir: as rotas de consulta exigem
-    tenant_id e provider, então omiti-los devolveria 422 a quem confia no header."""
-    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider), **extra}
+def _location(caminho: str, tenant_id: str, provider, banco=None, **extra: str) -> str:
+    """Location que o cliente consegue seguir.
+
+    As rotas de consulta exigem `tenant_id` e `provider` — e, desde o modelo de
+    dois eixos, também o `banco` quando o `provider` é `on`/`off`. O `banco`
+    ficou de fora quando o eixo nasceu, e o header passou a apontar para um
+    `422`: quebrado exatamente no modelo NOVO, e são no legado (`provider=c6`),
+    que carrega o banco no próprio valor e sai na 3.0.0.
+
+    Nada acusava porque nada seguia o header — o teste agora segue.
+    """
+    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider)}
+    if banco is not None:
+        params["banco"] = getattr(banco, "value", banco)
+    params.update(extra)
     return f"{caminho}?{urlencode(params)}"
 
 
@@ -96,7 +107,7 @@ def _creds(credentials, authorization, tenant_id, provider, banco=None):
 
 @router.get("", response_model=dict)
 def listar(
-    tenant_id: str, inicio: str, fim: str,
+    tenant_id: str = _TENANT, inicio: str = _INICIO, fim: str = _FIM,
     vencimento: bool = False, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
@@ -111,7 +122,7 @@ def listar(
 
 @router.get("/recebidos", response_model=dict)
 def listar_recebidos(
-    tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON,
+    tenant_id: str = _TENANT, inicio: str = _INICIO, fim: str = _FIM, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -125,7 +136,7 @@ def listar_recebidos(
 
 @router.get("/recebidos/{e2eid}", response_model=dict)
 def consultar_recebido(
-    e2eid: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    e2eid: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -139,7 +150,7 @@ def consultar_recebido(
 
 @router.put("/recebidos/{e2eid}/devolucao/{devolucao_id}", response_model=dict, status_code=201)
 def devolver(
-    e2eid: str, devolucao_id: str, body: dict, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    e2eid: str, devolucao_id: str, body: dict, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -153,9 +164,10 @@ def devolver(
     return p.devolver_pix(e2eid, devolucao_id, str(body["valor"]))
 
 
-@router.get("/recebidos/{e2eid}/devolucao/{devolucao_id}", response_model=dict)
+@router.get("/recebidos/{e2eid}/devolucao/{devolucao_id}", response_model=dict,
+            summary="Consultar devolução")
 def consultar_devolucao(
-    e2eid: str, devolucao_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    e2eid: str, devolucao_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -169,7 +181,7 @@ def consultar_devolucao(
 
 @router.get("/lotes", response_model=dict)
 def listar_lotes(
-    tenant_id: str, inicio: str, fim: str, provider: Provider = _PROVIDER_ON,
+    tenant_id: str = _TENANT, inicio: str = _INICIO, fim: str = _FIM, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -203,7 +215,7 @@ def criar_lote(
                   banco=body.banco)
     out = p.criar_lote_cobv(lote_id, body.descricao, _cobsv(body))
     response.headers["Location"] = _location(
-        f"/pix/lote/{lote_id}", body.tenant_id, body.provider)
+        f"/pix/lote/{lote_id}", body.tenant_id, body.provider, body.banco)
     return out
 
 
@@ -256,7 +268,7 @@ def revisar_lote(
 
 @router.get("/lote/{lote_id}", response_model=dict)
 def consultar_lote(
-    lote_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON,
+    lote_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -270,7 +282,7 @@ def consultar_lote(
 
 @router.get("/{txid}", response_model=PixCobrancaOut)
 def consultar(
-    txid: str, tenant_id: str, vencimento: bool = False, provider: Provider = _PROVIDER_ON,
+    txid: str, tenant_id: str = _TENANT, vencimento: bool = False, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,
     authorization: str | None = _AUTH_HEADER,
@@ -284,7 +296,7 @@ def consultar(
 
 @router.patch("/{txid}", response_model=PixCobrancaOut)
 def revisar(
-    txid: str, campos: dict, tenant_id: str,
+    txid: str, campos: dict, tenant_id: str = _TENANT,
     vencimento: bool = False, provider: Provider = _PROVIDER_ON,
     banco: Banco | None = _BANCO,
     credentials: str | None = _CREDS_HEADER,

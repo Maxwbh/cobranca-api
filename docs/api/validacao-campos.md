@@ -56,8 +56,9 @@ conjunto fechado por banco. Tamanhos abaixo são em **dígitos** (mín.–máx.)
 | **Banco do Nordeste** (004) | 1–4 | 1–7 (+`digito_conta`) | — | 21, 31, 41, 51 | 1–7 (+DV) | `digito_conta` |
 | **Banestes** (021) | (impressão) | 1–10 (+`digito_conta`) | — | 11, 13 | 1–8 (+DV duplo) | `digito_conta` |
 | **C6 Bank** (336) | 4 | —³ | 1–12 | 10, 20 | 1–10 (+DV; pode ser `P`) | indicador conforme carteira |
-| **HSBC** (399) | 4 | 1–7 | — | **CNR, CSB** (alfanum.) | 1–13 | CNR: `data_vencimento` **obrig.** |
+| **HSBC** (399) | 4 | 1–7 | — | **CNR** (alfanum.) | 1–13 | CNR: `data_vencimento` **obrig.** |
 | **Safra** (422) | 1–4 (+`digito_agencia`) | 1–8 (+`digito_conta`) | — | 1, 2 | 1–8 (+DV) | `digito_agencia`, `digito_conta` **obrig.** |
+| **Inter** (077) | 1–4 | —³ | 1–7 | **110** | 1–10 (+DV) | só a 110: na 112/121 quem numera é o banco |
 
 ¹BB só usa agência/conta nos convênios 4 e 6. ²Caixa: agência só na impressão.
 ³Não entra no campo livre (o beneficiário vem do convênio). ⁴Santander usa

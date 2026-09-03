@@ -52,9 +52,20 @@ No 400 o código/tipo **não é gravado** — a unidade é definida pelo layout:
 |---|---|
 | `percentual_multa` + `codigo_multa='2'` | ✅ (o código é redundante, mas aceito) |
 | `valor_mora` + `tipo_mora='1'` | ✅ |
-| `codigo_multa='1'` (valor fixo de multa) | ❌ **400** — não existe no 400 |
-| `tipo_mora='2'` (taxa mensal %) | ❌ **400** — a mora do 400 é valor/dia |
-| `percentual_mora` (sem posição no layout) | ❌ **400** — use `valor_mora` |
+| `codigo_multa='1'` + `valor_multa` | ❌ **400** — exceto **Inter** |
+| `tipo_mora='2'` + `percentual_mora` | ❌ **400** — exceto **Inter** |
+| `cod_desconto='4'` + `percentual_desconto` | ❌ **400** — exceto **Inter** |
+| `percentual_mora` sozinho | ❌ **400** — use `valor_mora` |
+
+#### A exceção: Inter (077)
+
+O layout do Inter tem os **dois** campos de cada encargo — itens 10/11 (multa),
+14/15 (mora) e 30/31 (desconto) do registro tipo 1 — e escolhe pelo código. Nele
+`valor_multa`, `percentual_mora` e `percentual_desconto` são gravados de verdade.
+
+É o **único** dos 14 layouts 400 em que isso vale. Medido A/B em todos: gerar o
+arquivo com dois valores diferentes do campo e comparar byte a byte. Nos outros
+13 o campo entra, não é gravado e some — que é justamente o que a recusa evita.
 
 > **Por que recusar em vez de ignorar:** `codigo_multa='1'` com valor `50`
 > faria o banco cobrar **50%** onde você quis **R$ 50** — num título de
@@ -86,13 +97,22 @@ Ailos emite o 2º/3º desconto e a multa só quando há multa informada.
 | Banco do Brasil (001) | ✅ | 📝 instrução | ✅ | — | ✅ | ✅ |
 | Citibank (745) | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | BRB / Brasília (070) | ✅ | — | ✅ | — | — | ✅ |
+| Safra (422) | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| Inter (077) | ✅ | ✅ | ✅ | — | — | — |
+
+> Medida A/B em todos os 14 layouts, não copiada: gerar o arquivo com dois
+> valores diferentes do campo e comparar byte a byte. `✅` significa que o
+> arquivo muda — ou seja, que o campo tem posição de verdade.
 
 - **2º e 3º desconto** existem apenas no **CNAB 240**.
 - **BB e Itaú (400)**: a multa vai por **instrução** (código de ocorrência),
   não como percentual posicional — enviar `percentual_multa` não altera o
   arquivo, e isso é esperado.
-- Banestes (021) não tem remessa CNAB — só impressão do boleto.
-- Banestes (021), HSBC (399) e Safra (422) só emitem boleto (sem remessa CNAB).
+- **Safra (422) e Inter (077) ganharam remessa CNAB 400** na pyCobrança 1.1.1.
+  Esta página dizia que o Safra só emitia boleto; deixou de ser verdade.
+- Banestes (021) e HSBC (399) só emitem boleto — não têm remessa CNAB.
+- **Inter:** multa em **valor** e desconto em **percentual**, além das formas
+  comuns. Sem IOF e sem abatimento no layout.
 
 ## Exemplo
 

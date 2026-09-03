@@ -11,19 +11,15 @@
     "carteira": "18",
     "nosso_numero": "123",
     "numero_documento": "CTR-2025-001",
-    "documento_numero": "CTR-2025-001",
     "valor": 1500.0,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "N",
     "local_pagamento": "Pagavel em qualquer banco ate o vencimento",
-    "instrucao1": "Não receber após o vencimento",
-    "instrucao2": "Parcela 1 de 1",
     "data_documento": "2025/11/26",
     "cedente_endereco": "Av. Teste, 200",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "sicoob_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -40,14 +36,12 @@
     "numero_documento": "NF-2025-1234",
     "valor": 2500.0,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "N",
     "local_pagamento": "Pagavel em qualquer banco ate o vencimento",
-    "instrucao1": "Não receber após 30 dias",
     "data_documento": "2025/11/26",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "bradesco_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -63,14 +57,12 @@
     "numero_documento": "FAT-2025-001",
     "valor": 3500.0,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "S",
     "local_pagamento": "Pagavel em qualquer banco ate o vencimento",
-    "instrucao1": "Após vencimento cobrar multa de 2%",
     "data_documento": "2025/11/26",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "itau_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -85,14 +77,12 @@
     "numero_documento": "NF-2025-999",
     "valor": 850.0,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "N",
     "local_pagamento": "Pagavel em qualquer banco ate o vencimento",
-    "instrucao1": "Não receber após 30 dias do vencimento",
     "data_documento": "2025/11/26",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "caixa_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -109,14 +99,12 @@
     "numero_documento": "CONT-2025-555",
     "valor": 10000.0,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "N",
     "local_pagamento": "Preferencialmente nas casas lotericas",
-    "instrucao1": "Multa de 2% após vencimento",
     "data_documento": "2025/11/26",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "santander_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -133,14 +121,12 @@
     "numero_documento": "PED-2025-777",
     "valor": 5250.75,
     "data_vencimento": "2025/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "S",
     "local_pagamento": "Pagavel em qualquer banco ate o vencimento",
-    "instrucao1": "Não aceitar pagamento em cheque",
     "data_documento": "2025/11/26",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "banco_c6_valido": {
     "cedente": "Aurora Servicos Empresariais LTDA",
@@ -157,14 +143,12 @@
     "numero_documento": "INV-2026-001",
     "valor": 2750.0,
     "data_vencimento": "2026/12/31",
-    "moeda": "9",
-    "especie": "R$",
     "especie_documento": "DM",
     "aceite": "N",
     "local_pagamento": "Pagavel em qualquer banco",
-    "instrucao1": "Apos vencimento cobrar multa de 2%",
     "data_documento": "2026/04/09",
-    "instrucoes": "Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento."
+    "instrucoes": "Apos o vencimento, multa de 2% e juros de 1% ao mes, pro rata die.\nDesconto de R$ 50,00 para pagamento ate 5 dias antes do vencimento.\nNao receber apos 30 dias do vencimento; decorrido o prazo, protestar.\nHavendo divergencia, prevalece o contrato n. CTR-2026-0417.\nDuvidas: setor financeiro, (11) 3679-2380, dias uteis das 9h as 18h.\nPagavel em qualquer instituicao financeira do pais ate o vencimento.",
+    "especie_moeda": "R$"
   },
   "invalido_sem_nosso_numero": {
     "cedente": "Empresa Teste",
