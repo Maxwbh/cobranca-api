@@ -40,7 +40,7 @@ BEGIN
   --   || '"pfx_password":"'  || '&sicoob_pfx_password'  || '"}');
 
   l_token := cobranca_api.cadastrar_credenciais(
-    p_tenant => 'empresa_hml', p_provider => 'sicoob',
+    p_tenant => 'empresa_hml', p_provider => 'on', p_banco => 'sicoob',
     p_credenciais_json => l_creds);
 
   DBMS_OUTPUT.put_line('token: ' || SUBSTR(l_token, 1, 12) || '...');
@@ -58,7 +58,7 @@ BEGIN
   -- Consulte `GET /bancos` para ver os campos exigidos por banco.
   l_cob := cobranca_api.registrar_cobranca(
     p_tenant   => 'empresa_hml',
-    p_provider => 'sicoob',
+    p_provider => 'on', p_banco => 'sicoob',
     p_boleto   => l_boleto,
     p_account_config_json => '{"cooperativa":"&cooperativa",'
                           || '"conta":"&conta",'

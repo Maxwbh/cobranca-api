@@ -17,23 +17,30 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
-- **Swagger publicado no site**, gerado do código e sem depender do serviço no
-  ar: [gateway](https://maxwbh.github.io/cobranca-api/swagger/) e
-  [offline](https://maxwbh.github.io/cobranca-api/swagger/offline.html).
-- Boleto sai com o **logo do banco emissor** no cabeçalho, por padrão, em todos
-  os caminhos (avulso, lote, carnê e fatura). Citibank não tem marca empacotada
-  e segue com a sigla; `logo` em `data` continua sobrepondo.
-- **`banco`** em todas as rotas e corpos: `provider` passa a ser o **caminho**
-  (`on` = API do banco · `off` = engine pyCobrança) e `banco` a instituição
-  (`c6`, `sicoob`, `itau`, `banco_brasil`…). O nome do banco no `provider`
-  (`provider=c6`) segue valendo como apelido e sai na 3.0.0.
-- `GET /bancos` diz o que **esta instalação** faz com cada banco:
-  `registrado_pronto`, `fallback_offline`, `caminho_efetivo` e a flag que liga.
+- **Inter (077) é o 19º banco offline** — boleto, remessa e retorno CNAB 400, carteira 110.
+- **`GET /cobrancas` e `/cobrancas/sumario`**: a coleção do período, janela de 90 dias. Só Inter.
+- **`GET /credenciais`**: validade do certificado mTLS, dias restantes e se ele é do ambiente da base.
+- **`pix_copia_cola`, `pix_observacao`, `codigo_barras` e `linha_digitavel`** no `data` do boleto, e **`pix_vinculado`** na resposta dizendo se o QR **liquida o título** ou só credita a chave.
+- **Vinte campos do boleto publicados no Swagger** — nove específicos de banco e onze que a API já aceitava calada.
+- **`banco` em todas as rotas**: `provider` passa a ser o caminho (`on`/`off`). `GET /bancos` diz o que cada banco faz aqui.
+- **`X-Remessa-Avisos`** diz o que o layout não gravou; **`layout_generico`** no retorno avisa leitura por layout de reserva.
 
 ### Alterado
-- Credenciais são guardadas e procuradas pelo **banco**, não pelo `provider`.
-  Token emitido antes continua valendo; ao cadastrar com `provider=on`, informe
-  o `banco`.
+- ⚠️ **Campo desconhecido em `data` responde `400`** — era descartado calado. `BOLETO_ACEITA_CAMPO_DESCONHECIDO=1` volta ao antigo; sai na 3.0.0.
+- ⚠️ **`logo` em texto responde `400`**: era lido como caminho de arquivo no servidor. Use `logo_empresa`.
+- ⚠️ **A mesma conta nas duas grafias (`conta`/`conta_corrente`) responde `400`.**
+- ⚠️ **A faixa FEBRABAN é aceita e ignorada no boleto** — quem a preenche é o caixa. Os valores vão na remessa CNAB.
+- ⚠️ **Pedido conferido antes de ir ao banco** em `/pix-automatico`, `/checkout`, `/carne`, `/extrato`, `/conciliacao` e nos `/config/webhook-*`: enums fechados, URLs, períodos e tetos de upload.
+- ⚠️ **Engine `pyCobrança` 1.1.1**: o boleto `moderno` tem desenho novo.
+
+### Corrigido
+- ⚠️ **A faixa de marca e `instrucao1`..`instrucao6` passam a sair no papel** — eram documentadas e o PDF saía sem elas.
+- ⚠️ **O endereço do pagador chega inteiro ao boleto** (bairro, cidade, UF e CEP eram descartados).
+- ⚠️ **`POST /api/retorno` recusa arquivo de outro banco**, e a ocorrência sai no vocabulário do banco do arquivo.
+- **Sicoob: carteira `09` gerava boleto diferente da `9`**; a `CSB` do HSBC, que nunca produziu boleto válido, saiu; a remessa do Inter sai com o nome que o banco exige.
+- **Cerca de trinta respostas `500` viraram `4xx` com corpo JSON** — credencial incompleta, `txid` longo, banco sem a capacidade, JSON válido de forma errada.
+- **Banco sem o recurso responde `422` mesmo sem credencial.** Era `424 credenciais ausentes`, que mandava buscar um segredo que não resolveria nada. Vale em `/extrato`, `/conciliacao/*`, `/cobrancas*`, `/pix-automatico/*`, `/bolepix` e `/checkout`.
+- **Todo parâmetro obrigatório do Swagger traz exemplo.** Eram 55 sem nenhum — `tenant_id` em 49 rotas e o `inicio`/`fim` do `/pix`, que são datas RFC3339 e apareciam como texto livre.
 
 ## [2.2.0] - 2026-08-08
 

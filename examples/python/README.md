@@ -24,16 +24,18 @@ curl http://localhost:8000/api/health
 
 ### 3. Apontar os scripts
 
-A URL está **no topo de cada arquivo**, fixa em `http://localhost:8000`. Para
-rodar contra outro ambiente, edite a constante do script
-(`API_URL` / `REMESSA_URL`).
+Os três leem a variável `API`, e caem em `http://localhost:8000` sem ela:
+
+```bash
+API=https://meu-host python generate_boleto.py
+```
 
 ## 🚀 Exemplos disponíveis
 
 | Script | O que faz | Saída |
 |---|---|---|
 | `generate_boleto.py` | **Comece por aqui.** Uma cobrança em `POST /cobranca` + o PDF pela engine, com a conferência da linha digitável | `examples/test_output/boleto.pdf` |
-| `generate_test_boletos.py` | 12 boletos de C6 e Sicoob (padrão e PIX) via `GET /api/boleto`, para conferência visual | PDFs em `examples/test_output/` |
+| `generate_test_boletos.py` | 12 boletos de C6 e Sicoob (6 comuns e 6 com QR Pix) via `GET /api/boleto`, para conferência visual | PDFs em `examples/test_output/` |
 | `generate_remessa.py` | Arquivo de remessa CNAB via `POST /api/remessa`, com upload de JSON | `.rem` de remessa |
 
 ```bash
@@ -43,8 +45,9 @@ python examples/python/generate_remessa.py
 ```
 
 Os três **saem com código ≠ 0 quando alguma chamada falha** e imprimem o corpo
-do erro (a API diz qual campo recusou). Para apontar a outro ambiente:
-`API=https://meu-host python examples/python/generate_boleto.py`.
+do erro (a API diz qual campo recusou). O de boletos vai além e confere o
+**arquivo**: `200` não prova QR, e os seis boletos "Pix" já saíram por meses
+byte a byte do tamanho dos comuns, sem QR e sem aviso.
 
 ## Os dois eixos: `provider` e `banco`
 
@@ -70,26 +73,36 @@ em [`postman/fixtures/sample_data.json`](../../postman/fixtures/sample_data.json
 Postman usa. A referência campo a campo está em
 [`docs/fields/`](../../docs/fields/).
 
-Armadilhas mais comuns:
+Armadilhas mais comuns — cada uma medida contra a engine, não lembrada:
 
-- **Sicoob (756)** — `variacao` e `convenio` são obrigatórios; `aceite` tem de
-  ser `'N'`; `linha_digitavel` pode voltar `null` em `/api/boleto/data`, mas
-  aparece no PDF.
-- **Caixa (104)** — `carteira` aceita só `'1'` ou `'2'`; `nosso_numero` tem 15
-  dígitos.
-- **C6 (336)** — `carteira` aceita só `'10'` ou `'20'`; não envie
-  `digito_conta`.
+- **Caixa (104)** — `carteira` é `'14'` ou `'24'` (a página dizia `'1'`/`'2'`,
+  que a engine nunca aceitou); `convenio` tem **no máximo 6** dígitos e
+  `nosso_numero` no máximo 15.
+- **C6 (336)** — `carteira` é `'10'` ou `'20'`. `digito_conta` **não dá erro,
+  mas também não muda nada**: no boleto e na remessa o arquivo sai idêntico com
+  ou sem ele.
+- **Sicoob (756)** — `convenio` e `carteira` bastam; `variacao` é opcional e
+  `aceite` não é fixo em `'N'`. `/api/boleto/data` devolve `linha_digitavel`
+  preenchida.
+- **QR Pix no boleto** — quem desenha é `chave_pix` + `tipo_chave_pix` (a engine
+  monta o EMV). `emv` e `pix_label` são da era Ruby e **respondem 400**; antes
+  eram descartados em silêncio, e o boleto saía sem QR. Banco sem suporte a Pix
+  recusa a chave em vez de imprimir um boleto pela metade.
 - **Instruções** — `instrucoes` é uma **lista de linhas**, no máximo 7, cada
-  uma com até 100 caracteres. Acima do limite a API responde 422.
-- **`template`** — só `classico` ou `moderno`. Carnê **não** é template: é o
-  endpoint `POST /api/render/carne`, que recebe a lista de parcelas.
+  uma com até 100 caracteres. Acima do limite a API responde **400** com a linha
+  e o tamanho.
+- **`template`** — `classico` ou `moderno` em `GET /api/boleto`; em
+  `POST /api/boleto/multi` vale também `carne` (3 vias por A4). Valor
+  desconhecido é 400 nos dois.
 
 ## ⚠️ Erros frequentes
 
 | Sintoma | Causa | O que fazer |
 |---|---|---|
 | Conexão recusada | API não está no ar | `docker compose up --build` |
-| `422` com lista de campos | Campo obrigatório do banco faltando | Confira `docs/fields/` |
+| `400` com `validation_errors` | Regra do banco violada nas rotas `/api/*` | Leia a lista — ela nomeia o campo. Confira `docs/fields/` |
+| `422` com `detail` | Campo que o **schema** exige faltando, ou `provider`/`banco` inválido | É o Pydantic do gateway, antes de qualquer banco |
+| **`201` com `status: "erro"`** | `POST /cobranca` recusado pela regra do banco | O engano mais comum: **é 201**. Os campos recusados estão em `raw.validation_errors` |
 | `422 item_id duplicado` | Dois itens do lote com o mesmo identificador | Corrija o payload — seriam o mesmo título emitido duas vezes |
 | `413` | Lote acima de `LOTE_MAX_ITENS` | Quebre o lote ou ajuste a variável de ambiente |
 | Timeout no primeiro request | Free tier do Render hiberna | Repita — a primeira chamada leva ~50s |

@@ -10,10 +10,10 @@ from typing import Any
 from app.core.vault import Vault
 from app.providers.base import BankProvider
 from app.providers.offline_engine import PyCobrancaProvider
-from app.providers.c6 import C6Provider
-from app.providers.inter import InterProvider
-from app.providers.itau import ItauProvider
-from app.providers.sicoob import SicoobProvider
+from app.providers.c6 import C6_BASE as c6_base, C6Provider
+from app.providers.inter import INTER_BASE as inter_base, InterProvider
+from app.providers.itau import ITAU_BASE as itau_base, ItauProvider
+from app.providers.sicoob import SICOOB_BASE as sicoob_base, SicoobProvider
 from app.schemas import Banco, PROVIDER_LEGADO_BANCO, Provider, eh_offline
 
 # --- os dois eixos, cada um no seu mapa ---------------------------------------
@@ -37,12 +37,14 @@ _REST_POR_BANCO: dict[Banco, type[BankProvider]] = {
 # contrato.
 _SLUG_ENGINE: dict[Banco, str] = {
     Banco.c6: "banco_c6",
-    **{b: b.value for b in Banco if b not in (Banco.c6, Banco.inter)},
+    **{b: b.value for b in Banco if b is not Banco.c6},
 }
-# O Inter NÃO está aqui de propósito: a engine não tem o layout 077. Sem
-# caminho OFF, `provider=off&banco=inter` é recusado com a lista de quem tem —
-# cair em outro banco emitiria boleto REGISTRADO NO LUGAR ERRADO, que é falha
-# silenciosa e cara.
+# O Inter ficou de fora daqui enquanto a engine não tinha o layout 077, e o
+# `provider=off&banco=inter` era recusado — cair em outro banco emitiria boleto
+# REGISTRADO NO LUGAR ERRADO. A pyCobrança 1.1.1 implementou o Inter (boleto,
+# remessa e retorno CNAB 400, só a carteira 110), então ele passa a ser o 19º
+# banco offline e o único, com o C6, o Sicoob e o Itaú, a existir nos dois
+# caminhos.
 
 # Compatibilidade: o roteador antigo mapeava Provider→classe. Mantido porque
 # testes e rotas ainda referenciam, e porque `build_rest_provider` usa.
@@ -186,6 +188,54 @@ def build_rest_provider(
     _, banco = resolver_caminho(provider, banco, account_config)
     creds = credentials or vault.get_credentials(tenant_id, banco.value)
     return _REST_POR_BANCO[banco](account_config=account_config, credentials=creds)
+
+
+def classe_rest(provider: Provider, banco: Banco | None = None,
+                account_config: dict[str, Any] | None = None) -> type[BankProvider] | None:
+    """A CLASSE do provider REST, sem cofre e sem credencial.
+
+    Existe para responder "este banco oferece a capacidade?" **antes** de pedir
+    credencial. Capacidade é propriedade do banco e do código, não de quem
+    chama: o `GET /bancos` já a publica sem autenticação nenhuma, então
+    respondê-la mais cedo não expõe nada de novo.
+
+    Devolve `None` quando a combinação não resolve — caminho `off`, banco
+    desconhecido, `provider` sem banco. Nesses casos quem tem a mensagem certa é
+    o `build_rest_provider`, e engoli-la aqui trocaria "só existe no caminho ON"
+    por um erro de capacidade que não é o do chamador.
+    """
+    if eh_offline(provider):
+        return None
+    try:
+        _, banco = resolver_caminho(provider, banco, account_config)
+    except CaminhoInvalido:
+        return None
+    return _REST_POR_BANCO.get(banco)
+
+
+#: Para onde cada banco está apontado — variável de ambiente e o default do
+#: provider. É lido na CHAMADA, e não no import, porque quem aponta o serviço
+#: para o sandbox mexe no ambiente: congelar no import faria a resposta descrever
+#: um destino diferente do que o cliente HTTP vai usar.
+_BASE_POR_BANCO: dict[str, tuple[str, str]] = {
+    Banco.c6.value: ("C6_BASE_URL", c6_base),
+    Banco.inter.value: ("INTER_BASE_URL", inter_base),
+    Banco.sicoob.value: ("SICOOB_BASE_URL", sicoob_base),
+    Banco.itau.value: ("ITAU_BASE_URL", itau_base),
+}
+
+
+def base_do_banco(chave: str | None) -> str | None:
+    """A base HTTP em uso para aquele banco, ou `None` se ele não tem caminho ON.
+
+    Serve ao diagnóstico de credencial: é contra este host que o host do CN do
+    certificado é comparado (`core/certificado.ambiente_confere`).
+    """
+    par = _BASE_POR_BANCO.get(chave or "")
+    if par is None:
+        return None
+    variavel, padrao = par
+    return os.environ.get(variavel) or padrao
 
 
 def credentials_from_header(value: str | None) -> dict[str, Any] | None:

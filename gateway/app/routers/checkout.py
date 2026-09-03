@@ -10,7 +10,9 @@
 # revoga decisão sem ninguém revisar.
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
 from app.core.idempotency import (
     ConflitoDeIdempotencia,
@@ -19,9 +21,12 @@ from app.core.idempotency import (
 )
 from app.core.vault import Vault, get_vault
 from app.registry import build_rest_provider, credentials_from_header
-from app.routers._capacidades import exige_capacidade
+from app.routers._capacidades import (
+    exige_capacidade,
+    exige_capacidade_antes_da_credencial,
+)
 from app.routers._credentials import resolve_request_credentials
-from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON
+from app.routers._params import BANCO as _BANCO, PROVIDER_ON as _PROVIDER_ON, TENANT as _TENANT
 from app.schemas import (
     Autenticacao,
     Banco,
@@ -41,7 +46,12 @@ _AUTH_HEADER = Header(default=None, description="Bearer bapi_... (token do /cred
 _IDEMPOTENCIA_HEADER = Header(
     default=None, alias="Idempotency-Key",
     description="Reenvio com a mesma chave devolve O MESMO link, sem criar outro no "
-                "banco. Mesma chave com corpo diferente é 422.")
+                "banco. Mesma chave com outro pedido — corpo, provider ou banco "
+                "diferentes — é 422.")
+_LOCATION = {
+    "description": "URL de consulta do link criado, já com tenant_id, provider e banco",
+    "schema": {"type": "string"},
+}
 
 # Cartão existe onde a instituição OFERECE link hospedado. Hoje, o C6.
 _ALTERNATIVA = ("link de pagamento existe no banco que oferece a funcionalidade — "
@@ -110,8 +120,9 @@ def _payer_checkout(pagador: Pagador) -> dict:
     return payer
 
 
-@router.post("", response_model=CheckoutOut, status_code=201)
-def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
+@router.post("", response_model=CheckoutOut, status_code=201,
+             responses={201: {"headers": {"Location": _LOCATION}}})
+def criar(body: CheckoutIn, response: Response, authorization: str | None = _AUTH_HEADER,
           idempotency_key: str | None = _IDEMPOTENCIA_HEADER,
           vault: Vault = Depends(get_vault)) -> CheckoutOut:
     """Cria o link de pagamento e devolve a `url` para onde mandar o pagador.
@@ -122,15 +133,24 @@ def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
     Mande `Idempotency-Key` se houver botão humano na frente disto: sem a chave,
     duplo clique cria **dois links para a mesma venda**, e nada impede o pagador
     de pagar os dois."""
-    # A impressão é do checkout, não do corpo inteiro: `credentials` pode vir no
-    # request e não faz parte da identidade do pedido — o mesmo pedido com a
-    # credencial reenviada de outro jeito continua sendo o mesmo pedido.
-    marca = impressao(body.checkout.model_dump(mode="json")) if idempotency_key else ""
+    # A impressão é do checkout MAIS o destino, não do corpo inteiro:
+    # `credentials` pode vir no request e não faz parte da identidade do pedido —
+    # o mesmo pedido com a credencial reenviada de outro jeito continua sendo o
+    # mesmo pedido. `provider` e `banco` entram porque SÃO identidade: sem eles,
+    # a mesma chave enviada a outro banco devolvia o link do primeiro, e o
+    # segundo banco nunca era chamado — a venda ia para a instituição errada com
+    # 201 e nada acusando.
+    marca = impressao(_pedido(body)) if idempotency_key else ""
     if idempotency_key:
         guardada = _replay(body.tenant_id, idempotency_key, marca)
         if guardada is not None:
             return guardada
 
+    # ...e a capacidade antes da CREDENCIAL: sem isto, banco sem o recurso
+    # respondia 424 e mandava buscar credencial que não resolveria nada.
+    exige_capacidade_antes_da_credencial(body.provider, body.banco, body.account_config,
+                                         "criar_checkout", recurso="link de pagamento com cartão",
+                                         alternativa=_ALTERNATIVA)
     creds = resolve_request_credentials(authorization=authorization, explicit=body.credentials,
                                         tenant_id=body.tenant_id, provider=body.provider, banco=body.banco)
     p = _provider(body.tenant_id, body.provider, body.account_config, vault, creds,
@@ -168,7 +188,30 @@ def criar(body: CheckoutIn, authorization: str | None = _AUTH_HEADER,
     resultado = criar_link(payload)
     if idempotency_key:
         _guardar(body.tenant_id, idempotency_key, marca, resultado)
+    if resultado.id:
+        response.headers["Location"] = _location(
+            f"/checkout/{resultado.id}", body.tenant_id, body.provider, body.banco)
     return resultado
+
+
+def _pedido(body: CheckoutIn) -> dict:
+    """O que identifica o pedido para fins de idempotência."""
+    return {"checkout": body.checkout.model_dump(mode="json"),
+            "provider": getattr(body.provider, "value", body.provider),
+            "banco": getattr(body.banco, "value", body.banco)}
+
+
+def _location(caminho: str, tenant_id: str, provider, banco=None) -> str:
+    """Location que o cliente consegue seguir.
+
+    `GET /checkout/{id}` exige `tenant_id` e `provider`, e o `banco` junto quando
+    o provider é `on`/`off` — o header sem eles apontava para um `422`. Mesma
+    correção feita em `/cobranca` e `/pix`; aqui não havia header nenhum, e o
+    `201` devolvia um `id` que só o consumidor sabia montar em URL."""
+    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider)}
+    if banco is not None:
+        params["banco"] = getattr(banco, "value", banco)
+    return f"{caminho}?{urlencode(params)}"
 
 
 def _replay(tenant_id: str, chave: str, marca: str) -> CheckoutOut | None:
@@ -200,7 +243,7 @@ def _guardar(tenant_id: str, chave: str, marca: str, resultado: CheckoutOut) -> 
 
 
 @router.get("/{checkout_id}", response_model=CheckoutOut)
-def consultar(checkout_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
+def consultar(checkout_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
               credentials: str | None = _CREDS_HEADER,
               authorization: str | None = _AUTH_HEADER,
               vault: Vault = Depends(get_vault)) -> CheckoutOut:
@@ -218,7 +261,7 @@ def consultar(checkout_id: str, tenant_id: str, provider: Provider = _PROVIDER_O
 
 
 @router.delete("/{checkout_id}", response_model=CheckoutOut)
-def cancelar(checkout_id: str, tenant_id: str, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
+def cancelar(checkout_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER_ON, banco: Banco | None = _BANCO,
              credentials: str | None = _CREDS_HEADER,
              authorization: str | None = _AUTH_HEADER,
              vault: Vault = Depends(get_vault)) -> CheckoutOut:

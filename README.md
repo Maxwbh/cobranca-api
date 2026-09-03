@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(max-width: 600px)" srcset="./docs/assets/banner-mobile.svg" />
-    <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária: online nas APIs de 4 bancos (C6, Sicoob, Inter e Itaú — boleto registrado, Pix, Pix Automático, cartão, Bolepix, conciliação) e offline na engine embutida (boleto PDF, CNAB 240/400, carnê, OFX) para 18 bancos" width="100%" />
+    <img src="./docs/assets/banner.svg" alt="Cobranca-API — Plataforma Open Source de Cobrança Bancária: online nas APIs de 4 bancos (C6, Sicoob, Inter e Itaú — boleto registrado, Pix, Pix Automático, cartão, Bolepix, conciliação) e offline na engine embutida (boleto PDF, CNAB 240/400, carnê, OFX) para 19 bancos" width="100%" />
   </picture>
 </p>
 
@@ -18,13 +18,14 @@
      GitHub e mudam sozinhos. Badge estático `shields.io/badge/...` afirma o que
      ninguém verifica — um CI quebrado atrás de um selo verde fixo é pior do que
      nenhum selo. Os dois últimos continuam informativos (19 bancos — 4 online
-     + 18 offline —, OpenAPI) porque são contrato, não métrica. -->
+     + 19 offline; C6, Sicoob, Inter e Itaú existem nos dois caminhos, então o
+     TOTAL segue 19 —, OpenAPI) porque são contrato, não métrica. -->
 <p align="center">
   <a href="https://github.com/Maxwbh/cobranca-api/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Maxwbh/cobranca-api/ci.yml?branch=main&style=for-the-badge&label=build&labelColor=0F172A" alt="Status do build" /></a>
   <a href="https://github.com/Maxwbh/cobranca-api/releases/latest"><img src="https://img.shields.io/github/v/release/Maxwbh/cobranca-api?style=for-the-badge&label=vers%C3%A3o&color=1E40AF&labelColor=0F172A" alt="Última versão" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/Maxwbh/cobranca-api?style=for-the-badge&color=10B981&labelColor=0F172A" alt="Licença MIT" /></a>
   <a href="https://github.com/Maxwbh/cobranca-api/stargazers"><img src="https://img.shields.io/github/stars/Maxwbh/cobranca-api?style=for-the-badge&color=F59E0B&labelColor=0F172A" alt="Stars" /></a>
-  <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 4 online (C6, Sicoob, Inter, Itaú) e 18 offline" />
+  <img src="https://img.shields.io/badge/19-bancos-06B6D4?style=for-the-badge&labelColor=0F172A" alt="19 bancos — 4 online (C6, Sicoob, Inter, Itaú) e 19 offline" />
   <img src="https://img.shields.io/badge/OpenAPI-3.0_·_3.1-6BA539?style=for-the-badge&labelColor=0F172A" alt="OpenAPI 3.0 e 3.1" />
 </p>
 
@@ -62,7 +63,7 @@
 <p align="center"><sub>
   Resposta <strong>real</strong>, capturada da API — caminho offline (Sicoob),
   sem credencial e sem convênio. O mesmo <code>POST /cobranca</code> com
-  <code>provider=c6</code> registra no banco.
+  <code>provider=on&amp;banco=c6</code> registra no banco.
 </sub></p>
 
 ### Dois mundos, um contrato
@@ -72,12 +73,19 @@
 | **O que faz** | Boleto **registrado**, Pix e Pix Automático (BACEN), **link de pagamento com cartão**, Bolepix, extrato e conciliação | Boleto em **PDF**, CNAB **240/400** (remessa e retorno), **carnê 3-vias**, parsing de **OFX** |
 | **Como** | OAuth2 + mTLS contra o banco | pyCobrança **no mesmo processo** — sem rede, sem sidecar |
 | **Precisa de** | Convênio e credenciais do banco | **Nada** — roda sem internet |
-| **Bancos** | C6 (336) · Sicoob (756) · Inter (077) | **18 bancos** |
+| **Bancos** | C6 (336) · Sicoob (756) · Inter (077) · Itaú (341)¹ | **19 bancos** |
 | **Serve para** | Cobrar e conciliar de verdade, com o banco | Gerar, validar e processar arquivo — inclusive sem convênio |
 
-**Não são dois produtos.** É o mesmo `POST /cobranca`: com `provider=c6` vai ao
-banco, sem `provider` cai na engine. Trocar de mundo é trocar um campo — e é o
-que permite começar offline hoje e ligar o banco quando o convênio sair.
+**Não são dois produtos.** É o mesmo `POST /cobranca`: `provider=on&banco=c6`
+vai ao banco, `provider=off&banco=c6` cai na engine. Trocar de mundo é trocar um
+campo — e é o que permite começar offline hoje e ligar o banco quando o convênio
+sair. (O nome do banco no `provider` — `provider=c6` — segue valendo como
+apelido até a 3.0.0.)
+
+<sub>¹ O Itaú tem provider escrito, mas nasce **desligado** por
+`ITAU_REGISTERED_READY`: sem a flag, `banco=itau` emite pela engine, que tem o
+layout 341. O payload de emissão ainda depende do catálogo do banco, que exige
+login.</sub>
 
 Tudo por **REST**, em **um único container 100% Python**, com **lote assíncrono**
 e artefatos assinados.
@@ -157,7 +165,7 @@ open source **100% Python** — como **engine oficial de cobrança**, responsáv
 </td>
 <td>
 
-- **PIX / Bolepix** (EMV, QR)
+- **QR Pix no boleto** (EMV): Bolepix com o `pix_copia_cola` do banco; QR avulso a partir de `chave_pix`
 - Segmento PIX no CNAB
 - Sem dependências de sistema
 
@@ -247,18 +255,54 @@ Exemplos **reais gerados pela API** (engine pyCobrança, Python puro), um por ba
 <p align="center">
   <img src="./docs/assets/boletos/banco_c6.png" width="24%" alt="Boleto C6 Bank" />
   <img src="./docs/assets/boletos/sicoob.png" width="24%" alt="Boleto Sicoob" />
+  <img src="./docs/assets/boletos/inter.png" width="24%" alt="Boleto Banco Inter" />
   <img src="./docs/assets/boletos/bolepix.png" width="24%" alt="Boleto híbrido com Pix (Bolepix)" />
+</p>
+<p align="center">
   <img src="./docs/assets/boletos/carne.png" width="24%" alt="Carnê 3-vias" />
 </p>
 
 <p align="center">
   <sub>
     <strong>Banco do Brasil</strong> · <strong>Itaú</strong> · <strong>Santander</strong> · <strong>Caixa</strong> ·
-    <strong>C6 Bank</strong> · <strong>Sicoob</strong> ·
-    <strong>Bolepix</strong> (boleto híbrido com QR Pix) · <strong>Carnê</strong> (3 vias A4)
+    <strong>C6 Bank</strong> · <strong>Sicoob</strong> · <strong>Inter</strong> ·
+    <strong>Bolepix</strong> (QR <em>do banco</em>, que dá baixa no título) ·
+    <strong>Carnê</strong> (3 vias A4)
     &nbsp;— e mais 12 bancos.
   </sub>
 </p>
+
+### Dois modelos e a faixa de marca
+
+O `template` escolhe o desenho, e **os dois saem da mesma chamada** — só muda o
+parâmetro. A faixa de marca é opcional e existe só no `moderno`: pedi-la no
+`classico` responde `400` em vez de devolver um boleto sem marca nenhuma.
+
+<p align="center">
+  <img src="./docs/assets/boletos/modelo-moderno.png" width="32%" alt="Boleto no modelo moderno: chips de vencimento, valor e nosso número, QR do Bolepix e faixa FEBRABAN em branco, para o caixa preencher" />
+  <img src="./docs/assets/boletos/modelo-classico.png" width="32%" alt="Boleto no modelo clássico, layout tradicional da ficha de compensação" />
+  <img src="./docs/assets/boletos/faixa-de-marca.png" width="32%" alt="Boleto moderno com faixa de marca: selo, nome do beneficiário, marca d'água e rodapé de contato" />
+</p>
+
+<p align="center">
+  <sub>
+    <code>template=moderno</code> (padrão) · <code>template=classico</code> ·
+    <strong>faixa de marca</strong> (<code>logo_empresa</code>, <code>cor_marca</code>,
+    <code>marca_dagua</code>, <code>rodape_contato</code>)
+  </sub>
+</p>
+
+A **faixa de totalizadores** (FEBRABAN) sai sempre em branco, e é assim que
+tem de ser: desconto, multa e juros dependem da **data do pagamento**, então
+quem preenche ali é o caixa, no ato. A regra vai impressa nas `instrucoes`
+("após o vencimento, multa de 2% e juros de 1% ao mês") e os valores vão na
+**remessa CNAB** — é o arquivo que o banco processa para calcular na data em
+que o título for pago.
+
+> As imagens acima são geradas por
+> [`scripts/gerar-boletos-exemplo.py`](./scripts/gerar-boletos-exemplo.py), que
+> passa pelo mesmo caminho da API. Refazer é um comando —
+> `PYTHONPATH=gateway python scripts/gerar-boletos-exemplo.py`.
 
 > 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
 > [demo ao vivo](https://cobranca-api-sq67.onrender.com/api/docs) — instância de
@@ -296,7 +340,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | "Preciso de CNAB 240/400 para enviar ao banco" | `POST /api/remessa` gera o arquivo pronto |
 | "Preciso processar o retorno do banco" | `POST /api/retorno` parseia e retorna JSON |
 | "Preciso conciliar pagamentos com extrato" | `POST /api/ofx/parse` extrai nosso_numero do OFX |
-| "Preciso de boleto com QR Code PIX" | Campo `emv` no payload + `pix=true` na remessa |
+| "Preciso de boleto com QR Code PIX" | Campo `chave_pix` no payload + `pix=true` na remessa |
 | "Não quero dependências de sistema" | Engine **100% Python** (pyCobrança) — PDF sem GhostScript |
 | "Preciso saber quais bancos/formatos são suportados" | `GET /api/bancos` retorna tudo dinamicamente |
 | "Preciso receber por cartão, sem guardar dados de cartão" | `POST /checkout` devolve um link; o PAN é digitado na página do banco |
@@ -304,12 +348,13 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 ### Diferenciais
 
 - **100% Python** — Engine [pyCobrança](https://github.com/Maxwbh/pyCobranca) **in-process**: um runtime, um container, sem sidecar
-- **18 bancos offline** — boleto + CNAB (15 bancos com remessa, 26 combinações banco×layout, 7 com segmento PIX)
+- **19 bancos offline** — boleto + CNAB (17 bancos com remessa, 21 combinações banco×layout, 7 com segmento PIX)
 - **Boleto registrado via API** — C6, Sicoob, Inter e Itaú (341, desligado por padrão até `ITAU_REGISTERED_READY`): Pix, Bolepix, Pix Automático, extrato e conciliação. Nem todo banco faz tudo, e `GET /bancos` responde a matriz exata por introspecção do código
 - **Link de pagamento com cartão** — `POST /checkout` no C6: crédito ou débito, à vista ou parcelado, com Pix no mesmo link. O cartão é digitado na página do banco; PAN nunca passa por aqui
 - **Lote assíncrono** — `POST /jobs/boletos` e `/jobs/cnab/remessas`: 202 + `job_id`, falha por item isolada, artefatos com `sha256` e webhook de conclusão
 - **Credenciais zero-knowledge** — token `bapi_`; o servidor não decifra sem ele
 - **Carnê 3-vias** — N parcelas em PDF A4
+- **Dois modelos de boleto** — `moderno` (padrão) e `classico`, mesma chamada; faixa de marca opcional (logo, cor, marca d'água, rodapé) e faixa de totalizadores FEBRABAN com o valor cobrado somado
 - **Swagger UI** — interativo em `/docs` (gateway) e `/api/docs` (offline)
 - **Docker ready** — imagem única, deploy em 1 minuto no Render, Railway ou qualquer cloud
 
@@ -321,7 +366,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | Endpoint | Método | O que faz |
 |----------|:------:|-----------|
 | **`/api/docs`** | GET | Swagger UI interativa |
-| **`/api/bancos`** | GET | 18 bancos com capacidades (boleto, CNAB, PIX, carteiras) |
+| **`/api/bancos`** | GET | 19 bancos com capacidades (boleto, CNAB, PIX, carteiras) |
 | `/api/boleto/data` | GET | Dados calculados: nosso_numero, código barras, linha digitável |
 | `/api/boleto` | GET | Gerar PDF. `include_data=true` → JSON + base64 |
 | `/api/boleto/multi` | POST | Múltiplos boletos em 1 arquivo |
@@ -337,7 +382,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | **`/docs`** | GET | Swagger do gateway |
 | `/bancos` | GET | Catálogo com capacidades reais e esquema de credenciais por banco |
 | `/credenciais` | POST | Credenciais do banco → token `bapi_` (zero-knowledge) |
-| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6, Sicoob, Inter) ou offline, conforme `provider` |
+| `/cobranca` | POST/GET/PUT/DELETE | Boleto registrado (C6, Sicoob, Inter, Itaú) ou offline, conforme `provider` |
 | `/carne` | POST | Carnê 3-vias (registra N parcelas e monta o PDF) |
 | `/pix` · `/bolepix` · `/pix-automatico` | — | Pix BACEN, boleto híbrido e débito recorrente |
 | `/checkout` | POST/GET/DELETE | **Link de pagamento com cartão** (crédito/débito, parcelado, Pix no mesmo link) — C6 |
@@ -362,7 +407,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | `/api/boleto/validate` | GET | Validar dados do boleto |
 | `/api/boleto/data` | GET | Dados calculados |
 | `/api/boleto/nosso_numero` | GET | Apenas nosso_numero |
-| `/api/boleto` | GET | Gerar boleto (PDF/JPG/PNG/TIF) |
+| `/api/boleto` | GET | Gerar boleto em **PDF** (`jpg`/`png`/`tif` foram descontinuados) |
 | `/api/boleto/multi` | POST | Múltiplos boletos |
 | `/api/remessa` | POST | Remessa CNAB |
 | `/api/retorno` | POST | Retorno CNAB |
@@ -388,8 +433,8 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | Caixa | 104 | ✅ | 240 | 240 | ✅ |
 | Bradesco | 237 | ✅ | 400 | 400 | ✅ |
 | **Banco C6** | **336** | ✅ | 400 | 400 | ✅ |
-| Itaú | 341 | ✅ | 400 + 444 | 400 | ✅ |
-| Sicredi | 748 | ✅ | 240 | 240 | ✅ |
+| Itaú | 341 | ✅ | 400 | 400 | ✅ |
+| Sicredi | 748 | ✅ | 240 | 240 | — |
 | Sicoob | 756 | ✅ | 400 + 240 | 240 | ✅ |
 | Banrisul | 041 | ✅ | 400 | 400 | — |
 | Unicred | 136 | ✅ | 400 + 240 | 400 | — |
@@ -484,11 +529,11 @@ Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/c
 | Componente | Tecnologia |
 |-----------|-----------|
 | API | Python 3.12 · FastAPI · Uvicorn |
-| Engine offline | [pyCobrança](https://github.com/Maxwbh/pyCobranca) 1.0.2 (Python puro) |
+| Engine offline | [pyCobrança](https://github.com/Maxwbh/pyCobranca) (Python puro) — boleto, CNAB, OFX e Pix EMV |
 | PDF | ReportLab (via pyCobrança) — sem GhostScript |
-| Providers online | C6 Bank · Sicoob · Banco Inter (OAuth2 + mTLS) |
-| OFX | `ofxparse` |
-| Testes | pytest · 387 testes + regressão Postman (128 requests, cobertura de endpoint verificada no build) |
+| Providers online | C6 Bank · Sicoob · Banco Inter · Itaú (OAuth2 + mTLS) |
+| OFX | pyCobrança (v1 SGML e v2 XML) — sem dependência externa |
+| Testes | pytest + regressão Postman — cobertura de endpoint derivada do router e verificada no build |
 | Docs | OpenAPI 3.0/3.1 · Swagger UI |
 | Container | Docker · python:3.12-slim |
 

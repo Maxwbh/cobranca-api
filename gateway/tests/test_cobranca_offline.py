@@ -66,25 +66,51 @@ def _payload_offline(endereco):
 
 
 def test_offline_carrega_o_endereco_inteiro_do_sacado():
-    """So o logradouro seguia para a engine: numero, bairro, cidade, UF e CEP
-    eram descartados em silencio, apesar de o CNAB ter posicao para todos.
-    Boleto com rua e sem numero e' endereco incompleto, e saia assim mesmo."""
+    """O endereco vai inteiro para a engine -- numa linha, que e o que o
+    boleto tem.
+
+    Bairro, cidade, UF e CEP chegaram a ser enviados como campos proprios
+    (`sacado_bairro`, `sacado_cidade`...) e o construtor do titulo NAO tem
+    esses campos: descartava os quatro, um por um, em silencio. Aquelas
+    posicoes existem no CNAB, nao no boleto. O papel saia com rua e numero e
+    mais nada."""
     d = _payload_offline({"logradouro": "Rua Presidente Kennedy", "numero": "126A",
                           "bairro": "Canaa", "cidade": "Sete Lagoas", "uf": "MG",
                           "cep": "35701206"})
-    assert d["sacado_endereco"] == "Rua Presidente Kennedy, 126A"
-    assert d["sacado_bairro"] == "Canaa"
-    assert d["sacado_cidade"] == "Sete Lagoas"
-    assert d["sacado_uf"] == "MG"
-    assert d["sacado_cep"] == "35701206"
+    assert d["sacado_endereco"] == (
+        "Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206")
+    assert not [c for c in d if c.startswith("sacado_") and c != "sacado_endereco"
+                and c != "sacado_documento"], "campo que o titulo nao tem"
 
 
 def test_offline_aceita_o_endereco_em_ingles():
     """O schema aceita as duas grafias; quem consome nao deveria adivinhar qual."""
     d = _payload_offline({"street": "Av. Teste", "number": 100, "neighborhood": "Centro",
                           "city": "Sao Paulo", "state": "SP", "zip_code": "01000000"})
-    assert d["sacado_endereco"] == "Av. Teste, 100"
-    assert d["sacado_bairro"] == "Centro"
+    assert d["sacado_endereco"] == "Av. Teste, 100, Centro, Sao Paulo, SP, CEP 01000000"
+
+
+def test_endereco_do_sacado_chega_ao_papel():
+    """A assercao que faltava: os testes olhavam o payload, e era o CONSTRUTOR
+    que descartava. Payload certo com boleto errado passava."""
+    import base64
+    import io
+
+    from pypdf import PdfReader
+
+    from app.core import pycob
+    d = _payload_offline({"logradouro": "Rua Presidente Kennedy", "numero": "126A",
+                          "bairro": "Canaa", "cidade": "Sete Lagoas", "uf": "MG",
+                          "cep": "35701206"})
+    d |= {"cedente": "Empresa Teste LTDA", "documento_cedente": "11222333000181",
+          "agencia": "3073", "conta_corrente": "12345678", "convenio": "1234567",
+          "carteira": "18", "nosso_numero": "123"}
+    pdf, _info = pycob.emitir_boleto("banco_brasil", d)
+    texto = "".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+    achatado = texto.replace("\n", " ")
+    for pedaco in ("Canaa", "Sete Lagoas", "MG", "35701206"):
+        assert pedaco in achatado, f"{pedaco!r} nao chegou ao boleto"
+    assert base64.b64encode(pdf[:4]).decode()  # PDF de verdade
 
 
 def test_offline_nao_converte_numero_para_inteiro():

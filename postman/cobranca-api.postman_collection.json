@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Cobranca-API — Cenário de Teste HML",
-    "description": "Coleção v3.6.0 do plano docs/development/plano-cenario-teste-postman-hml.md.\n\n**Rastreabilidade:** cada request tem ID (BC-xxx funcional, NEG-xxx negativo, SMK smoke) ligado à matriz §4 do plano e aos testes T1–T10 do roadmap de migração.\n\n**Smoke (pre-deploy, <5min):** `newman run ... --folder 'SMK · Smoke (pre-deploy, < 5 min)'`\n**Regressão completa:** rodar a coleção inteira (ordem 00→NEG).\n\n**Catálogo de serviços:** as descrições citam IDs `C6-Sxx`/`SIC-Sxx` — o catálogo completo de serviços de cada banco (inclusive não implementados) vive em docs/development/<banco>-rest.md, seção \"Serviços do banco × Cobranca-API\".\n\n**Fixtures:** os uploads usam spec/fixtures/ do repositório — rodar newman a partir da raiz do repo (Postman UI: Working Directory = raiz do repo).",
+    "description": "Coleção v3.6.0 do serviço único (REST online na raiz + offline em /api/*).\n\n**Rastreabilidade:** cada request tem ID (BC-xxx funcional, NEG-xxx negativo, SMK smoke) ligado à matriz de rastreabilidade e aos critérios T1–T10 em postman/README.md.\n\n**Smoke (pre-deploy, <5min):** `newman run ... --folder 'SMK · Smoke (pre-deploy, < 5 min)'`\n**Regressão completa:** rodar a coleção inteira (ordem 00→NEG).\n\n**Catálogo de serviços:** as descrições citam IDs `C6-Sxx`/`SIC-Sxx` — o catálogo completo de serviços de cada banco (inclusive não implementados) vive em docs/development/<banco>-rest.md, seção \"Serviços do banco × Cobranca-API\".\n\n**Fixtures:** os uploads usam postman/fixtures/ do repositório — rodar newman a partir da raiz do repo (Postman UI: Working Directory = raiz do repo).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -45,7 +45,7 @@
     },
     {
       "key": "cob_utils",
-      "value": "// ==== Utils da coleção (funções planas: escopo compartilhado coleção->request; \n// NÃO usar globalThis — o sandbox do newman não suporta) ====\nfunction novoTxid(p) { return (p + Date.now() + 'XXXXXXXXXX').replace(/[^a-zA-Z0-9]/g, 'X').slice(0, 30); }\nfunction novoExtRef() { return Array.from({length: 26}, function () { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]; }).join(''); }\nfunction saveToken(varName, ativo) {\n  const t = pm.response.json().token;\n  pm.expect(t).to.match(/^bapi_/);\n  pm.environment.set(varName, t);\n  if (ativo) pm.environment.set('bapi_token', t);\n}\nfunction saveIfPresent(varName, field) {\n  try { const v = pm.response.json()[field]; if (v) pm.environment.set(varName, String(v)); } catch (e) {}\n}\nfunction assertPdfBinario() {\n  pm.test('status 200', () => pm.response.to.have.status(200));\n  pm.test('content-type pdf', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('pdf'));\n  pm.test('magic bytes %PDF', () => pm.expect(pm.response.text().substring(0, 4)).to.eql('%PDF'));\n  ['X-Nosso-Numero', 'X-Nosso-Numero-Formatado', 'X-Nosso-Numero-DV', 'X-Codigo-Barras', 'X-Linha-Digitavel']\n    .forEach(h => pm.test('header ' + h, () => pm.expect(pm.response.headers.has(h)).to.be.true));\n  pm.test('sem content-encoding residual (T2)', () => pm.expect(pm.response.headers.has('Content-Encoding')).to.be.false);\n}\nfunction assertCamposNossoNumero() {\n  const b = pm.response.json();\n  ['nosso_numero', 'nosso_numero_formatado', 'nosso_numero_dv', 'codigo_barras', 'linha_digitavel']\n    .forEach(c => pm.test('campo ' + c, () => pm.expect(b).to.have.property(c)));\n}\n\n// ---- status esperado, com 424/422 sensivel a CREDENCIAL ---------------------\n// Regra por banco:\n//   C6     -> exige TODAS (client_id, client_secret, pfx_base64, pfx_password).\n//   Sicoob -> client_id + UMA das duas vias:\n//               (a) access_token  (sandbox, dispensa OAuth/mTLS)\n//               (b) client_secret + pfx_base64 + pfx_password  (OAuth + mTLS)\n//             NENHUMA das duas = ERRO GRAVE (nao e aviso: e ma configuracao).\n// 424/422-por-credencial com credencial AUSENTE -> AVISO nomeando o que falta.\n// Com a credencial PRESENTE                     -> FALHA (erro real do banco).\nvar CRED_BANCO = {\n  C6: {\n    obrigatorias: ['c6_client_id', 'c6_client_secret', 'c6_pfx_base64'],\n    vias: []\n  },\n  SICOOB: {\n    obrigatorias: ['sicoob_client_id'],\n    vias: [\n      { nome: 'access_token (sandbox)', chaves: ['sicoob_access_token'] },\n      { nome: 'OAuth+mTLS', chaves: ['sicoob_client_secret', 'sicoob_pfx_base64'] }\n    ]\n  }\n};\nfunction vazia(k) { return !pm.variables.get(k); }\n// Diagnostico de um banco: { faltam: [...], grave: bool }\nfunction diagnosticoBanco(banco) {\n  var def = CRED_BANCO[banco];\n  if (!def) { return { faltam: [], grave: false }; }\n  var faltam = def.obrigatorias.filter(vazia);\n  if (def.vias.length) {\n    var completa = def.vias.filter(function (v) { return v.chaves.every(function (k) { return !vazia(k); }); });\n    if (!completa.length) {\n      // nenhuma via satisfeita: e ma configuracao, nao so ausencia\n      var parcial = def.vias.some(function (v) { return v.chaves.some(function (k) { return !vazia(k); }); });\n      def.vias.forEach(function (v) { faltam = faltam.concat(v.chaves.filter(vazia)); });\n      return { faltam: faltam, grave: true, parcial: parcial,\n               vias: def.vias.map(function (v) { return v.nome; }) };\n    }\n  }\n  return { faltam: faltam, grave: false };\n}\nfunction expandeRequisitos(requer) {\n  var out = [];\n  (requer || []).forEach(function (k) {\n    if (k === 'C6' || k === 'SICOOB') { out = out.concat(diagnosticoBanco(k).faltam); return; }\n    if (k === 'BANCO') {\n      out = out.concat(diagnosticoBanco((pm.variables.get('provider') || 'c6').toUpperCase()).faltam);\n      return;\n    }\n    if (vazia(k)) { out.push(k); }\n  });\n  return out.filter(function (v, i, a) { return a.indexOf(v) === i; });\n}\nfunction faltantesDe(requer) { return expandeRequisitos(requer); }\nfunction registraAviso(nomes) {\n  var a = JSON.parse(pm.environment.get('avisos_cred') || '[]');\n  a.push({ req: pm.info.requestName, faltam: nomes });\n  pm.environment.set('avisos_cred', JSON.stringify(a));\n}\nfunction statusEsperado(esperados, requer) {\n  var code = pm.response.code;\n  var faltam = faltantesDe(requer);\n  var corpo = '';\n  try { corpo = pm.response.text() || ''; } catch (e) { corpo = ''; }\n  var porCredencial = (code === 424) || (code === 422 && /ausente|obrigat|credenc/i.test(corpo));\n  if (porCredencial && faltam.length) {\n    registraAviso(faltam);\n    console.log('AVISO ' + code + ' em ' + pm.info.requestName + ' -> FALTA: ' + faltam.join(', '));\n    pm.test('AVISO . ' + code + ' por credencial ausente: ' + faltam.join(', '),\n      function () { return true; });\n    return;\n  }\n  pm.test('status em [' + esperados.join(', ') + ']', function () {\n    pm.expect(esperados, code === 424\n      ? 'credencial configurada e AINDA ASSIM rejeitada pelo banco - erro real'\n      : 'status inesperado').to.include(code);\n  });\n}"
+      "value": "// ==== Utils da coleção (funções planas: escopo compartilhado coleção->request; \n// NÃO usar globalThis — o sandbox do newman não suporta) ====\nfunction novoTxid(p) { return (p + Date.now() + 'XXXXXXXXXX').replace(/[^a-zA-Z0-9]/g, 'X').slice(0, 30); }\nfunction novoExtRef() { return Array.from({length: 26}, function () { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]; }).join(''); }\nfunction saveToken(varName, ativo) {\n  const t = pm.response.json().token;\n  pm.expect(t).to.match(/^bapi_/);\n  pm.environment.set(varName, t);\n  if (ativo) pm.environment.set('bapi_token', t);\n}\nfunction saveIfPresent(varName, field) {\n  try { const v = pm.response.json()[field]; if (v) pm.environment.set(varName, String(v)); } catch (e) {}\n}\nfunction assertPdfBinario() {\n  pm.test('status 200', () => pm.response.to.have.status(200));\n  pm.test('content-type pdf', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('pdf'));\n  pm.test('magic bytes %PDF', () => pm.expect(pm.response.text().substring(0, 4)).to.eql('%PDF'));\n  ['X-Nosso-Numero', 'X-Nosso-Numero-Formatado', 'X-Nosso-Numero-DV', 'X-Codigo-Barras', 'X-Linha-Digitavel']\n    .forEach(h => pm.test('header ' + h, () => pm.expect(pm.response.headers.has(h)).to.be.true));\n  pm.test('sem content-encoding residual (T2)', () => pm.expect(pm.response.headers.has('Content-Encoding')).to.be.false);\n}\nfunction assertCamposNossoNumero() {\n  const b = pm.response.json();\n  ['nosso_numero', 'nosso_numero_formatado', 'nosso_numero_dv', 'codigo_barras', 'linha_digitavel']\n    .forEach(c => pm.test('campo ' + c, () => pm.expect(b).to.have.property(c)));\n}\n\n// ---- status esperado, com 424/422 sensivel a CREDENCIAL ---------------------\n// Regra por banco:\n//   C6     -> exige TODAS (client_id, client_secret, pfx_base64, pfx_password).\n//   Sicoob -> client_id + UMA das duas vias:\n//               (a) access_token  (sandbox, dispensa OAuth/mTLS)\n//               (b) client_secret + pfx_base64 + pfx_password  (OAuth + mTLS)\n//             NENHUMA das duas = ERRO GRAVE (nao e aviso: e ma configuracao).\n// 424/422-por-credencial com credencial AUSENTE -> AVISO nomeando o que falta.\n// Com a credencial PRESENTE                     -> FALHA (erro real do banco).\nvar CRED_BANCO = {\n  INTER: {\n    // client_id + client_secret + material de certificado em UMA das duas\n    // formas (par PEM ou PKCS12) — o mesmo que o /bancos publica no esquema.\n    obrigatorias: ['inter_client_id', 'inter_client_secret'],\n    vias: [\n      { nome: 'par PEM (.crt + .key)', chaves: ['inter_cert_pem', 'inter_key_pem'] },\n      { nome: 'PKCS12', chaves: ['inter_pfx_base64'] }\n    ]\n  },\n  C6: {\n    obrigatorias: ['c6_client_id', 'c6_client_secret', 'c6_pfx_base64'],\n    vias: []\n  },\n  SICOOB: {\n    obrigatorias: ['sicoob_client_id'],\n    vias: [\n      { nome: 'access_token (sandbox)', chaves: ['sicoob_access_token'] },\n      { nome: 'OAuth+mTLS', chaves: ['sicoob_client_secret', 'sicoob_pfx_base64'] }\n    ]\n  }\n};\nfunction vazia(k) { return !pm.variables.get(k); }\n// Diagnostico de um banco: { faltam: [...], grave: bool }\nfunction diagnosticoBanco(banco) {\n  var def = CRED_BANCO[banco];\n  if (!def) { return { faltam: [], grave: false }; }\n  var faltam = def.obrigatorias.filter(vazia);\n  if (def.vias.length) {\n    var completa = def.vias.filter(function (v) { return v.chaves.every(function (k) { return !vazia(k); }); });\n    if (!completa.length) {\n      // nenhuma via satisfeita: e ma configuracao, nao so ausencia\n      var parcial = def.vias.some(function (v) { return v.chaves.some(function (k) { return !vazia(k); }); });\n      def.vias.forEach(function (v) { faltam = faltam.concat(v.chaves.filter(vazia)); });\n      return { faltam: faltam, grave: true, parcial: parcial,\n               vias: def.vias.map(function (v) { return v.nome; }) };\n    }\n  }\n  return { faltam: faltam, grave: false };\n}\nfunction expandeRequisitos(requer) {\n  var out = [];\n  (requer || []).forEach(function (k) {\n    // Qualquer banco do CRED_BANCO, e nao uma lista fixa: com a lista fixa,\n    // banco novo (INTER) caia no ramo generico e o aviso dizia 'FALTA: INTER'\n    // em vez de nomear as variaveis que faltam.\n    if (CRED_BANCO[k]) { out = out.concat(diagnosticoBanco(k).faltam); return; }\n    if (k === 'BANCO') {\n      out = out.concat(diagnosticoBanco((pm.variables.get('provider') || 'c6').toUpperCase()).faltam);\n      return;\n    }\n    if (vazia(k)) { out.push(k); }\n  });\n  return out.filter(function (v, i, a) { return a.indexOf(v) === i; });\n}\nfunction faltantesDe(requer) { return expandeRequisitos(requer); }\nfunction registraAviso(nomes) {\n  var a = JSON.parse(pm.environment.get('avisos_cred') || '[]');\n  a.push({ req: pm.info.requestName, faltam: nomes });\n  pm.environment.set('avisos_cred', JSON.stringify(a));\n}\nfunction statusEsperado(esperados, requer) {\n  var code = pm.response.code;\n  var faltam = faltantesDe(requer);\n  var corpo = '';\n  try { corpo = pm.response.text() || ''; } catch (e) { corpo = ''; }\n  var porCredencial = (code === 424) || (code === 422 && /ausente|obrigat|credenc/i.test(corpo));\n  if (porCredencial && faltam.length) {\n    registraAviso(faltam);\n    console.log('AVISO ' + code + ' em ' + pm.info.requestName + ' -> FALTA: ' + faltam.join(', '));\n    pm.test('AVISO . ' + code + ' por credencial ausente: ' + faltam.join(', '),\n      function () { return true; });\n    return;\n  }\n  pm.test('status em [' + esperados.join(', ') + ']', function () {\n    pm.expect(esperados, code === 424\n      ? 'credencial configurada e AINDA ASSIM rejeitada pelo banco - erro real'\n      : 'status inesperado').to.include(code);\n  });\n}"
     },
     {
       "key": "tenant_id",
@@ -101,7 +101,7 @@
     },
     {
       "key": "boleto_data_json",
-      "value": "{\"valor\": 1500.0, \"cedente\": \"Aurora Servicos Empresariais LTDA\", \"documento_cedente\": \"47816329000199\", \"sacado\": \"Vitória Gabriela Emanuelly Ramos\", \"sacado_documento\": \"77044362109\", \"sacado_endereco\": \"Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia, GO, CEP 74360390\", \"agencia\": \"3073\", \"conta_corrente\": \"12345678\", \"convenio\": \"1234567\", \"carteira\": \"18\", \"nosso_numero\": \"123\", \"numero_documento\": \"CTR-2025-001\", \"data_vencimento\": \"2027-12-30\", \"instrucoes\": \"Apos o vencimento, cobrar multa de 2% e juros de mora de 1% ao mes, pro rata die.\\nConceder desconto de R$ 50,00 para pagamento efetuado ate 5 dias antes do vencimento.\\nNao receber apos 30 dias corridos do vencimento; decorrido o prazo, protestar o titulo.\\nHavendo divergencia com o contrato n. CTR-2026-0417, prevalece o instrumento contratual.\\nDuvidas: setor financeiro, telefone (11) 3679-2380, dias uteis das 9h as 18h.\\nPagavel em qualquer instituicao financeira do pais ate a data de vencimento.\"}"
+      "value": "{\"valor\": 1500.0, \"cedente\": \"Aurora Servicos Empresariais LTDA\", \"documento_cedente\": \"47816329000199\", \"sacado\": \"Vitória Gabriela Emanuelly Ramos\", \"sacado_documento\": \"77044362109\", \"sacado_endereco\": \"Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia, GO, CEP 74360390\", \"agencia\": \"3073\", \"conta_corrente\": \"12345678\", \"convenio\": \"1234567\", \"carteira\": \"18\", \"nosso_numero\": \"123\", \"numero_documento\": \"CTR-2025-001\", \"data_vencimento\": \"2027-12-30\", \"instrucoes\": \"Apos o vencimento, multa de 2% e juros de 1% ao mes.\\nDesconto de R$ 50,00 ate 5 dias antes do vencimento.\\nNao receber apos 30 dias; decorrido o prazo, protestar.\\nPrevalece o contrato n. CTR-2026-0417 em caso de duvida.\\nDuvidas: financeiro, (11) 3679-2380, dias uteis 9h-18h.\\nPagavel em qualquer banco ate a data de vencimento.\"}"
     },
     {
       "key": "cnpj_alfanumerico",
@@ -799,16 +799,21 @@
                   "    pm.expect(['on', 'off'], x.id).to.include(x.caminho_efetivo);",
                   "  });",
                   "});",
-                  "// O Inter não tem layout 077 na engine: o catálogo diz que não há para onde cair.",
+                  "// O Inter não tinha layout 077 na engine e o catálogo dizia que não havia para",
+                  "// onde cair. A pyCobrança 1.1.1 implementou o 077: ele passa a existir nos dois",
+                  "// caminhos, como C6, Sicoob e Itaú.",
                   "const inter = b.bancos.find((x) => x.id === 'inter');",
-                  "pm.test('Inter sem fallback offline', () => pm.expect(inter.fallback_offline).to.be.null);"
+                  "pm.test('Inter cai no próprio layout offline', () =>",
+                  "  pm.expect(inter.fallback_offline).to.eql('inter'));",
+                  "pm.test('Inter existe nos dois caminhos', () =>",
+                  "  pm.expect(inter.caminhos).to.eql(['on', 'off']));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "BC-005 · Catálogo offline (18 bancos CNAB)",
+          "name": "BC-005 · Catálogo offline (19 bancos CNAB)",
           "request": {
             "method": "GET",
             "header": [],
@@ -969,6 +974,75 @@
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
                   "pm.test('201 + token bapi_', () => { pm.response.to.have.status(201); saveToken('bapi_token_sicoob', false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-094 · Cadastrar credenciais Inter → token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/credenciais",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credenciais"
+              ]
+            },
+            "description": "O Inter entrega o certificado como par `.crt` + `.key`; o PKCS12 é alternativa. Manda-se um OU outro — nunca campos vazios, que fariam o handshake falhar com erro que não se parece com 'falta certificado'.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"inter\",\n  \"credentials\": {{inter_credentials_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "// Só o que estiver preenchido: campo de certificado VAZIO é pior que",
+                  "// ausente — o provider tenta o mTLS com material vazio e o erro sai do",
+                  "// handshake, longe da causa.",
+                  "const creds = { client_id: pm.variables.get('inter_client_id'),",
+                  "                client_secret: pm.variables.get('inter_client_secret') };",
+                  "[['cert_pem', 'inter_cert_pem'], ['key_pem', 'inter_key_pem'],",
+                  " ['pfx_base64', 'inter_pfx_base64'], ['pfx_password', 'inter_pfx_password']]",
+                  "  .forEach(function (par) {",
+                  "    const v = pm.variables.get(par[1]);",
+                  "    if (v) { creds[par[0]] = v; }",
+                  "  });",
+                  "pm.variables.set('inter_credentials_json', JSON.stringify(creds));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([201], [\"INTER\"]);",
+                  "if (pm.response.code === 201) { saveToken('bapi_token_inter', false); }"
                 ]
               }
             }
@@ -1702,6 +1776,336 @@
                   "// até a 3.0.0 — se divergirem, a migração quebra quem já integrou.",
                   "pm.test('código de barras do banco pedido', () =>",
                   "  pm.expect(b.codigo_barras).to.be.a('string').with.lengthOf(44));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-095 · Spec offline em JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/openapi.json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "openapi.json"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('e uma spec OpenAPI', () => pm.expect(pm.response.json()).to.have.property('openapi'));",
+                  "pm.test('tem paths', () => pm.expect(Object.keys(pm.response.json().paths).length).to.be.above(10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-096 · Spec offline em YAML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/openapi.yaml",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "openapi.yaml"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('content-type YAML', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('yaml'));",
+                  "pm.test('mesma spec do JSON', () => pm.expect(pm.response.text()).to.include('openapi:'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-097 · Render boleto (JSON + PDF base64)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/render/boleto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "render",
+                "boleto"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"{{bank_offline}}\",\n  \"data\": {{boleto_data_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('linha digitavel', () => pm.expect(b.linha_digitavel).to.match(/^[0-9. ]+$/));",
+                  "pm.test('PDF embutido', () => pm.expect(b.pdf_base64.length).to.be.above(1000));",
+                  "pm.test('diz se o QR liquida', () => pm.expect(b).to.have.property('pix_vinculado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-098 · Render carnê (2 parcelas)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/render/carne",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "render",
+                "carne"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"{{bank_offline}}\",\n  \"boletos\": [\n    {\"valor\": 750.0, \"cedente\": \"{{cedente}}\", \"documento_cedente\": \"{{documento_cedente}}\", \"sacado\": \"{{pagador_nome}}\", \"sacado_documento\": \"{{pagador_documento}}\", \"agencia\": \"{{agencia_offline}}\", \"conta_corrente\": \"{{conta_offline}}\", \"convenio\": \"{{convenio_offline}}\", \"carteira\": \"{{carteira_offline}}\", \"nosso_numero\": \"1231\", \"numero_documento\": \"CTR-P1\", \"data_vencimento\": \"2027-12-30\"},\n    {\"valor\": 750.0, \"cedente\": \"{{cedente}}\", \"documento_cedente\": \"{{documento_cedente}}\", \"sacado\": \"{{pagador_nome}}\", \"sacado_documento\": \"{{pagador_documento}}\", \"agencia\": \"{{agencia_offline}}\", \"conta_corrente\": \"{{conta_offline}}\", \"convenio\": \"{{convenio_offline}}\", \"carteira\": \"{{carteira_offline}}\", \"nosso_numero\": \"1232\", \"numero_documento\": \"CTR-P2\", \"data_vencimento\": \"2027-12-30\"}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('duas parcelas', () => pm.expect(b.itens.length).to.eql(2));",
+                  "pm.test('PDF do carne', () => pm.expect(b.pdf_base64.length).to.be.above(1000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-099 · Render fatura com itens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/render/fatura",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "render",
+                "fatura"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"{{bank_offline}}\",\n  \"data\": {{boleto_data_json}},\n  \"fatura\": {\"itens\": [{\"descricao\": \"Mensalidade 12/2027\", \"valor\": \"1.500,00\"}]}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('linha digitavel', () => pm.expect(b.linha_digitavel).to.match(/^[0-9. ]+$/));",
+                  "pm.test('PDF da fatura', () => pm.expect(b.pdf_base64.length).to.be.above(1000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-100 · Render remessa (JSON, sem multipart)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/render/remessa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "render",
+                "remessa"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"banco_brasil\",\n  \"type\": \"cnab240\",\n  \"data\": {\n    \"empresa_mae\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\",\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"digito_conta\": \"0\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"variacao_carteira\": \"017\",\n    \"sequencial_remessa\": 1,\n    \"pagamentos\": [{\"nosso_numero\": \"123456789\", \"numero_documento\": \"CTR-1\", \"valor\": 1500.0, \"data_vencimento\": \"2027-12-30\", \"sacado\": \"{{pagador_nome}}\", \"sacado_documento\": \"{{pagador_documento}}\", \"sacado_endereco\": \"Rua Padre Feijo, 873\", \"sacado_bairro\": \"Jardim Vila Boa\", \"sacado_cidade\": \"Goiania\", \"sacado_uf\": \"GO\", \"sacado_cep\": \"74360390\"}]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('CNAB no corpo JSON', () => pm.expect(pm.response.json().cnab.length).to.be.above(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-101 · Lote multi-banco num PDF só",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/boleto/multi",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "boleto",
+                "multi"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "data",
+                  "type": "file",
+                  "src": "postman/fixtures/boletos_multi_bb.json",
+                  "description": "Dois boletos, cada um com o seu `bank` (BB e Sicoob)"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Lote NAO tem X-Nosso-Numero: sao varios boletos num PDF so, e",
+                  "// nenhum numero unico descreve o arquivo. `assertPdfBinario()` confere",
+                  "// esses headers e por isso nao serve aqui.",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('e PDF', () => pm.expect(pm.response.stream.slice(0,4).toString()).to.eql('%PDF'));",
+                  "pm.test('PDF do lote, maior que o de um boleto', () => pm.expect(pm.response.responseSize).to.be.above(20000));",
+                  "pm.test('sem header de boleto unico', () => pm.expect(pm.response.headers.get('X-Nosso-Numero')).to.be.undefined);"
                 ]
               }
             }
@@ -3829,7 +4233,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"template\": \"moderno\",\n  \"boletos\": [\n    {\n      \"bank\": \"{{bank_offline}}\",\n      \"external_id\": \"ITEM-1\",\n      \"valor\": \"{{valor}}\",\n      \"vencimento\": \"{{vencimento}}\",\n      \"cedente\": \"{{cedente}}\",\n      \"documento_cedente\": \"{{documento_cedente}}\",\n      \"sacado\": \"{{pagador_nome}}\",\n      \"sacado_documento\": \"{{pagador_documento}}\",\n      \"agencia\": \"{{agencia_offline}}\",\n      \"conta_corrente\": \"{{conta_offline}}\",\n      \"convenio\": \"{{convenio_offline}}\",\n      \"carteira\": \"{{carteira_offline}}\",\n      \"nosso_numero\": \"123\",\n      \"data_vencimento\": \"2027-12-30\"\n    },\n    {\n      \"bank\": \"{{bank_offline}}\",\n      \"external_id\": \"ITEM-INVALIDO\"\n    }\n  ]\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"template\": \"moderno\",\n  \"boletos\": [\n    {\n      \"bank\": \"{{bank_offline}}\",\n      \"external_id\": \"ITEM-1\",\n      \"valor\": \"{{valor}}\",\n      \"cedente\": \"{{cedente}}\",\n      \"documento_cedente\": \"{{documento_cedente}}\",\n      \"sacado\": \"{{pagador_nome}}\",\n      \"sacado_documento\": \"{{pagador_documento}}\",\n      \"agencia\": \"{{agencia_offline}}\",\n      \"conta_corrente\": \"{{conta_offline}}\",\n      \"convenio\": \"{{convenio_offline}}\",\n      \"carteira\": \"{{carteira_offline}}\",\n      \"nosso_numero\": \"123\",\n      \"data_vencimento\": \"2027-12-30\"\n    },\n    {\n      \"bank\": \"{{bank_offline}}\",\n      \"external_id\": \"ITEM-INVALIDO\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5769,6 +6173,287 @@
       ]
     },
     {
+      "name": "13 · Coleção de cobranças (Inter)",
+      "description": "`GET /cobrancas` e `/cobrancas/sumario` — a coleção que a API não sabia devolver. Hoje só o Inter as publica.",
+      "item": [
+        {
+          "name": "BC-092 · Coleção de cobranças do período (Inter)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/cobrancas?tenant_id={{tenant_id}}&provider=inter&inicio=2026-01-01&fim=2026-01-31&pagina=1&tamanho=25&situacao=A_RECEBER",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobrancas"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "inter"
+                },
+                {
+                  "key": "inicio",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "fim",
+                  "value": "2026-01-31"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "tamanho",
+                  "value": "25"
+                },
+                {
+                  "key": "situacao",
+                  "value": "A_RECEBER"
+                }
+              ]
+            },
+            "description": "Coleção de boletos do período. Só o Inter publica esta rota; nos demais bancos ela responde 422 dizendo quem oferece (NEG-012). `pagina` começa em 1 e o gateway converte para a base 0 do Inter.",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_inter}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "// Sem token do Inter não há o que exercitar: sem este pulo a requisição",
+                  "// sairia com `Bearer ` vazio e o 401 esconderia a causa (credencial",
+                  "// ausente no ambiente, não token inválido).",
+                  "if (!pm.variables.get('bapi_token_inter')) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName);",
+                  "  pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (sem credencial do Inter)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200], [\"INTER\"]);",
+                  "if (pm.response.code === 200) {",
+                  "  const b = pm.response.json();",
+                  "  pm.test('corpo do banco (passthrough)', () => pm.expect(b).to.have.property('cobrancas'));",
+                  "  pm.test('cobrancas é lista', () => pm.expect(b.cobrancas).to.be.an('array'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BC-093 · Sumário de cobranças do período (Inter)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/cobrancas/sumario?tenant_id={{tenant_id}}&provider=inter&inicio=2026-01-01&fim=2026-01-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobrancas",
+                "sumario"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "inter"
+                },
+                {
+                  "key": "inicio",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "fim",
+                  "value": "2026-01-31"
+                }
+              ]
+            },
+            "description": "Totais do período por situação, sem paginar. O Inter devolve array na raiz e o gateway o embrulha em `sumario` — array na raiz não tem onde crescer.",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bapi_token_inter}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "// Sem token do Inter não há o que exercitar: sem este pulo a requisição",
+                  "// sairia com `Bearer ` vazio e o 401 esconderia a causa (credencial",
+                  "// ausente no ambiente, não token inválido).",
+                  "if (!pm.variables.get('bapi_token_inter')) {",
+                  "  const _p = JSON.parse(pm.environment.get('pulados') || '[]');",
+                  "  _p.push(pm.info.requestName);",
+                  "  pm.environment.set('pulados', JSON.stringify(_p));",
+                  "  console.log('PULADO: ' + pm.info.requestName + ' (sem credencial do Inter)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200], [\"INTER\"]);",
+                  "if (pm.response.code === 200) {",
+                  "  const b = pm.response.json();",
+                  "  // O Inter devolve array na raiz; o gateway embrulha em `sumario`.",
+                  "  pm.test('totais em sumario', () => pm.expect(b.sumario).to.be.an('array'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "NEG-012 · Coleção em banco que não tem → 422",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cobrancas?tenant_id={{tenant_id}}&provider={{provider}}&inicio=2026-01-01&fim=2026-01-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobrancas"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "{{provider}}"
+                },
+                {
+                  "key": "inicio",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "fim",
+                  "value": "2026-01-31"
+                }
+              ]
+            },
+            "description": "C6 e Sicoob tratam um título por vez. A rota existe para todos e recusa com 422 nomeando quem oferece — nunca 500, nunca 200 vazio."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('diz quem oferece', () => pm.expect(pm.response.text()).to.include('inter'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "NEG-013 · Período invertido na coleção → 422",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/cobrancas?tenant_id={{tenant_id}}&provider=inter&inicio=2026-01-31&fim=2026-01-01",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "cobrancas"
+              ],
+              "query": [
+                {
+                  "key": "tenant_id",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "provider",
+                  "value": "inter"
+                },
+                {
+                  "key": "inicio",
+                  "value": "2026-01-31"
+                },
+                {
+                  "key": "fim",
+                  "value": "2026-01-01"
+                }
+              ]
+            },
+            "description": "Conferido ANTES da ida ao banco — e por isso este caso roda sem credencial do Inter. No banco, período invertido volta lista vazia, que quem chama lê como ausência de movimento."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('não foi ao banco', () => pm.expect(pm.response.text()).to.include('invertido'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "HML · Roteiro de homologação C6 v3.0",
       "item": [
         {
@@ -6878,7 +7563,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "statusEsperado([200, 201, 424], [\"C6\"]);"
+                  "statusEsperado([200, 201, 424], [\"C6\", \"chave_pix\"]);"
                 ]
               }
             },
@@ -7744,7 +8429,7 @@
           ]
         },
         {
-          "name": "NEG-009 · caminho off no Inter → 422",
+          "name": "BC-090 · Inter no caminho off (19º banco) → 201",
           "request": {
             "method": "POST",
             "header": [
@@ -7762,13 +8447,13 @@
                 "cobranca"
               ]
             },
-            "description": "A engine não tem o layout 077. Emitir por outro banco seria registrar a cobrança no lugar errado — falha silenciosa e cara.",
+            "description": "O Inter era o único banco com caminho `on` e sem `off`, porque a engine não tinha o layout 077 — e a recusa era o certo: cair em outro banco registraria a cobrança no lugar errado. A pyCobrança 1.1.1 implementou o 077 (boleto, remessa e retorno CNAB 400), então o `off` passa a existir. Conta literal e não variável de ambiente: a carteira do Inter é a 110 e o nosso número tem 10 dígitos — as variáveis `*_offline` são do Banco do Brasil.",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"inter\",\n  \"account_config\": {\n    \"agencia\": \"{{agencia_offline}}\",\n    \"conta_corrente\": \"{{conta_offline}}\",\n    \"convenio\": \"{{convenio_offline}}\",\n    \"carteira\": \"{{carteira_offline}}\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"123\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"provider\": \"off\",\n  \"banco\": \"inter\",\n  \"account_config\": {\n    \"agencia\": \"0001\",\n    \"conta_corrente\": \"123456\",\n    \"convenio\": \"123456\",\n    \"carteira\": \"110\",\n    \"cedente\": \"{{cedente}}\",\n    \"documento_cedente\": \"{{documento_cedente}}\"\n  },\n  \"cobranca\": {\n    \"valor\": \"{{valor}}\",\n    \"vencimento\": \"{{vencimento}}\",\n    \"nosso_numero\": \"1234567890\",\n    \"seu_numero\": \"{{seu_numero}}\",\n    \"pagador\": {\n      \"nome\": \"{{pagador_nome}}\",\n      \"documento\": \"{{pagador_documento}}\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -7784,9 +8469,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
-                  "pm.test('status 422', () => pm.response.to.have.status(422));",
-                  "pm.test('não emite por outro banco', () =>",
-                  "  pm.expect(pm.response.json().detail).to.include(\"caminho 'off'\"));"
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('emitiu pelo layout DO INTER', () =>",
+                  "  pm.expect(b.codigo_barras).to.be.a('string').and.to.match(/^077/));",
+                  "pm.test('linha digitável do 077', () =>",
+                  "  pm.expect(b.linha_digitavel).to.be.a('string').and.to.match(/^0779/));"
                 ]
               }
             }
@@ -7847,6 +8535,57 @@
       "name": "ZZ · Encerramento",
       "description": "Roda por ÚLTIMO: revoga o token ativo (invalida o Bearer da run).",
       "item": [
+        {
+          "name": "BC-091 · Consultar credencial e validade do certificado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/credenciais",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credenciais"
+              ]
+            },
+            "description": "O que está guardado sob o token, SEM o segredo. Responde a pergunta que a API não sabia responder: quando a integração para de funcionar. O certificado mTLS dos bancos vale um ano e não tem renovação in-place — vence e toda chamada falha no handshake de uma vez. Diz também QUAL certificado está em uso: o ambiente está no host dentro do CN (baas-api-sandbox × baas-api), e carregar o do ambiente errado só aparecia no primeiro handshake."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('cob_utils'));  // utils portáveis (newman isola escopos)",
+                  "statusEsperado([200, 401]);",
+                  "// So valida o CORPO quando houve sucesso: sem token valido nao ha payload.",
+                  "if (pm.response.code === 200) {",
+                  "  const b = pm.response.json();",
+                  "  pm.test('o token volta mascarado', () =>",
+                  "    pm.expect(b.token).to.match(/^bapi_\\*+$/));",
+                  "  pm.test('o segredo do banco nao sai na resposta', () => {",
+                  "    const corpo = JSON.stringify(b);",
+                  "    pm.expect(corpo).to.not.include('PRIVATE KEY');",
+                  "    pm.expect(corpo).to.not.include('client_secret');",
+                  "  });",
+                  "  if (b.certificado) {",
+                  "    pm.test('situacao do certificado e conhecida', () =>",
+                  "      pm.expect(['ok', 'expirando', 'expirado', 'ilegivel']).to.include(b.certificado.situacao));",
+                  "    pm.test('certificado nao vencido', () =>",
+                  "      pm.expect(b.certificado.situacao).to.not.eql('expirado'));",
+                  "    if (b.certificado.par_confere !== null && b.certificado.par_confere !== undefined) {",
+                  "      pm.test('a chave privada e a deste certificado', () =>",
+                  "        pm.expect(b.certificado.par_confere).to.be.true);",
+                  "    }",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "BC-008 · Revogar token ativo",
           "request": {

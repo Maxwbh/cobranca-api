@@ -163,9 +163,31 @@ banco está desligado nesta instalação (`<BANCO>_REGISTERED_READY`), o caminho
 não basta para ela. Confira antes em `GET /bancos` — `registrado_pronto` e
 `caminho_efetivo` respondem por banco.
 
-## `p_provider`: caminho e banco
+## `p_provider` e `p_banco`: caminho e instituição
 
 A API separa os dois eixos: `provider` é o **caminho** (`on` = API do banco,
-`off` = engine pyCobrança) e `banco` é a **instituição**. Este pacote passa o
-nome do banco em `p_provider` (`'c6'`, `'sicoob'`) — apelido que a API aceita
-como `on` + `banco` e mantém até a **3.0.0**. Nada aqui precisa mudar agora.
+`off` = engine pyCobrança) e `banco` é a **instituição**.
+
+```sql
+-- registrado na API do banco
+l_cob := cobranca_api.registrar_cobranca(p_tenant => 'empresa1',
+           p_provider => 'on',  p_banco => 'c6', p_boleto => l_boleto, ...);
+
+-- gerado pela engine, sem convênio
+l_cob := cobranca_api.registrar_cobranca(p_tenant => 'empresa1',
+           p_provider => 'off', p_banco => 'banco_brasil', p_boleto => l_boleto, ...);
+```
+
+O nome do banco em `p_provider` (`'c6'`, `'sicoob'`, `'inter'`, `'itau'`) segue
+aceito como apelido de `on` + `banco`, e sai na **3.0.0** — chamada antiga não
+quebra. Mas o apelido existe **só para esses quatro**: `p_provider =>
+'banco_brasil'` responde `422`, e `'off'` sem `p_banco` também — a API pede o
+banco e lista os 19. Era por isso que o caminho offline não era alcançável por
+aqui; `p_banco` resolve, e vale igual em `cadastrar_credenciais`,
+`criar_checkout`, `consultar_checkout` e `cancelar_checkout`.
+
+As três funções de checkout traziam `p_provider DEFAULT 'c6'` — o apelido que
+sai na 3.0.0 —, então quem nunca passasse o parâmetro herdava a grafia antiga
+sem saber. Hoje o padrão é `p_provider => 'on'` com `p_banco => 'c6'`, que é o
+mesmo destino (medido: as duas formas chamam `POST /v1/checkouts/`) escrito no
+vocabulário que fica. Passar `p_provider => 'c6'` continua funcionando.

@@ -1,6 +1,9 @@
 # C6 Bank — Integração REST (boleto, Pix, conciliação)
 
-> Implementada no gateway Python (`gateway`), provider `c6`.
+> Implementada no gateway Python (`gateway`).
+> **Chamada:** `provider=on&banco=c6` — `provider` é o **caminho** (`on`/`off`) e
+> `banco` a instituição. O `provider=c6` segue valendo como apelido legado até a
+> 3.0.0, e é a forma que aparece nos exemplos antigos deste documento.
 > Integração irmã: [sicoob-rest.md](./sicoob-rest.md) — o Pix compartilha o
 > mesmo código BACEN (`app/providers/bacen_pix.py`).
 > Specs oficiais: seção [Onde baixar a documentação oficial](#onde-baixar-a-documentação-oficial).

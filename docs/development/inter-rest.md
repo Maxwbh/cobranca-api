@@ -4,6 +4,11 @@
 > `gateway/tests/test_cobranca_inter.py` e **validado no sandbox do banco** —
 > `scripts/homologacao_inter.py`, evidência em
 > [`evidencia-sandbox-inter.json`](../homologacao/evidencia-sandbox-inter.json).
+>
+> **Chamada:** `provider=on&banco=inter` (`provider=inter` segue valendo como
+> apelido legado até a 3.0.0). O Inter é o único sem caminho `off`: a engine não
+> tem o layout 077, e `provider=off&banco=inter` responde `422` em vez de emitir
+> no banco errado.
 
 O contrato abaixo não é suposição: foi extraído do **SDK oficial do banco**,
 [`inter-co/pj-sdk-java`](https://github.com/inter-co/pj-sdk-java) (`Constants.java`,
@@ -74,11 +79,12 @@ a validação vale integração ponta a ponta.
 | INT-S08 | Banking v2 — extrato | `GET /banking/v2/extrato` | ✅ | `GET /extrato` |
 | INT-S09 | Banking v2 — saldo | `GET /banking/v2/saldo` | 🔜 | Sem rota hoje (idem `SIC-S06`) |
 | INT-S10 | Banking v2 — pagamentos, DARF, lote, Pix pagamento | `/banking/v2/pagamento*` | ⛔ | Saída de dinheiro |
+| INT-S11 | Pix Automático (`rec`/`solicrec`/`cobr`/`locrec`) | `/pix/v2` — `/rec`, `/solicrec`, `/cobr`, `/locrec`, `/webhookrec`, `/webhookcobr` | ✅ | **Grátis** pelo `BacenPixAutomaticoMixin`: as 17 chamadas batem com a spec do banco. Exige CNPJ com 6+ meses (BACEN) |
 
-> **Pix Automático não consta no SDK oficial.** A versão anterior deste
-> documento o listava como planejado; não há `rec`/`solicrec`/`cobr` em
-> `pj-sdk-java`. Confirmar no portal antes de prometer — pode ser ausência do
-> SDK, não da API.
+> **Pix Automático não consta no SDK oficial.** Não há `rec`/`solicrec`/`cobr`
+> em `pj-sdk-java` — pode ser ausência do SDK, não da API. Enquanto não se
+> confirma, o catálogo **não anuncia** a capacidade: ver *O que falta*, item 1.
+> C6 (15 casos em 4 jornadas) e Sicoob (`PA_01`) estão confirmados no sandbox.
 
 ## Mapeamento — onde está o trabalho real
 
@@ -206,9 +212,61 @@ boleto sem Pix pede `formas_recebimento: "BOLETO"` explicitamente.
 
 ## O que falta
 
-1. **Pix Automático:** confirmar no portal se o Inter expõe `rec`/`solicrec`.
-2. **Alarme de vencimento do certificado** — o de sandbox vale 30 dias.
-2. **Confirmar no portal se o Pix Automático existe** — o provider herda o
-   mixin, então o dialeto está pronto, mas o SDK oficial não cobre `rec`.
-3. **Alarme de vencimento do certificado.** Vale 1 ano, sem renovação
-   in-place: vence e a integração para. É risco de operação.
+1. ~~Confirmar o Pix Automático no portal.~~ **Confirmado — a capacidade está
+   ligada.** A spec OpenAPI do próprio banco fecha a questão:
+
+   | | |
+   |---|---|
+   | path base | `/pix/v2` — **o mesmo** que `InterProvider.PIX_BASE` já usava |
+   | produção | `https://cdpj.partners.bancointer.com.br/pix/v2` |
+   | sandbox | `https://cdpj-sandbox.partners.uatinter.co/pix/v2` |
+   | recursos | `/rec`, `/solicrec`, `/cobr`, `/locrec`, `/webhookrec`, `/webhookcobr` |
+   | scopes | `rec.*`, `solicrec.*`, `cobr.*`, `webhookrec.*`, `webhookcobr.*`, `payloadlocationrec.*` |
+
+   **As 17 chamadas do `BacenPixAutomaticoMixin` existem na spec, uma a uma** —
+   zero divergências. A ausência no `pj-sdk-java` era do SDK, não do banco.
+
+   Faltava um detalhe que teria quebrado tudo em produção: o token do Inter
+   **não pedia nenhum** dos escopos do recurso. Paths certos e escopo faltando
+   dá `403` — falha que não se parece com "faltou escopo". Os doze entraram em
+   `INTER_SCOPES`.
+
+   > **Como chegar à spec.** A página de referência é SPA (Redocly) e não
+   > entrega os endpoints por fetch nem por `curl` — devolve a casca do
+   > catálogo. A URL sai do bundle `/assets/js/main.*.js`, onde o redocusaurus
+   > a declara:
+   > `https://developers.inter.co/redocusaurus/swagger-api-pix-automatico-yaml.yaml`
+   >
+   > O inventário extraído está versionado em
+   > `docs/homologacao/evidencia-pix-automatico-inter.json`, e um teste compara
+   > o mixin contra ele — sem rede, e sem depender de quem leu a página.
+
+   > ⚠️ **Restrição do BACEN, não da API:** o Pix Automático só é oferecido a
+   > **CNPJ com pelo menos 6 meses de atividade** (aviso no topo da referência).
+   > É recusa de cadastro, não erro de integração — sem isso registrado, a
+   > investigação começa pelo lugar errado.
+
+   **O que ainda falta:** exercitar no sandbox com credencial real. A spec traz
+   `/sandbox/rec/{idRec}/status`, `/sandbox/solicrec/{idRec}/status`,
+   `/sandbox/cobr/{txId}/status` e `/sandbox/cobr/pagamento` — dá para simular
+   autorização e pagamento de ponta a ponta, como foi feito no C6.
+
+2. **`INT-S05` — listar/sumário de cobranças.** Sem rota hoje; avaliar.
+
+   > **Ciclo `on`→`off` — resolvido.** O Inter é o único banco que existe nos
+   > dois caminhos com o mesmo layout, então dá para registrar no `on` e
+   > desenhar o PDF no `off` com o QR que liquida (`pix_copia_cola`). O risco
+   > era o número: o `registrar` daqui manda `seuNumero` e **nunca**
+   > `nossoNumero` — quem numera é o banco. Renderizar offline com o próprio
+   > número imprimia outro título, com `200`.
+   >
+   > `data.codigo_barras` e `data.linha_digitavel` agora são **conferidos**: se
+   > o cálculo local discordar do que o banco registrou, `400`. Use o
+   > `nossoNumero` que a consulta (`INT-S02`) devolve em `raw.boleto`.
+
+3. **`INT-S09` — saldo.** Lacuna de superfície, não do Inter: o gateway não
+   expõe saldo para banco nenhum (idem `SIC-S06`).
+
+4. **Alarme de vencimento do certificado.** Vale 1 ano, sem renovação in-place:
+   vence e a integração para. É risco de operação, e vale para C6 e Sicoob
+   também.

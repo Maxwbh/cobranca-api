@@ -8,7 +8,7 @@ from app.schemas import Status
 def sicoob_env(monkeypatch):
     monkeypatch.setenv("VAULT__empresa1__sicoob__client_id", "cid")
     monkeypatch.setenv("VAULT__empresa1__sicoob__client_secret", "sec")
-    # cobrança registrada do Sicoob pronta (senão cai no fallback brcobrança)
+    # cobrança registrada do Sicoob pronta (senão cai no fallback da engine offline)
     monkeypatch.setenv("SICOOB_REGISTERED_READY", "true")
 
 

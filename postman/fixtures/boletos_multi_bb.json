@@ -1,0 +1,35 @@
+[
+  {
+    "bank": "banco_brasil",
+    "cedente": "Aurora Servicos Empresariais LTDA",
+    "documento_cedente": "47816329000199",
+    "sacado": "Vitória Gabriela Emanuelly Ramos",
+    "sacado_documento": "77044362109",
+    "sacado_endereco": "Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia, GO",
+    "agencia": "3073",
+    "conta_corrente": "12345678",
+    "convenio": "1234567",
+    "carteira": "18",
+    "nosso_numero": "1231",
+    "numero_documento": "CTR-2025-001-P1",
+    "valor": 750.0,
+    "data_vencimento": "2027-12-30"
+  },
+  {
+    "bank": "sicoob",
+    "cedente": "Aurora Servicos Empresariais LTDA",
+    "documento_cedente": "47816329000199",
+    "sacado": "Vitória Gabriela Emanuelly Ramos",
+    "sacado_documento": "77044362109",
+    "sacado_endereco": "Rua Padre Feijó, 873, Jardim Vila Boa, Goiânia, GO",
+    "agencia": "3073",
+    "conta_corrente": "12345678",
+    "convenio": "123456",
+    "carteira": "1",
+    "variacao": "01",
+    "nosso_numero": "1232",
+    "numero_documento": "CTR-2025-001-P2",
+    "valor": 750.0,
+    "data_vencimento": "2027-12-30"
+  }
+]

@@ -1,7 +1,7 @@
 # Checkout C6 — link de pagamento com cartao.
 #
-# Cobre os cenarios BC-081..BC-087 e NEG-008..NEG-011 do
-# docs/development/plano-cenario-teste-postman-hml.md (secao 4.4).
+# Cobre os cenarios BC-081..BC-087 e NEG-008..NEG-011 da matriz de
+# rastreabilidade em postman/README.md (secao "Cartao no C6").
 #
 # Nao ha e2e de pagamento: ninguem paga link de cartao por script -- o PAN e
 # digitado na pagina do C6, e e exatamente isso que a decisao 3 quer. Chegar a
@@ -404,3 +404,103 @@ def test_credencial_no_request_nao_muda_a_identidade_do_pedido(client, c6_env, m
 
     assert r.status_code == 201
     assert len(calls) == 1
+
+
+# --- revisao de /checkout ---------------------------------------------------------
+
+def test_criacao_devolve_location_que_o_cliente_consegue_seguir(client, c6_env, monkeypatch):
+    """O 201 devolvia `id` e mais nada: montar a URL de consulta ficava por conta
+    de quem chama, adivinhando que `tenant_id`, `provider` e `banco` sao
+    obrigatorios la. Mesma correcao feita em /cobranca e /pix -- e aqui o teste
+    SEGUE o header, que e o unico jeito de saber que ele funciona."""
+    _capture(monkeypatch, _CRIADO)
+    r = client.post("/checkout", json={"tenant_id": "empresa1", "provider": "on",
+                                       "banco": "c6", "checkout": {"valor": "150.00"}})
+    assert r.status_code == 201, r.text
+    destino = r.headers["location"]
+    assert destino.startswith("/checkout/chk_1?")
+    seguido = client.get(destino)
+    assert seguido.status_code == 200, f"{destino} -> {seguido.status_code} {seguido.text}"
+    assert seguido.json()["id"] == "chk_1"
+
+
+def test_mesma_chave_em_outro_banco_nao_devolve_o_link_do_primeiro(client, monkeypatch):
+    """A impressao era so do `checkout`: `banco` e `provider` ficavam de fora.
+
+    Mesma chave, mesmo valor, OUTRO banco devolvia 201 com o link do primeiro e
+    nunca chamava o segundo -- a venda parecia ter ido para uma instituicao que
+    nao viu o pedido. Destino e identidade do pedido, nao detalhe de transporte."""
+    for banco in ("c6", "sicoob"):
+        monkeypatch.setenv(f"VAULT__empresa1__{banco}__client_id", "cid")
+        monkeypatch.setenv(f"VAULT__empresa1__{banco}__client_secret", "sec")
+        monkeypatch.setenv(f"{banco.upper()}_REGISTERED_READY", "true")
+    calls = _capture(monkeypatch, _CRIADO)
+    cab = {"Idempotency-Key": "k-banco"}
+    corpo = {"tenant_id": "empresa1", "provider": "on", "banco": "c6",
+             "checkout": {"valor": "10.00"}}
+
+    assert client.post("/checkout", json=corpo, headers=cab).status_code == 201
+    r = client.post("/checkout", json={**corpo, "banco": "sicoob"}, headers=cab)
+
+    assert r.status_code == 422, r.text
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("valor", ["0", "0.00", "-10.00"])
+def test_valor_zero_ou_negativo_nao_vira_link_de_pagamento(client, c6_env, monkeypatch, valor):
+    """`amount: -10.0` chegava a sair daqui para o banco. Link de pagamento com
+    valor nulo ou negativo nao e pedido possivel -- e a recusa e daqui, com o
+    nome do campo, nao um 400 do banco traduzido em 422 generico."""
+    calls = _capture(monkeypatch, _CRIADO)
+    r = client.post("/checkout", json=_body(valor=valor))
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "data:text/html,<script>x</script>",
+                                 "nao-e-url"])
+def test_redirect_url_sem_esquema_navegavel_e_recusada(client, c6_env, monkeypatch, url):
+    """Esta URL nao fica aqui: o banco a publica na pagina DELE, na frente de
+    quem esta digitando o cartao. Repassar `javascript:` era deixar esta API
+    escolher o que roda no dominio do banco."""
+    calls = _capture(monkeypatch, _CRIADO)
+    r = client.post("/checkout", json=_body(redirect_url=url))
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+def test_redirect_url_http_e_https_passam(client, c6_env, monkeypatch):
+    calls = _capture(monkeypatch, _CRIADO)
+    for url in ("https://loja.com.br/ok", "http://localhost:8080/ok"):
+        r = client.post("/checkout", json=_body(redirect_url=url))
+        assert r.status_code == 201, r.text
+    assert [c["json"]["redirect_url"] for c in calls] == [
+        "https://loja.com.br/ok", "http://localhost:8080/ok"]
+
+
+@pytest.mark.parametrize("campo,valor", [
+    ("save_card", True), ("card_number", "4111111111111111"), ("public_key", "x"),
+])
+def test_campo_fora_de_escopo_no_topo_do_corpo_tambem_e_recusado(client, c6_env, monkeypatch,
+                                                                 campo, valor):
+    """O `extra=forbid` so existia dentro de `checkout`. No nivel de cima o campo
+    era engolido com 201: o chamador concluia que mandou o PAN e que a API
+    aceitou. A promessa de que dado de cartao nao existe aqui so vale se o campo
+    for RECUSADO."""
+    calls = _capture(monkeypatch, _CRIADO)
+    r = client.post("/checkout", json={"tenant_id": "empresa1", "provider": "c6",
+                                       "checkout": {"valor": "1.00"}, campo: valor})
+    assert r.status_code == 422, r.text
+    assert calls == []
+
+
+def test_o_422_de_campo_recusado_nao_devolve_o_valor(client, c6_env):
+    """Recusar `card_number` e devolve-lo inteiro no corpo do erro troca um
+    problema por outro: o PAN sai daqui para o log de quem chamou. O nome do
+    campo basta para corrigir; o valor quem enviou ja tem."""
+    pan = "4111111111111111"
+    r = client.post("/checkout", json={"tenant_id": "empresa1", "provider": "c6",
+                                       "checkout": {"valor": "1.00"}, "card_number": pan})
+    assert r.status_code == 422
+    assert pan not in r.text
+    assert "card_number" in r.text

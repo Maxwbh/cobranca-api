@@ -56,12 +56,12 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
         return OAuthMtlsClient(
             base_url=SICOOB_BASE,
             auth_url=SICOOB_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             pfx_base64=self.credentials.get("pfx_base64", ""),
             pfx_password=self.credentials.get("pfx_password", ""),
             scopes=self.credentials.get("scopes", SICOOB_SCOPES),
-            default_headers={"client_id": self.credentials["client_id"]},  # Sicoob exige
+            default_headers={"client_id": self.credencial("client_id")},  # Sicoob exige
             static_token=self.credentials.get("access_token", ""),  # sandbox: token do portal
         )
 
@@ -91,6 +91,8 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
             linha_digitavel=res.get("linhaDigitavel"),
             codigo_barras=res.get("codigoBarras"),
             pix_copia_cola=res.get("pixCopiaECola") or res.get("qrCode"),  # boleto híbrido
+            # QR dinâmico do banco: liquida o título. Ver a nota em `c6.py`.
+            pix_vinculado=True if (res.get("pixCopiaECola") or res.get("qrCode")) else None,
             pdf_base64=res.get("pdfBoleto"),
             raw=data,
         )
@@ -111,6 +113,7 @@ class SicoobProvider(BacenPixMixin, BacenPixRecebidosMixin, BacenPixAutomaticoMi
             status=_map_status(res.get("situacaoBoleto") or res.get("situacao")) or Status.pendente,
             linha_digitavel=res.get("linhaDigitavel"),
             pix_copia_cola=res.get("pixCopiaECola"),
+            pix_vinculado=True if res.get("pixCopiaECola") else None,
             raw=data,
         )
 

@@ -34,7 +34,7 @@ docker compose up --build   # (na raiz do repo)
 ## Por que a engine é uma biblioteca (e não um serviço)
 - No caminho **registrado** (C6, Sicoob, Inter) o **banco devolve** linha digitável/PDF/QR →
   o serviço só orquestra OAuth+mTLS+JSON. **Não usa a engine.**
-- No caminho **offline/CNAB/carnê** (18 bancos) → `core/pycob.py` chama a engine
+- No caminho **offline/CNAB/carnê** (19 bancos) → `core/pycob.py` chama a engine
   **pyCobrança** no próprio processo (sem HTTP, sem sidecar).
 
 Um processo, uma imagem, um deploy. À medida que a adoção da API registrada
@@ -110,9 +110,16 @@ app/
 | POST | `/webhooks/{banco}/{tenant_id}` | Idem, roteando ao consumidor **dono do tenant** |
 | GET | `/health` | Health check |
 
-**Roteamento de provider:** `provider=c6|sicoob` → API REST do banco;
-vazio/omitido ou `pycobranca` → CNAB offline (engine pyCobrança, in-process).
-Pix e conciliação exigem provider REST (422 caso contrário).
+**Roteamento — dois eixos:** `provider` é o **caminho** (`on` = API do banco,
+`off` = engine pyCobrança in-process) e `banco` é a **instituição**
+(`c6`, `sicoob`, `inter`, `itau`, `banco_brasil`…). Pix e conciliação só
+existem no caminho `on` (422 caso contrário).
+
+Aceitos como apelido legado, e saindo na 3.0.0: o nome do banco no `provider`
+(`provider=c6` ≡ `provider=on&banco=c6`), só para os quatro com API REST; e
+`pycobranca` ≡ `off`. No caminho `off` o banco é obrigatório dos dois jeitos —
+em `banco` ou em `account_config.bank`; sem nenhum dos dois, `422` listando os
+disponíveis.
  Detalhes do C6 em
 [`docs/development/c6-rest.md`](../docs/development/c6-rest.md).
 
@@ -185,6 +192,8 @@ O roteamento fica em `registry.build_provider`.
 | `WEBHOOK_TOKEN__<BANCO>` | token do webhook de **entrada** (ex.: `WEBHOOK_TOKEN__C6`) — 401 se divergir. **Obrigatório**: sem ele a rota recusa |
 | `WEBHOOK_ALLOW_UNAUTHENTICATED` | `1` aceita webhook sem token (comportamento anterior a 2.3.0) — **inseguro**, ver abaixo |
 | `WEBHOOK_CONFIRM` | `0` desliga a reconsulta ao banco antes de propagar `liquidado` (default: ligada) |
+| `WEBHOOK_URL_PERMITE_LOCAL` | `1` aceita `http://` e destino não roteável em `/config/webhook-*` — só para homologação com túnel local |
+| `UPLOAD_MAX_BYTES` | Teto por arquivo nas rotas `/api/*` de upload (default 10 MB) — acima disso, `413` |
 | `WEBHOOK_DEDUP` | `0` desliga o dedup de reentrega do banco (default: ligado) |
 | `OUTBOX_DRAIN_INTERVAL` | segundos entre drenagens da fila de push (default `30`; `0` desliga a thread **e a limpeza**) |
 | `WEBHOOK_INBOX_RETENCAO_DIAS` | idade máxima das marcas de dedup (default `7`) |

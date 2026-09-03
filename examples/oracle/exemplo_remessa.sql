@@ -61,9 +61,10 @@ BEGIN
     -- ATENCAO a semantica POR LAYOUT:
     --   CNAB 400: mora e VALOR/dia  -> valor_mora
     --   CNAB 240: mora pode ser %   -> tipo_mora='2' + percentual_mora
-    -- Mandar percentual_mora num 400 NAO tem efeito (o layout nao tem a
-    -- posicao). Nome generico (multa/juros/desconto) e RECUSADO com 400 e uma
-    -- dica — de proposito: um apelido esconderia o encargo sumindo.
+    -- Mandar percentual_mora num 400 e RECUSADO com 400 ("tipo_mora='2' nao
+    -- existe no CNAB 400"), e nao aceito em silencio — o layout nao tem a
+    -- posicao, e gravar nada seria o encargo sumindo sem aviso. Nome generico
+    -- (multa/juros/desconto) tambem e 400, com a dica do nome certo.
     || '"codigo_multa":"2",'
     || '"percentual_multa":2.00,'
     || '"valor_mora":1.00,'

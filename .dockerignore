@@ -10,6 +10,13 @@ docs/
 # EXCEÇÃO: o openapi.yaml é asset de RUNTIME (servido em /api/openapi.* e /api/docs),
 # então precisa ir para a imagem mesmo com docs/ ignorado.
 !docs/openapi.yaml
+# EXCEÇÃO: o renderizador do Swagger, pelo mesmo motivo. Sem ele na imagem,
+# `/docs` e `/api/docs` buscam CSS e JS na unpkg.com — e este produto é
+# self-hosted, em rede que libera saída host a host (é o que o
+# `examples/oracle/acl_setup.sql` configura). Onde a saída não inclui a unpkg,
+# a página abre com o cabeçalho e o Swagger simplesmente não aparece.
+!docs/swagger/vendor
+!docs/swagger/vendor/**
 DEPLOY.md
 CHANGELOG.md
 CONTRIBUTING.md

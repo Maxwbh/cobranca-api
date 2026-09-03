@@ -1,0 +1,63 @@
+{
+  "banco": "inter",
+  "codigo_banco": "077",
+  "recurso": "Pix Automático",
+  "fonte": {
+    "spec": "https://developers.inter.co/redocusaurus/swagger-api-pix-automatico-yaml.yaml",
+    "pagina": "https://developers.inter.co/references/pix-automatico",
+    "titulo": "API Pix Automático",
+    "obtida_em": "2026-08-26",
+    "como": "a página é SPA (Redocly) e não entrega os endpoints por fetch; a URL da spec saiu do bundle /assets/js/main.*.js, onde o redocusaurus a declara"
+  },
+  "servers": [
+    "https://cdpj.partners.bancointer.com.br/pix/v2",
+    "https://cdpj-sandbox.partners.uatinter.co/pix/v2"
+  ],
+  "path_base": "/pix/v2",
+  "operacoes": [
+    "DELETE /locrec/{id}/idRec",
+    "DELETE /webhookcobr",
+    "DELETE /webhookrec",
+    "GET /cobr",
+    "GET /cobr/{txid}",
+    "GET /locrec",
+    "GET /locrec/{id}",
+    "GET /rec",
+    "GET /rec/{idRec}",
+    "GET /solicrec/{idSolicRec}",
+    "GET /webhookcobr",
+    "GET /webhookrec",
+    "PATCH /cobr/{txid}",
+    "PATCH /rec/{idRec}",
+    "PATCH /sandbox/cobr/{txId}/status",
+    "PATCH /sandbox/rec/{idRec}/status",
+    "PATCH /sandbox/solicrec/{idRec}/status",
+    "PATCH /solicrec/{idSolicRec}",
+    "POST /cobr",
+    "POST /cobr/{txid}/retentativa/{data}",
+    "POST /locrec",
+    "POST /rec",
+    "POST /sandbox/cob/pagamento",
+    "POST /sandbox/cobr/pagamento",
+    "POST /solicrec",
+    "PUT /cobr/{txid}",
+    "PUT /webhookcobr",
+    "PUT /webhookrec"
+  ],
+  "scopes": [
+    "cobr.read",
+    "cobr.write",
+    "payloadlocationrec.read",
+    "payloadlocationrec.write",
+    "pix.write",
+    "rec.read",
+    "rec.write",
+    "solicrec.read",
+    "solicrec.write",
+    "webhookcobr.read",
+    "webhookcobr.write",
+    "webhookrec.read",
+    "webhookrec.write"
+  ],
+  "restricao_bacen": "a API só é oferecida a CNPJ com pelo menos 6 meses de atividade (aviso no topo da página de referência)"
+}

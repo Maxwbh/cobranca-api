@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.url_webhook import validar_url_webhook
+
 
 class Provider(str, Enum):
     """**Caminho** da cobrança — e só isso. Qual banco é o campo `banco`.
@@ -119,8 +121,12 @@ class Pagador(BaseModel):
 class Cobranca(BaseModel):
     valor: Decimal = Field(description="Valor da cobrança", examples=["1000.00"])
     vencimento: date = Field(description="Data de vencimento (ISO)", examples=["2026-07-10"])
-    nosso_numero: str | None = Field(default=None, description="Nosso número (opcional; o banco pode atribuir)")
-    seu_numero: str | None = Field(default=None, description="Seu número / identificador do emissor (opcional)")
+    nosso_numero: str | None = Field(
+        default=None, description="Nosso número (opcional; o banco pode atribuir)",
+        examples=["12345678"])
+    seu_numero: str | None = Field(
+        default=None, description="Seu número / identificador do emissor (opcional)",
+        examples=["PED-2027-0042"])
     pagador: Pagador
     # Encargos da cobranca REGISTRADA (online): repassados a API do banco no
     # formato dela (cada banco define a forma). Para o caminho OFFLINE/CNAB, os
@@ -194,6 +200,17 @@ class CobrancaOut(BaseModel):
     linha_digitavel: str | None = None
     codigo_barras: str | None = None
     pix_copia_cola: str | None = Field(default=None, description="PIX copia-e-cola (EMV), quando híbrido")
+    pix_vinculado: bool | None = Field(
+        default=None,
+        description=(
+            "O QR **liquida o título**? `true` = Bolepix: QR dinâmico registrado "
+            "no banco, e pagar por ele dá baixa. `false` = QR **avulso**, montado "
+            "a partir de `chave_pix`: credita a chave e deixa o título **em "
+            "aberto** — risco de segunda cobrança ou de protesto de boleto já "
+            "pago. `null` = boleto sem PIX. O caminho `on` sempre devolve `true`; "
+            "no `off` depende de você mandar `pix_copia_cola` (do banco) ou "
+            "`chave_pix`."),
+        examples=[True])
     pdf_base64: str | None = Field(default=None, description="PDF do boleto em base64, quando disponível")
     raw: dict[str, Any] | None = Field(default=None, description="Resposta crua do banco (debug)")
 
@@ -206,25 +223,36 @@ class PixCobranca(BaseModel):
 
     valor: Decimal = Field(description="Valor original da cobrança", examples=["10.00"])
     chave: str | None = Field(
-        default=None,
+        default=None, examples=["7d9f1a52-0c3b-4e21-9f88-1a2b3c4d5e6f"],
         description="Chave Pix do recebedor. Se omitida, usa `account_config.chave_pix`.",
     )
+    # O formato é do BACEN e a mensagem da cobv já o CITAVA — sem aplicá-lo:
+    # `txid="abc"` e txid com hífen chegavam ao banco e voltavam como `400` dele,
+    # traduzido em `422` com `upstream`. Validar aqui recusa antes da ida à rede,
+    # com mensagem própria, e vale para cob, cobv e itens de lote de uma vez.
+    # Mesmo movimento do `POST /bolepix` na 2.1.1: "recusa com 422 dizendo qual
+    # campo falta, antes de chamar o banco".
     txid: str | None = Field(
         default=None,
-        description="Txid ([a-zA-Z0-9]{26,35}). Obrigatório na cobv; na cob o banco gera.",
+        pattern=r"^[a-zA-Z0-9]{26,35}$",
+        examples=["PEDIDO2027000000000000004242"],
+        description="Txid do BACEN: 26 a 35 caracteres, só letras e dígitos. "
+                    "Obrigatório na cobv. Na cob é opcional — enviado, é o "
+                    "identificador da cobrança (`PUT`); omitido, o banco gera um.",
     )
     expiracao_segundos: int = Field(
         default=3600, description="Validade da cob imediata, em segundos (ignorado na cobv)."
     )
     data_vencimento: date | None = Field(
-        default=None,
+        default=None, examples=["2027-12-10"],
         description="Se presente, emite cobv (cobrança com vencimento) em vez de cob imediata.",
     )
     validade_apos_vencimento: int = Field(
         default=30, description="Dias corridos em que a cobv ainda pode ser paga após o vencimento."
     )
     devedor: Pagador | None = Field(default=None, description="Devedor (obrigatório na cobv)")
-    descricao: str | None = Field(default=None, description="solicitacaoPagador (texto ao pagador)")
+    descricao: str | None = Field(default=None, examples=["Mensalidade 12/2027"],
+                                  description="solicitacaoPagador (texto ao pagador)")
 
 
 class PixCobrancaIn(BaseModel):
@@ -270,25 +298,52 @@ class PixCobrancaOut(BaseModel):
 # --- Bolepix (boleto híbrido online com Pix EVP — C6 /v2/bank_slips) ----------
 
 
+#: Formato do identificador no /v2 do C6. Estava escrito em três lugares
+#: (comentário do módulo, docstring da rota, descrição do campo) e não valia em
+#: nenhum: `abc` e id de 40 caracteres iam para o banco e voltavam como 400 dele.
+EXTERNAL_REFERENCE_ID = r"^[A-Z0-9]{26}$"
+
+
 class BolepixCobranca(BaseModel):
-    valor: Decimal = Field(description="Valor da cobrança", examples=["99.90"])
-    vencimento: date
-    descricao: str = Field(description="Descrição da cobrança (obrigatória no Bolepix)")
+    valor: Decimal = Field(gt=0, description="Valor da cobrança — maior que zero",
+                           examples=["99.90"])
+    vencimento: date = Field(examples=["2027-12-30"])
+    descricao: str = Field(description="Descrição da cobrança (obrigatória no Bolepix)",
+                           examples=["Assinatura 12/2027"])
     pagador: Pagador = Field(
         description="endereco OBRIGATORIO: {address|logradouro+numero, neighborhood|bairro, "
                     "city|cidade, state|uf, zip_code|cep} — os 3 ultimos sao exigidos pelo C6 /v2"
     )
     external_reference_id: str | None = Field(
-        default=None, description="^[A-Z0-9]{26}$ — gerado automaticamente se omitido"
+        default=None, pattern=EXTERNAL_REFERENCE_ID,
+        description="`^[A-Z0-9]{26}$` — 26 caracteres, só maiúsculas e dígitos. Gerado "
+                    "automaticamente se omitido, e devolvido em `id`. **É por ele que se "
+                    "consulta o Bolepix**, e reenviar o mesmo devolve a cobrança existente "
+                    "em vez de criar outra — mande o seu se houver botão humano na frente. "
+                    "String vazia vale como omitido: template que substitui variável não "
+                    "preenchida produz `\"\"`, e isso sempre significou \"gere um\".",
+        examples=["PEDIDO00000000000000004242"],
     )
-    chave_pix: str | None = Field(default=None, description="Chave EVP; default: account_config.chave_pix")
-    nosso_numero: str | None = None
+
+    @field_validator("external_reference_id", mode="before")
+    @classmethod
+    def _vazio_e_ausente(cls, v: Any) -> Any:
+        return None if isinstance(v, str) and not v.strip() else v
+    chave_pix: str | None = Field(
+        default=None, examples=["7d9f1a52-0c3b-4e21-9f88-1a2b3c4d5e6f"],
+        description="Chave EVP do recebedor. Sem ela (aqui ou em `account_config.chave_pix`) "
+                    "não há segmento Pix, e o resultado é um boleto comum — que é `/cobranca`, "
+                    "não Bolepix. Por isso a ausência responde 422.")
+    nosso_numero: str | None = Field(default=None, examples=["12345678"])
     instrucoes: list[str] | None = None
-    dias_apos_vencimento: int | None = Field(default=None, description="days_after_due_date")
+    dias_apos_vencimento: int | None = Field(
+        default=None, ge=0,
+        description="days_after_due_date — dias de tolerância APÓS o vencimento; negativo não "
+                    "existe (o boleto não vence antes de vencer)")
 
 
 class BolepixIn(BaseModel):
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -338,7 +393,8 @@ class CheckoutCobranca(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    valor: Decimal = Field(description="Valor total do checkout", examples=["150.00"])
+    valor: Decimal = Field(
+        gt=0, description="Valor total do checkout — maior que zero", examples=["150.00"])
     tipo: TipoCartao = Field(default=TipoCartao.credito, description="credito | debito")
     parcelas: int = Field(
         default=1, ge=1,
@@ -362,10 +418,14 @@ class CheckoutCobranca(BaseModel):
     )
     recorrente: bool | None = Field(default=None, description="Sinaliza cobrança recorrente")
     pix: bool = Field(default=False, description="Oferece Pix no mesmo link (QR gerado pelo banco)")
-    descricao: str | None = None
-    expira_em: datetime | None = Field(default=None, description="Default do banco: 7 dias")
-    redirect_url: str | None = Field(default=None, description="Para onde o pagador volta após pagar")
-    external_reference_id: str | None = Field(default=None, description="Seu identificador")
+    descricao: str | None = Field(default=None, examples=["Pedido 4242"])
+    expira_em: datetime | None = Field(default=None, description="Default do banco: 7 dias",
+                                       examples=["2027-12-30T23:59:59-03:00"])
+    redirect_url: str | None = Field(
+        default=None, description="Para onde o pagador volta após pagar — http(s) apenas",
+        examples=["https://sua-loja.com.br/pedido/4242/retorno"])
+    external_reference_id: str | None = Field(default=None, description="Seu identificador",
+                                              examples=["PED-2027-0042"])
     pagador: Pagador | None = Field(
         default=None,
         description="Se enviado com endereço, exige street|logradouro, number|numero (numérico), "
@@ -382,9 +442,26 @@ class CheckoutCobranca(BaseModel):
             raise ValueError("parcelas > 1 exige juros_por (loja ou emissor)")
         return v
 
+    @field_validator("redirect_url")
+    @classmethod
+    def _redirect_navegavel(cls, v: str | None) -> str | None:
+        # Esta URL não fica aqui: o banco a publica na PÁGINA DELE, e o pagador
+        # a percorre. Repassar esquema arbitrário — `javascript:...` à frente —
+        # é deixar esta API escolher o que roda no domínio do banco, na frente
+        # de quem está digitando o cartão. Só destino navegável passa.
+        if v and not v.lower().startswith(("http://", "https://")):
+            raise ValueError("redirect_url deve começar com http:// ou https://")
+        return v
+
 
 class CheckoutIn(BaseModel):
-    tenant_id: str
+    # `extra="forbid"` aqui, e não só no `checkout`: o módulo promete que dado de
+    # cartão não existe nesta API, e a promessa só vale se o campo for RECUSADO.
+    # Sem isto, `card_number` no nível de cima respondia 201 e sumia — o chamador
+    # concluía que mandou o PAN e que a API o aceitou.
+    model_config = {"extra": "forbid"}
+
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -406,11 +483,11 @@ class CheckoutOut(BaseModel):
 
 
 class LoteCobvIn(BaseModel):
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
-    descricao: str
+    descricao: str = Field(examples=["Mensalidades 12/2027"])
     cobrancas: list[PixCobranca] = Field(description="Cada item exige txid e data_vencimento")
     credentials: dict[str, Any] | None = None
 
@@ -426,7 +503,7 @@ class LoteCobvRevisaoIn(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -446,18 +523,22 @@ class Recorrencia(BaseModel):
     objeto: str | None = Field(default=None, description="Descrição do objeto do contrato", examples=["Aluguel Apto 101"])
     devedor: Pagador
     periodicidade: str = Field(description="SEMANAL | MENSAL | TRIMESTRAL | SEMESTRAL | ANUAL", examples=["MENSAL"])
-    data_inicial: date
-    data_final: date | None = None
-    valor_fixo: Decimal | None = Field(default=None, description="valorRec — cobranças de valor fixo")
-    valor_minimo: Decimal | None = Field(default=None, description="valorMinimoRecebedor — valor variável")
+    data_inicial: date = Field(examples=["2027-01-10"])
+    data_final: date | None = Field(default=None, examples=["2027-12-10"])
+    valor_fixo: Decimal | None = Field(default=None, examples=["150.00"],
+                                       description="valorRec — cobranças de valor fixo")
+    valor_minimo: Decimal | None = Field(default=None, examples=["50.00"],
+                                         description="valorMinimoRecebedor — valor variável")
     politica_retentativa: str = Field(default="PERMITE_3R_7D", description="NAO_PERMITE | PERMITE_3R_7D")
     loc: int | None = Field(default=None, description="Id de locrec p/ adesão via QR (Jornada 2)")
-    txid_ativacao: str | None = Field(default=None, description="ativacao.dadosJornada.txid (Jornadas 3/4)")
+    txid_ativacao: str | None = Field(
+        default=None, examples=["PEDIDO2027000000000000004242"],
+        description="ativacao.dadosJornada.txid (Jornadas 3/4)")
     extras: dict[str, Any] | None = Field(default=None, description="Campos BACEN adicionais (merge no payload)")
 
 
 class RecorrenciaIn(BaseModel):
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -465,19 +546,42 @@ class RecorrenciaIn(BaseModel):
     credentials: dict[str, Any] | None = None
 
 
+#: Txid do BACEN — o mesmo padrão da cob/cobv, aplicado também ao cobr.
+TXID_BACEN = r"^[a-zA-Z0-9]{26,35}$"
+
+
 class CobrancaRecorrente(BaseModel):
     """Uma cobrança do ciclo (cobr) — agendar >= 2 dias antes do vencimento.
     O agendamento é responsabilidade do produto consumidor (gateway stateless)."""
 
-    id_rec: str = Field(description="idRec da recorrência aprovada")
-    valor: Decimal
-    data_vencimento: date
-    info_adicional: str | None = None
+    id_rec: str = Field(description="idRec da recorrência aprovada",
+                        examples=["RR12345678202701101a2b3c4d5e6"])
+    valor: Decimal = Field(gt=0, examples=["150.00"],
+                           description="Valor da parcela do ciclo — maior que zero")
+    data_vencimento: date = Field(
+        examples=["2027-12-10"],
+        description="Vencimento da parcela. O BACEN quer o agendamento com pelo menos "
+                    "**2 dias** de antecedência; menos que isso o banco pode recusar. "
+                    "Data no PASSADO é recusada aqui — não existe agendar para ontem.")
+    info_adicional: str | None = Field(default=None, examples=["Parcela 3/12"])
     extras: dict[str, Any] | None = None
+
+    @field_validator("data_vencimento")
+    @classmethod
+    def _nao_agenda_para_ontem(cls, v: date) -> date:
+        # Medido: vencimento cinco dias no passado era aceito com 201 e seguia
+        # para o banco. A antecedência de 2 dias fica como aviso — não sei se o
+        # BACEN conta dia corrido ou útil, e travar errado impediria agendamento
+        # que o banco aceita. O passado não tem essa ambiguidade.
+        if v < date.today():
+            raise ValueError(
+                f"data_vencimento {v} está no passado; a cobrança do ciclo é agendada "
+                "para o futuro (o BACEN pede >= 2 dias de antecedência)")
+        return v
 
 
 class CobrancaRecorrenteIn(BaseModel):
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -488,7 +592,7 @@ class CobrancaRecorrenteIn(BaseModel):
 class SolicitacaoRecorrenciaIn(BaseModel):
     """solicrec — pedido de autorização enviado ao app do pagador (Jornada 1)."""
 
-    tenant_id: str
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict)
@@ -499,13 +603,85 @@ class SolicitacaoRecorrenciaIn(BaseModel):
 # --- Cadastro de webhook no banco ------------------------------------------------
 
 
+class ServicoWebhook(str, Enum):
+    """O que o banco notifica naquela URL.
+
+    O vocabulário nasceu do C6, que tem duas notificações (boleto e cartão). O
+    Inter tem UMA — e a chama de `COBRANCA`: quem lê a documentação do Inter
+    manda essa palavra e levava `422` listando só os termos do outro banco.
+    `COBRANCA` entra como grafia do mesmo serviço; o provider do C6 traduz para
+    a sua antes de falar com o banco, senão o alias viraria `400` lá na frente.
+    """
+
+    bank_slip = "BANK_SLIP"
+    checkout = "CHECKOUT"
+    cobranca = "COBRANCA"
+
+
+def campo_url_webhook(descricao: str) -> Any:
+    """A URL que o BANCO vai chamar.
+
+    Validada por um motivo prático antes de qualquer outro: destino inalcançável
+    é aceito com `200` e o cadastro parece feito — o cliente só descobre que não
+    recebe notificação quando um pagamento se perde. Ver `validar_url_webhook`.
+    """
+    return Field(description=descricao,
+                 examples=["https://api.minhaempresa.com.br/webhooks/c6/empresa_123"])
+
+
 class WebhookBancoIn(BaseModel):
-    tenant_id: str
+    model_config = {"extra": "forbid"}
+
+    tenant_id: str = Field(examples=["empresa_123"])
     provider: Provider = Provider.c6
     banco: Banco | None = campo_banco()
-    url: str = Field(description="URL pública que o banco chamará (ex: https://.../webhooks/c6/{tenant})")
-    service: str = Field(default="BANK_SLIP", description="BANK_SLIP | CHECKOUT")
+    url: str = campo_url_webhook(
+        "URL **pública e https** que o banco chamará "
+        "(ex: https://.../webhooks/c6/{tenant})")
+    service: ServicoWebhook = Field(
+        default=ServicoWebhook.bank_slip,
+        description="O que o banco notifica: `BANK_SLIP` (boleto) ou `CHECKOUT` (cartão). `COBRANCA` é a grafia do Inter para o boleto e vale como sinônimo — o Inter tem uma notificação só, e ali o campo é ignorado.")
     credentials: dict[str, Any] | None = None
+
+
+    @field_validator("url")
+    @classmethod
+    def _url_alcancavel(cls, v: str) -> str:
+        return validar_url_webhook(v)
+
+
+class WebhookPixIn(BaseModel):
+    """Webhook BACEN por chave — o banco chama a URL quando um Pix cai na chave.
+
+    Era `body: dict`: o Swagger não descrevia campo nenhum, campo com nome errado
+    passava calado e `credentials` viajava sem tipo dentro de um dicionário
+    livre."""
+
+    model_config = {"extra": "forbid"}
+
+    tenant_id: str = Field(examples=["empresa_123"])
+    provider: Provider = Provider.c6
+    banco: Banco | None = campo_banco()
+    chave: str = Field(description="Chave Pix do recebedor (a mesma das cobranças)",
+                       examples=["financeiro@minhaempresa.com.br"])
+    url: str = campo_url_webhook(
+        "URL **pública e https** que o banco chamará quando um Pix cair na chave")
+    credentials: dict[str, Any] | None = None
+
+    @field_validator("tenant_id", "chave", "url")
+    @classmethod
+    def _obrigatorio(cls, v: str, info: Any) -> str:
+        # A versão com corpo livre recusava os três VAZIOS com "campo
+        # obrigatório: <nome>", e a troca por schema tinha perdido a checagem.
+        # A frase volta igual: há consumidor que lê o erro por ela.
+        if not (v or "").strip():
+            raise ValueError(f"campo obrigatório: {info.field_name}")
+        return v
+
+    @field_validator("url")
+    @classmethod
+    def _url_alcancavel(cls, v: str) -> str:
+        return validar_url_webhook(v)
 
 
 # --- Tokenização de credenciais ----------------------------------------------
@@ -534,12 +710,70 @@ class CredencialIn(BaseModel):
     )
 
 
+class CertificadoOut(BaseModel):
+    """Metadado do certificado mTLS. **Nunca** o certificado nem a chave."""
+
+    situacao: str = Field(
+        description=("`ok` · `expirando` · `expirado` · `ilegivel`. O limiar de "
+                     "`expirando` acompanha a **vida** do certificado: 30 dias para um "
+                     "anual, um terço da validade para os de vida curta. Fixo em 30, o "
+                     "certificado do Inter — que vive 30 dias — nascia `expirando`."),
+        examples=["ok"])
+    titular: str | None = Field(default=None, examples=[
+        "MSDOBRASILLTDA05230380000174-baas-api-sandbox.c6bank.info"],
+        description="CN do certificado. Os bancos escrevem `<RAZAO><CNPJ>-<host>`, e o "
+                    "**host diz o ambiente**: `baas-api-sandbox` é sandbox, `baas-api` "
+                    "é produção. É por aqui que se confere qual certificado está em uso.")
+    emissor: str | None = None
+    valido_de: str | None = None
+    valido_ate: str | None = Field(default=None, examples=["2027-08-21"])
+    alerta_a_partir_de: int | None = Field(
+        default=None, examples=[30],
+        description="Quantos dias restantes fazem este certificado virar `expirando`. "
+                    "Varia com a vida dele — sem este campo, `expirando` com 9 dias num "
+                    "caso e `ok` com 25 noutro pareceria incoerência.")
+    dias_restantes: int | None = Field(
+        default=None, examples=[360],
+        description="Negativo quando já venceu. O certificado dos bancos vale um ano e "
+                    "**não tem renovação in-place**: vence e toda chamada passa a falhar "
+                    "no handshake, de uma vez.")
+    host: str | None = Field(
+        default=None, examples=["baas-api-sandbox.c6bank.info"],
+        description="O host extraído do CN — é ele que diz o ambiente. `null` quando o "
+                    "banco não carimba host no CN (o do Inter é só o nome da aplicação).")
+    base_em_uso: str | None = Field(
+        default=None, examples=["https://baas-api-sandbox.c6bank.info"],
+        description="Para onde ESTE servidor está apontado naquele banco.")
+    ambiente_confere: bool | None = Field(
+        default=None, examples=[True],
+        description="O certificado é do mesmo ambiente da `base_em_uso`? `false` significa "
+                    "que toda chamada vai falhar no handshake — o banco responde `403 mTLS`, "
+                    "que se lê como credencial inválida e manda conferir client_id e secret, "
+                    "que estão certos. `null` = não dá para dizer (sem host no CN).")
+    formato: str | None = Field(default=None, examples=["pem"])
+    detalhe: str | None = Field(default=None,
+                                description="Por que não deu para ler, quando `ilegivel`.")
+    cnpj: str | None = Field(default=None, examples=["05230380000174"],
+                             description="Extraído do CN, para conferência num olhar.")
+    par_confere: bool | None = Field(
+        default=None, examples=[True],
+        description="A chave privada é a DESTE certificado? `null` quando não há par PEM "
+                    "para comparar. `false` é o erro clássico da troca de certificado — "
+                    "`.crt` novo com `.key` antigo —, que no handshake vira uma mensagem "
+                    "de TLS que não aponta o par trocado.")
+
+
 class CredencialOut(BaseModel):
     token: str = Field(description="Token opaco (bapi_...) — exibido UMA única vez; guarde-o. "
                                    "Use nas demais rotas via Authorization: Bearer")
     tenant_id: str
     provider: Provider
     banco: Banco | None = campo_banco("Instituição destas credenciais (eco do request).")
+    certificado: CertificadoOut | None = Field(
+        default=None,
+        description="Metadado do certificado mTLS enviado, quando há. Vem no cadastro "
+                    "porque é onde o erro custa menos: carregar o certificado do ambiente "
+                    "errado só aparecia no primeiro handshake, horas depois.")
 
 
 # --- Conciliação (C6 Pay statement) ------------------------------------------
@@ -582,8 +816,17 @@ class CarneIn(BaseModel):
     provider: Provider
     banco: Banco | None = campo_banco()
     account_config: dict[str, Any] = Field(default_factory=dict, description="Blob por provider (ver CobrancaIn)")
-    bank: str = Field(description="Slug do banco na engine pyCobrança para renderizar o carnê", examples=["banco_c6"])
-    parcelas: list[Cobranca] = Field(description="Parcelas do carnê (registradas individualmente)")
+    bank: str | None = Field(
+        default=None,
+        description="Slug do layout na engine pyCobrança. **Redundante**: o layout vem do "
+                    "`banco`. Aceito por compatibilidade e precisa concordar — `bank` "
+                    "divergente responde 422, porque carnê desenhado como um banco e "
+                    "registrado em outro não é pagável.",
+        examples=["banco_c6"])
+    parcelas: list[Cobranca] = Field(
+        min_length=1,
+        description="Parcelas do carnê (registradas individualmente). Pelo menos uma, e "
+                    "cada uma com identificador próprio (`seu_numero`/`nosso_numero`)")
     credentials: dict[str, Any] | None = Field(
         default=None,
         description="Credenciais do banco no request (só memória; fallback: cofre VAULT__*).",

@@ -64,7 +64,7 @@ class ItauProvider(BankProvider):
         return OAuthMtlsClient(
             base_url=ITAU_BASE,
             auth_url=ITAU_AUTH,
-            client_id=self.credentials["client_id"],
+            client_id=self.credencial("client_id"),
             client_secret=self.credentials.get("client_secret", ""),
             # O Itaú entrega .crt + .key (certificado dinâmico assinado por ele),
             # como o Inter. PKCS12 continua aceito para quem já converteu.

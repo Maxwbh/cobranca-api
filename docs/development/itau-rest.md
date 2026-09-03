@@ -1,8 +1,20 @@
-# Itaú Unibanco (341) — Integração REST · **PLANEJADO**
+# Itaú Unibanco (341) — Integração REST · **ESQUELETO**
 
-> **Status:** roadmap (não implementado). Ver [roadmap-providers.md](roadmap-providers.md).
+> **Status:** o provider **existe** (`gateway/app/providers/itau.py`) e o banco
+> aparece no `GET /bancos`, mas os paths e o payload de emissão ainda **não
+> foram confirmados** — o catálogo exige login. Por isso ele nasce **desligado**
+> por `ITAU_REGISTERED_READY`: sem a flag, `banco=itau` emite pela engine, que
+> tem o layout 341. Ver [roadmap-providers.md](roadmap-providers.md), Fase 0.
+>
+> **Chamada:** `provider=on&banco=itau` (`provider=itau` segue valendo como
+> apelido legado até a 3.0.0).
+>
+> **Não tem Pix Automático:** o provider não herda o mixin BACEN de recorrência,
+> e as rotas `/pix-automatico/*` respondem `422` nomeando quem oferece —
+> [pix-automatico.md](pix-automatico.md).
+>
 > É o banco com **maior base de cobrança do país** e o que mais aparece no
-> caminho offline (CNAB 400/444 da engine). O que falta é o caminho **online**.
+> caminho offline (CNAB 400/444 da engine). O que falta é fechar o **online**.
 >
 > **Leia a seção de onboarding antes de estimar prazo.** A dificuldade do Itaú
 > não é técnica, é de acesso: as credenciais de cobrança **não** saem por
@@ -238,9 +250,9 @@ confirma** — o resto está isolado, marcado e sai por variável de ambiente.
 | `pdf()` | **Não implementado de propósito** — o banco não devolve PDF; quem renderiza é a engine, e sobrescrever mentiria no `GET /bancos` |
 | Mixins BACEN (Pix) | **Não herdados ainda** — há relato de divergências no Pix do Itaú; herdar declararia capacidade sem lastro |
 | `normalizar_webhook` | Ausente — formato não confirmado |
-| Gate | `ITAU_REGISTERED_READY`; **desligado**, `provider=itau` emite pela engine (o 341 está entre os 18) |
+| Gate | `ITAU_REGISTERED_READY`; **desligado**, `provider=itau` emite pela engine (o 341 está entre os 19) |
 
-Os 20 testes afirmam **o nosso lado** — gate e fallback, dados do convênio
+Os 23 testes afirmam **o nosso lado** — gate e fallback, dados do convênio
 vindos do `account_config`, documento e CEP só com dígitos, dedução de
 CPF/CNPJ, header de correlação só quando informado, leitura tolerante,
 ausência de PDF, mapa de status e o que o catálogo declara. Nenhum deles afirma

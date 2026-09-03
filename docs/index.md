@@ -32,7 +32,7 @@ sidecar. É o mesmo `POST /cobranca`: **trocar de mundo é trocar um campo**.
 <img class="demo-terminal" src="assets/demo-terminal.svg"
      alt="Terminal: POST /cobranca com um payload de boleto devolve id, status registrado, linha digitável, código de barras e o PDF em base64 — pelo caminho offline, sem credencial de banco." />
 <span class="legenda">Resposta real, capturada da API — caminho offline, sem credencial
-e sem convênio. O mesmo <code>POST /cobranca</code> com <code>provider=c6</code> registra no banco.</span>
+e sem convênio. O mesmo <code>POST /cobranca</code> com <code>provider=on&amp;banco=c6</code> registra no banco.</span>
 
 ---
 
@@ -83,10 +83,11 @@ campos calculados sem gerar o PDF.
       <span class="chip chip-on">C6 Bank · 336</span>
       <span class="chip chip-on">Sicoob · 756</span>
       <span class="chip chip-on">Banco Inter · 077</span>
+      <span class="chip chip-on">Itaú · 341</span>
     </p>
     <ul>
       <li>Boleto <strong>registrado</strong> e Bolepix</li>
-      <li>Pix e Pix Automático (padrão BACEN)</li>
+      <li>Pix e Pix Automático (padrão BACEN) — Pix Automático em C6, Sicoob e Inter</li>
       <li>Link de pagamento com <strong>cartão</strong> (C6)</li>
       <li>Webhook, extrato e conciliação</li>
     </ul>

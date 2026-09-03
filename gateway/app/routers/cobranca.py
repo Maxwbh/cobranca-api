@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import os
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
 from app.core.vault import Vault, get_vault
 from app.registry import (_SLUG_ENGINE, build_provider, credentials_from_header,
                           resolver_caminho)
 from app.routers._credentials import resolve_request_credentials
-from app.routers._params import BANCO as _BANCO, PROVIDER as _PROVIDER
-from app.schemas import Banco, CobrancaIn, CobrancaOut, Provider
+from app.routers._params import BANCO as _BANCO, PROVIDER as _PROVIDER, TENANT as _TENANT
+from app.schemas import Banco, CobrancaIn, CobrancaOut, Provider, Status
 
 router = APIRouter(prefix="/cobranca", tags=["cobranca"])
 
@@ -17,7 +20,7 @@ router = APIRouter(prefix="/cobranca", tags=["cobranca"])
 # header setado em tempo de execução, então o Swagger dizia 201 sem dizer para
 # onde ir. Declarado aqui para aparecer no contrato.
 _LOCATION = {
-    "description": "URL de consulta do recurso criado, já com tenant_id e provider",
+    "description": "URL de consulta do recurso criado, já com tenant_id, provider e banco",
     "schema": {"type": "string"},
 }
 
@@ -37,6 +40,38 @@ _CODIGO_MODALIDADE = Query(default=None, description=_CONTA_DOC)
 
 
 
+def _flag(nome: str, default: bool = False) -> bool:
+    bruto = os.environ.get(nome)
+    return default if bruto is None else bruto.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _erro_vira_http(out: CobrancaOut) -> JSONResponse | None:
+    """`status: "erro"` como `422`, sob `COBRANCA_ERRO_HTTP=1`.
+
+    `201 Created` é a afirmação mais forte que o HTTP tem de "criei o recurso", e
+    a rota a usava para dizer que NÃO criou: dados recusados pela engine voltam
+    `201` com `status: "erro"` e `id: null`. Quem faz `raise_for_status()` — o
+    idiomático em qualquer cliente — dá o boleto por emitido.
+
+    Que é defeito, e não estilo, fica claro na comparação interna: a MESMA
+    violação (carteira 999 no BB) responde `400` em `GET /api/boleto/validate` e
+    em `POST /api/render/boleto`, e `422` quando é o banco que a detecta e
+    devolve `400`. Só aqui ela passa por sucesso — o mesmo erro com três códigos,
+    conforme quem o percebeu.
+
+    Mudar o default é quebra de contrato para quem já trata `status`, e a doc
+    ensina o comportamento atual em três lugares. Então entra como a casa faz
+    com contrato: flag com default compatível hoje (`WEBHOOK_ALLOW_UNAUTHENTICATED`
+    e `WEBHOOK_CONFIRM` são o precedente), default novo na 3.0.0.
+
+    O CORPO não muda — só o código. Quem migrar continua lendo
+    `raw.validation_errors` no mesmo lugar.
+    """
+    if out.status is not Status.erro or not _flag("COBRANCA_ERRO_HTTP"):
+        return None
+    return JSONResponse(status_code=422, content=jsonable_encoder(out))
+
+
 def _header_creds(value: str | None) -> dict | None:
     try:
         return credentials_from_header(value)
@@ -45,7 +80,14 @@ def _header_creds(value: str | None) -> dict | None:
 
 
 @router.post("", response_model=CobrancaOut, status_code=201,
-             responses={201: {"headers": {"Location": _LOCATION}}})
+             summary="Registrar cobrança (boleto)",
+             responses={201: {"headers": {"Location": _LOCATION},
+                              "description": "Cobrança registrada. **Cheque `status`**: por "
+                                             "compatibilidade, dados recusados pela engine "
+                                             "também respondem `201`, com `status: \"erro\"`, "
+                                             "`id: null` e sem `Location`. "
+                                             "`COBRANCA_ERRO_HTTP=1` faz esse caso responder "
+                                             "`422`, que passa a ser o default na 3.0.0."}})
 def registrar(
     body: CobrancaIn,
     response: Response,
@@ -69,25 +111,40 @@ def registrar(
         account_config=body.account_config, vault=vault, credentials=creds,
     )
     out = provider.registrar(body.cobranca)
+    recusa = _erro_vira_http(out)
+    if recusa is not None:
+        return recusa
     # 201 é o que o resto da API já faz (bolepix, checkout, credenciais, Pix
     # Automático); estas rotas só herdaram o default do FastAPI. O `Location`
-    # completo — com tenant_id e provider — é o que separa 201 útil de 201
-    # cosmético: sem os dois a consulta responde 422, e um Location que não se
-    # segue não vale o header.
+    # completo — com tenant_id, provider E BANCO — é o que separa 201 útil de
+    # 201 cosmético: sem os três a consulta responde 422, e um Location que não
+    # se segue não vale o header.
     #
     # Não é 202: o 202 afirma que ainda não há recurso, e aqui já há id e linha
     # digitável. A aprovação assíncrona da CIP no C6 é dita no `status`
     # (registrado|pendente), que é onde ela pertence.
     if out.id:
         response.headers["Location"] = _location(
-            f"/cobranca/{out.id}", body.tenant_id, body.provider)
+            f"/cobranca/{out.id}", body.tenant_id, body.provider, body.banco)
     return out
 
 
-def _location(caminho: str, tenant_id: str, provider: Provider, **extra: str) -> str:
-    """Location que o cliente consegue seguir: as rotas de consulta exigem
-    tenant_id e provider, então omiti-los devolveria 422 a quem confia no header."""
-    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider), **extra}
+def _location(caminho: str, tenant_id: str, provider: Provider,
+              banco: Banco | None = None, **extra: str) -> str:
+    """Location que o cliente consegue seguir.
+
+    As rotas de consulta exigem `tenant_id` e `provider` — e, desde o modelo de
+    dois eixos, também o `banco` quando o `provider` é `on`/`off`. O `banco`
+    ficou de fora quando o eixo nasceu, e o header passou a apontar para um
+    `422`: quebrado exatamente no modelo NOVO, e são no legado (`provider=c6`),
+    que carrega o banco no próprio valor e sai na 3.0.0.
+
+    Nada acusava porque nada seguia o header — o teste agora segue.
+    """
+    params = {"tenant_id": tenant_id, "provider": getattr(provider, "value", provider)}
+    if banco is not None:
+        params["banco"] = getattr(banco, "value", banco)
+    params.update(extra)
     return f"{caminho}?{urlencode(params)}"
 
 
@@ -105,7 +162,7 @@ def _conta(numero_cliente: int | None, codigo_modalidade: int | None) -> dict:
 
 @router.get("/{cobranca_id}", response_model=CobrancaOut)
 def consultar(
-    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    cobranca_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER,
     banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
@@ -124,9 +181,9 @@ def consultar(
     return p.consultar(cobranca_id)
 
 
-@router.get("/{cobranca_id}/pdf", response_model=CobrancaOut)
+@router.get("/{cobranca_id}/pdf", response_model=CobrancaOut, summary="PDF do boleto")
 def pdf(
-    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    cobranca_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER,
     banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
@@ -182,7 +239,7 @@ def pdf(
 
 @router.put("/{cobranca_id}", response_model=CobrancaOut)
 def alterar(
-    cobranca_id: str, campos: dict, tenant_id: str, provider: Provider = _PROVIDER,
+    cobranca_id: str, campos: dict, tenant_id: str = _TENANT, provider: Provider = _PROVIDER,
     banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,
@@ -206,7 +263,7 @@ def alterar(
 
 @router.delete("/{cobranca_id}", response_model=CobrancaOut)
 def baixar(
-    cobranca_id: str, tenant_id: str, provider: Provider = _PROVIDER,
+    cobranca_id: str, tenant_id: str = _TENANT, provider: Provider = _PROVIDER,
     banco: Banco | None = _BANCO,
     numero_cliente: int | None = _NUMERO_CLIENTE,
     codigo_modalidade: int | None = _CODIGO_MODALIDADE,

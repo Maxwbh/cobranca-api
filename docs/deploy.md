@@ -380,7 +380,7 @@ ela é necessária, sai de configuração:
 
 | Onde | Como definir |
 |---|---|
-| Regressão HML (Actions) | Variável de repo `HML_BASE_URL`, ou `base_url` no dispatch. Sem ela, o job falha explicando. |
+| Regressão contra banco | `COB_BASE_URL` no shell de quem roda. **Não roda no Actions** — ver `postman/README.md`. |
 | Keepalive (Actions) | Variável de repo `KEEPALIVE_URLS` (lista separada por espaço) |
 | Coleção Postman | `base_url` do environment, ou `COB_BASE_URL` via `--env-var` |
 | `scripts/benchmark_lote.py` | `COB_BASE_URL`, ou `--base-url`. Padrão: `http://localhost:8000` |

@@ -4,7 +4,9 @@ import urllib.request
 import urllib.error
 import json
 
-REMESSA_URL = 'http://localhost:8000/api/remessa'
+# Mesma variável dos outros scripts: `API=https://meu-host python este.py`.
+API = os.environ.get('API', 'http://localhost:8000').rstrip('/')
+REMESSA_URL = f'{API}/api/remessa'
 OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_output'))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -63,8 +65,6 @@ DATA_SICOOB = {
 
 def generate_remessa(name, bank, cnab_type, data):
     """Gera arquivo de remessa via POST /api/remessa com upload de arquivo JSON."""
-    import tempfile, io
-
     # Grava dados em arquivo temporário
     tmp_path = os.path.join(OUTPUT_DIR, f"_tmp_{name}.json")
     with open(tmp_path, 'w', encoding='utf-8') as f:

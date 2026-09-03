@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 336" width="1200" height="336"
-     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline, 100% Python, licença MIT.">
+     role="img" aria-label="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 4 bancos online (C6, Sicoob, Inter, Itaú) e 19 offline, 100% Python, licença MIT.">
   <!-- GERADO por scripts/gerar-banners.py — nao edite a mao. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -52,7 +52,7 @@
         <rect width="30" height="30" rx="7" fill="#06B6D4" fill-opacity="0.14"/>
         <g transform="translate(5 5) scale(0.8333333333333334)" fill="none" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z M14 3v4h4 M9 13h6 M9 17h4"/></g>
         <text x="42" y="13" font-size="14" font-weight="600" fill="#F8FAFC">Boletos PDF e carnês</text>
-        <text x="42" y="28" font-size="11" fill="#94A3B8">Layouts A4 de 18 bancos e carnê 3 vias</text>
+        <text x="42" y="28" font-size="11" fill="#94A3B8">Layouts A4 de 19 bancos e carnê 3 vias</text>
         <rect x="306" y="1" width="56" height="17" rx="8.5" fill="#94A3B8" fill-opacity="0.14" stroke="#94A3B8" stroke-opacity="0.4" stroke-width="1"/>
         <text x="334.0" y="13" font-size="9" font-weight="700" letter-spacing="0.8" fill="#94A3B8" text-anchor="middle">OFFLINE</text>
       </g>

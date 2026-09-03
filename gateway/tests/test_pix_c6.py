@@ -147,18 +147,21 @@ def test_pix_tenant_sem_credencial_retorna_424(client):
     assert r.status_code == 424
 
 
+TXID = "TX1234567890123456789012345"  # [a-zA-Z0-9]{26,35}, como o BACEN exige
+
+
 def test_pix_cobv_aponta_o_location_para_a_cobv_e_nao_para_a_cob(client, c6_env, monkeypatch):
     """cob e cobv moram na mesma rota e se distinguem por `vencimento`. Sem esse
     parametro o Location de uma cobv apontaria para uma cob que nao existe."""
     monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
                         lambda self, method, path, json=None, params=None: {
-                            "txid": "T1", "status": "ATIVA"})
+                            "txid": TXID, "status": "ATIVA"})
     r = client.post("/pix", json={
         "tenant_id": "empresa1", "provider": "c6", "account_config": {"chave_pix": "k"},
-        "pix": {"valor": "1.00", "txid": "T1", "data_vencimento": "2026-12-31",
+        "pix": {"valor": "1.00", "txid": TXID, "data_vencimento": "2026-12-31",
                 "devedor": {"nome": "T", "documento": "12345678909"}}})
     assert r.status_code == 201, r.text
-    assert r.headers["Location"] == "/pix/T1?tenant_id=empresa1&provider=c6&vencimento=true"
+    assert r.headers["Location"] == f"/pix/{TXID}?tenant_id=empresa1&provider=c6&vencimento=true"
 
 
 def test_pix_cob_imediata_nao_marca_vencimento_no_location(client, c6_env, monkeypatch):
@@ -183,7 +186,7 @@ def test_cob_devolve_valor_e_expira_em(client, c6_env, monkeypatch):
     nao ajuda em nada na consulta."""
     monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
                         lambda self, m, p, json=None, params=None: {
-                            "txid": "T1", "status": "ATIVA", "valor": {"original": "1.00"},
+                            "txid": TXID, "status": "ATIVA", "valor": {"original": "1.00"},
                             "pixCopiaECola": "00020101…",
                             "calendario": {"criacao": "2026-08-04T17:47:12.639Z",
                                            "expiracao": 3600}})
@@ -236,7 +239,7 @@ def test_prazo_absurdo_do_banco_nao_derruba_a_rota(client, c6_env, monkeypatch, 
     a resposta inteira por um erro."""
     monkeypatch.setattr("app.clients.oauth_mtls.OAuthMtlsClient.request",
                         lambda self, m, p, json=None, params=None: {
-                            "txid": "T1", "status": "ATIVA", "calendario": calendario})
+                            "txid": TXID, "status": "ATIVA", "calendario": calendario})
     r = client.post("/pix", json={"tenant_id": "empresa1", "provider": "c6",
                                   "account_config": {"chave_pix": "k"},
                                   "pix": {"valor": "1.00"}})

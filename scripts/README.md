@@ -242,3 +242,61 @@ Mas há um motivo melhor para não elevá-lo sem pensar: o header
 limite de header do `http.client` — o cliente perde **até o PDF**. O serviço
 agora trunca e sinaliza (`X-Boletos-Info-Truncado`), mas atrás de nginx (8 KB)
 ou ALB (16 KB) o teto é bem menor: ajuste `HEADER_JSON_MAX_BYTES`.
+
+## `validar_pix_automatico.py` — o Pix Automático banco a banco
+
+Percorre a superfície BACEN (`rec`, `locrec`, `solicrec`, `cobr`, webhooks,
+cancelamento) num banco por vez, pelas rotas do gateway, e classifica cada
+resposta pelo que ela **prova** — não pelo status HTTP.
+
+```bash
+PYTHONPATH=gateway python scripts/validar_pix_automatico.py            # os 4 bancos ON
+PYTHONPATH=gateway python scripts/validar_pix_automatico.py c6
+PYTHONPATH=gateway python scripts/validar_pix_automatico.py --json > evidencia.json
+```
+
+Credenciais saem do ambiente, com os mesmos nomes dos roteiros de homologação
+(`C6_SANDBOX_*`, `SICOOB_SANDBOX_*`, `INTER_SANDBOX_*`, `ITAU_SANDBOX_TOKEN`).
+Banco sem credencial sai como `sem_credencial`, e banco sem a capacidade sai
+como `nao_oferecido` antes de qualquer chamada.
+
+O veredito que justifica o roteiro é o **`nao_provado`**: `2xx` cujo corpo não é
+JSON. Foi assim que uma página de WAF do Sicoob entrou na evidência de agosto
+como `201`. Detalhe em [pix-automatico.md](../docs/development/pix-automatico.md).
+
+## `validar_open_finance.py` — o que os bancos publicam no Open Finance
+
+Lê o **Diretório de Participantes** (público, sem credencial) e reporta, para os
+quatro bancos integrados, papéis ativos, authorisation servers e as famílias de
+API que interessam a cobrança — inclusive
+`payments-pix-recurring-payments-automatic`.
+
+```bash
+python scripts/validar_open_finance.py
+python scripts/validar_open_finance.py --json > evidencia-open-finance.json
+python scripts/validar_open_finance.py --participantes participants.json  # cópia local
+```
+
+Nada é enviado a banco nenhum. O que o relatório **não** prova — que esta API
+poderia consumir essas APIs — está em
+[open-finance.md](../docs/development/open-finance.md).
+
+## `check_referencia_rotas.py` — a referência da API não pode ficar para trás
+
+Guarda de CI, no mesmo espírito do `postman/check_coverage.py`: compara as rotas
+da **app em execução** com o que `docs/api/gateway-python.md` cita, e reprova o
+build quando sobra rota sem menção.
+
+```bash
+PYTHONPATH=gateway python scripts/check_referencia_rotas.py
+# docs/api/gateway-python.md: 67/67 rotas do gateway documentadas
+```
+
+Existe por um motivo medido: a referência chegou a citar **31 de 67** rotas.
+Faltavam o Pix Automático inteiro (16), os jobs em lote (11), os Pix recebidos
+(4) e a leitura/remoção dos webhooks (4) — nada estava *errado*, só ausente, e
+por isso ninguém notou.
+
+Só rota do gateway conta; a superfície offline (`/api/*`) tem spec própria em
+`docs/openapi.yaml`. `/docs`, `/redoc` e `/openapi.json` são isentos, com o
+motivo escrito no próprio script — isenção sem justificativa vira esconderijo.

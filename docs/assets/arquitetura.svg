@@ -100,7 +100,7 @@
   <g class="t">
     <rect x="110"  y="500" width="150" height="62" rx="10" fill="#fff" stroke="#06B6D4"/>
     <text x="185" y="527" text-anchor="middle" class="lbl">Boleto PDF</text>
-    <text x="185" y="546" text-anchor="middle" class="sub">18 bancos</text>
+    <text x="185" y="546" text-anchor="middle" class="sub">19 bancos</text>
 
     <rect x="278" y="500" width="150" height="62" rx="10" fill="#fff" stroke="#06B6D4"/>
     <text x="353" y="527" text-anchor="middle" class="lbl">CNAB 240/400</text>
