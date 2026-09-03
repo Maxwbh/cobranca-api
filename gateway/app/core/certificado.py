@@ -1,0 +1,209 @@
+# Quando a integração para de funcionar sozinha.
+#
+# O certificado mTLS dos bancos vale um ano e NÃO tem renovação in-place: vence,
+# e toda chamada passa a falhar no handshake — de uma vez, sem aviso, sem nada
+# no código ter mudado. É risco de operação, e a API tinha zero visibilidade
+# sobre ele: o material entrava cifrado no cofre e ninguém mais olhava.
+#
+# Só metadado derivado sai daqui. A chave privada e o segredo NUNCA aparecem —
+# `core/vault.py`: "NUNCA logar credencial/certificado".
+from __future__ import annotations
+
+import base64
+import re
+from dataclasses import asdict, dataclass
+from datetime import date, datetime, timezone
+from typing import Any
+
+#: TETO de dias antes do vencimento em que o certificado é reportado como
+#: `expirando`. Trinta é o prazo em que ainda dá para pedir, receber e trocar um
+#: certificado anual sem parada — abaixo disso a renovação vira urgência.
+DIAS_DE_ALERTA = 30
+
+#: Fração da vida do certificado usada quando ele vive menos que o teto acima.
+#: Um terço: sobra tempo para pedir, receber e trocar, proporcionalmente.
+FRACAO_DE_ALERTA = 3
+
+
+def limiar_de_alerta(vida_em_dias: int) -> int:
+    """A partir de quantos dias restantes este certificado é `expirando`.
+
+    Trinta dias fixos foi calibrado para certificado ANUAL e mentia em cima de
+    qualquer outro: o do Inter vive 30 dias, então nascia `expirando` no dia da
+    emissão, com a validade inteira pela frente. Alerta que nunca desliga não é
+    alerta — é ruído que ensina a ignorar o campo, e o campo existe justamente
+    para ser levado a sério no dia em que importa.
+
+    O teto continua valendo para quem vive um ano; abaixo dele, o limiar é
+    proporcional. Nunca menos de um dia: certificado de vida curtíssima ainda
+    merece um aviso antes de virar `expirado`.
+    """
+    return max(1, min(DIAS_DE_ALERTA, vida_em_dias // FRACAO_DE_ALERTA))
+
+
+@dataclass(frozen=True)
+class Certificado:
+    """O que dá para dizer de um certificado sem revelar nada dele."""
+
+    #: `ok`, `expirando`, `expirado` ou `ilegivel`.
+    situacao: str
+    titular: str | None = None
+    emissor: str | None = None
+    valido_de: str | None = None
+    valido_ate: str | None = None
+    dias_restantes: int | None = None
+    #: A partir de quantos dias restantes este certificado vira `expirando`.
+    #: Sai na resposta porque um limiar que varia com a vida do certificado
+    #: precisa ser legível: sem ele, `expirando` com 9 dias restantes num
+    #: caso e `ok` com 25 noutro parece incoerência, e é a regra funcionando.
+    alerta_a_partir_de: int | None = None
+    formato: str | None = None
+    detalhe: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+def _pem(valor: str) -> bytes:
+    """Aceita PEM cru ou o mesmo material em base64 — como o cliente HTTP faz."""
+    texto = (valor or "").strip()
+    if "-----BEGIN" in texto:
+        return texto.encode()
+    try:
+        return base64.b64decode(texto, validate=True)
+    except Exception:
+        return texto.encode()
+
+
+def _nome(x509_nome) -> str:
+    from cryptography.x509.oid import NameOID
+
+    partes = x509_nome.get_attributes_for_oid(NameOID.COMMON_NAME)
+    return partes[0].value if partes else x509_nome.rfc4514_string()
+
+
+def _do_x509(cert, formato: str, hoje: date) -> Certificado:
+    inicio = cert.not_valid_before_utc.date()
+    fim = cert.not_valid_after_utc.date()
+    dias = (fim - hoje).days
+    limiar = limiar_de_alerta((fim - inicio).days)
+    situacao = "expirado" if dias < 0 else ("expirando" if dias <= limiar else "ok")
+    return Certificado(
+        situacao=situacao,
+        titular=_nome(cert.subject),
+        emissor=_nome(cert.issuer),
+        valido_de=inicio.isoformat(),
+        valido_ate=fim.isoformat(),
+        dias_restantes=dias,
+        alerta_a_partir_de=limiar,
+        formato=formato,
+    )
+
+
+def descrever(credenciais: dict[str, Any], *, hoje: date | None = None) -> Certificado | None:
+    """Metadado do certificado das credenciais, ou `None` quando não há.
+
+    Lê o par PEM (`cert_pem`) ou o PKCS12 (`pfx_base64`) — os dois formatos que
+    os bancos entregam. Certificado ilegível vira `situacao="ilegivel"` em vez
+    de exceção: a rota que chama isto é de diagnóstico, e derrubá-la esconderia
+    justamente o caso que ela existe para mostrar.
+    """
+    hoje = hoje or datetime.now(timezone.utc).date()
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives.serialization import pkcs12
+    except ImportError:  # pragma: no cover - cryptography é dependência do projeto
+        return None
+
+    if credenciais.get("cert_pem"):
+        try:
+            return _do_x509(x509.load_pem_x509_certificate(_pem(credenciais["cert_pem"])),
+                            "pem", hoje)
+        except Exception as e:
+            return Certificado(situacao="ilegivel", formato="pem",
+                               detalhe=f"não foi possível ler o certificado: {type(e).__name__}")
+
+    if credenciais.get("pfx_base64"):
+        senha = (credenciais.get("pfx_password") or "").encode() or None
+        try:
+            _, cert, _ = pkcs12.load_key_and_certificates(
+                base64.b64decode(credenciais["pfx_base64"]), senha)
+            if cert is None:
+                return Certificado(situacao="ilegivel", formato="pkcs12",
+                                   detalhe="PKCS12 sem certificado")
+            return _do_x509(cert, "pkcs12", hoje)
+        except Exception as e:
+            detalhe = "senha do PKCS12 incorreta ou ausente" if "mac" in str(e).lower() \
+                else f"não foi possível abrir o PKCS12: {type(e).__name__}"
+            return Certificado(situacao="ilegivel", formato="pkcs12", detalhe=detalhe)
+
+    return None
+
+
+def par_confere(credenciais: dict[str, Any]) -> bool | None:
+    """A chave privada é a DESTE certificado? `None` quando não dá para dizer.
+
+    O erro que isto pega é o de sempre em troca de certificado: o `.crt` novo
+    com o `.key` antigo. O handshake falha com uma mensagem de TLS que não
+    aponta o par trocado, e a investigação começa pelo lugar errado — foi o que
+    quase aconteceu aqui, com dois certificados diferentes no mesmo pacote.
+    """
+    if not (credenciais.get("cert_pem") and credenciais.get("key_pem")):
+        return None
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        cert = x509.load_pem_x509_certificate(_pem(credenciais["cert_pem"]))
+        chave = serialization.load_pem_private_key(_pem(credenciais["key_pem"]), password=None)
+        return cert.public_key().public_numbers() == chave.public_key().public_numbers()
+    except Exception:
+        return None
+
+
+def host_do_titular(cert: Certificado | None) -> str | None:
+    """O host que o banco carimbou no CN, quando há.
+
+    É o que separa sandbox de produção no C6: `...-baas-api-sandbox.c6bank.info`
+    contra `...-baas-api.c6bank.info`. Nem todo banco carimba — o CN do Inter é
+    só o nome da aplicação (`Cobrança_api`) —, e por isso a resposta é `None` em
+    vez de um palpite: ausência de host não é sinal de nada.
+    """
+    if not cert or not cert.titular:
+        return None
+    achado = re.search(r"-([A-Za-z0-9.-]+\.[A-Za-z]{2,})$", cert.titular.strip())
+    return achado.group(1) if achado else None
+
+
+def ambiente_confere(cert: Certificado | None, base_url: str | None) -> bool | None:
+    """O certificado é do MESMO ambiente para onde a API está apontada?
+
+    `None` quando não dá para dizer (sem host no CN, sem base configurada) —
+    e `None` não é aviso: só três dos bancos carimbam host no CN.
+
+    O que isto evita já aconteceu: certificado de PRODUÇÃO carregado com a base
+    de SANDBOX. O banco recusa o handshake e responde `403 mTLS`, que se lê como
+    "credencial inválida" — manda conferir client_id e secret, que estão certos.
+    A informação para dizer a verdade estava aqui o tempo todo: o host do CN e o
+    host da base. Custava uma comparação de string e custou uma homologação
+    inteira, 54 casos recusados um a um.
+    """
+    host = host_do_titular(cert)
+    if not host or not base_url:
+        return None
+    alvo = re.sub(r"^\w+://", "", base_url.strip()).split("/")[0].split(":")[0]
+    return bool(alvo) and host.lower() == alvo.lower()
+
+
+def cnpj_do_titular(cert: Certificado | None) -> str | None:
+    """CNPJ que o banco carimbou no CN, quando há.
+
+    Os bancos nomeiam o titular como `<RAZAOSOCIAL><CNPJ>-<host>`; o host diz o
+    AMBIENTE. Devolver o CNPJ separado é o que deixa quem opera conferir num
+    olhar que carregou o certificado certo — a confusão que motivou este módulo
+    foi exatamente um pacote com dois, de CNPJs e ambientes diferentes.
+    """
+    if not cert or not cert.titular:
+        return None
+    achado = re.search(r"(\d{14})", cert.titular)
+    return achado.group(1) if achado else None

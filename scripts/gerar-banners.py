@@ -122,14 +122,17 @@ ICONES = {
 }
 
 RECURSOS = [
-    ("documento", CIANO,     "Boletos PDF e carnês",   "OFFLINE", "Layouts A4 de 18 bancos e carnê 3 vias"),
+    ("documento", CIANO,     "Boletos PDF e carnês",   "OFFLINE", "Layouts A4 de 19 bancos e carnê 3 vias"),
     ("raio",      "#38BDF8", "Pix e Bolepix híbrido",  "ONLINE",  "QR dinâmico e Pix Automático BACEN"),
     ("ciclo",     "#34D399", "CNAB 240/400 e OFX",     "OFFLINE", "Remessa, retorno e conciliação"),
     ("cartao",    "#A78BFA", "Link de pagamento",      "ONLINE",  "Checkout com crédito e débito"),
 ]
 
-# 19 = 4 online (C6, Sicoob, Inter, Itaú) + 18 offline da engine, menos os 3
-# que estão nos dois caminhos (C6, Sicoob e Itaú). Detalhamento no ALT e no site.
+# 19 = 4 online (C6, Sicoob, Inter, Itaú) + 19 offline da engine, menos os 4
+# que estão nos dois caminhos. O Inter era o único banco `on` sem `off`; a
+# pyCobrança 1.1.1 implementou o layout 077, então ele passou para os dois lados
+# e o offline foi de 18 para 19 — o TOTAL segue 19, porque nenhuma instituição
+# nova entrou. Detalhamento no ALT e no site.
 PILLS = ["19 bancos", "REST + Python", "MIT Open Source"]
 
 
@@ -163,7 +166,7 @@ def fundo(w, h):
 
 
 ALT = ("Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. "
-       "4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline, 100% Python, licença MIT.")
+       "4 bancos online (C6, Sicoob, Inter, Itaú) e 19 offline, 100% Python, licença MIT.")
 
 
 # ---------------------------------------------------------------- desktop

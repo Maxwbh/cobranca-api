@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, Request
@@ -18,6 +19,21 @@ from app.schemas import Status, WebhookEvent
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 _NORMALIZERS = {"c6": C6Provider, "sicoob": SicoobProvider, "inter": InterProvider}
+
+
+class BancoEmissor(str, Enum):
+    """Slugs que esta API sabe normalizar.
+
+    Era `str` livre, e a combinação com o `_check_token` (que faz `.upper()`)
+    deixava passar: `/webhooks/C6` autenticava — o token bate — e caía no
+    `_NORMALIZERS.get("C6")`, que é `None`. O evento virava `ignorado` com
+    **200**, e 200 diz ao banco "recebi, pode parar de reentregar". Uma
+    maiúscula na URL cadastrada, e toda liquidação sumia em silêncio.
+    """
+
+    c6 = "c6"
+    sicoob = "sicoob"
+    inter = "inter"
 
 # Status que move dinheiro na ponta do consumidor: é o que ele usa para dar
 # baixa. Só estes valem a ida ao banco para confirmar.
@@ -140,10 +156,18 @@ async def _handle(banco: str, request: Request, tenant_id: str | None) -> Webhoo
         body = await request.json()
     except ValueError as e:
         raise HTTPException(status_code=422, detail="corpo do webhook não é JSON") from e
+    # JSON VÁLIDO de forma errada (`"texto"`, `[1,2,3]`) estourava dentro do
+    # normalizador: 500 não-JSON, e o banco reentregando em loop um payload que
+    # nunca ia funcionar. Corpo vazio virava evento com todos os campos nulos,
+    # empurrado ao consumidor assinado pela nossa chave.
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=422,
+            detail=f"corpo do webhook deve ser um objeto JSON; recebido: {type(body).__name__}")
+    if not body:
+        raise HTTPException(status_code=422, detail="corpo do webhook vazio")
 
-    klass = _NORMALIZERS.get(banco)
-    if not klass:
-        return WebhookEvent(event="ignorado", raw={"banco": banco})
+    klass = _NORMALIZERS[banco]
 
     # Dedup ANTES de normalizar: o banco reentrega até receber 2xx, e sem isto o
     # consumidor recebe a mesma liquidação N vezes e dá baixa N vezes. A
@@ -209,24 +233,28 @@ def _liberar(marca: Any) -> None:
 
 _BANCO_EMISSOR = Path(
     description="Banco que está notificando — é o slug usado na URL cadastrada nele "
-                "(`c6`, `sicoob`, `inter`). Define qual `WEBHOOK_TOKEN__<BANCO>` "
-                "valida a chamada. Não confundir com o parâmetro `banco` das rotas "
-                "de cobrança, que é a instituição do request.",
+                "(`c6`, `sicoob`, `inter`), **em minúsculas**. Define qual "
+                "`WEBHOOK_TOKEN__<BANCO>` valida a chamada. Slug fora da lista é "
+                "`422`, e não `200`: 200 faria o banco parar de reentregar um evento "
+                "que ninguém processou. Não confundir com o parâmetro `banco` das "
+                "rotas de cobrança, que é a instituição do request.",
+    examples=["c6"],
 )
 
 
 @router.post("/{banco}", response_model=WebhookEvent)
-async def receber(request: Request, banco: str = _BANCO_EMISSOR) -> WebhookEvent:
+async def receber(request: Request, banco: BancoEmissor = _BANCO_EMISSOR) -> WebhookEvent:
     """Webhook global (consumidor único / destino default).
 
     Exige `WEBHOOK_TOKEN__<BANCO>` (ou o opt-out explícito). **Sem tenant na
     rota não há confirmação no banco** — o cofre é por tenant; prefira a rota
     com tenant se o status precisa ser verificado."""
-    return await _handle(banco, request, tenant_id=None)
+    return await _handle(banco.value, request, tenant_id=None)
 
 
 @router.post("/{banco}/{tenant_id}", response_model=WebhookEvent)
-async def receber_por_tenant(request: Request, tenant_id: str, banco: str = _BANCO_EMISSOR) -> WebhookEvent:
+async def receber_por_tenant(request: Request, tenant_id: str,
+                             banco: BancoEmissor = _BANCO_EMISSOR) -> WebhookEvent:
     """Webhook por tenant (multi-sistema). O banco aponta o callback de cada conta
     para esta URL; o tenant vem do path e roteia para o consumidor dono."""
-    return await _handle(banco, request, tenant_id=tenant_id)
+    return await _handle(banco.value, request, tenant_id=tenant_id)

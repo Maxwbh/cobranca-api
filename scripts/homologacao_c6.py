@@ -16,6 +16,8 @@ o status e o corpo do erro, porque em homologação a recusa também é evidênc
 Uso (dentro da janela do sandbox — seg-sex, 7h-23h BRT):
 
     export C6_SANDBOX_CLIENT_ID=... C6_SANDBOX_CLIENT_SECRET=...
+    export C6_SANDBOX_CERT_PEM="$(cat cert.crt)" C6_SANDBOX_KEY_PEM="$(cat cert.key)"
+    # ou, para quem tem o material em PKCS12:
     export C6_SANDBOX_PFX_BASE64=... C6_SANDBOX_PFX_PASSWORD=...
     export C6_SANDBOX_CHAVE_PIX=...
 
@@ -57,9 +59,14 @@ TENANT = os.environ.get("HML_TENANT", "homologacao")
 
 # O gateway lê credenciais do cofre por (tenant, provider). Injeta as do sandbox
 # antes de importar a app, para que os requests não precisem carregá-las.
+# `cert_pem`/`key_pem` entram porque é ASSIM que o C6 entrega o certificado: o
+# par .crt + .key, não PKCS12. Exigir PFX aqui obrigava um `openssl pkcs12
+# -export` antes de rodar o roteiro — passo manual, com a chave privada passando
+# por linha de comando. Os dois formatos valem; quem já converteu segue igual.
 for env_alvo, env_fonte in (
     ("client_id", "C6_SANDBOX_CLIENT_ID"), ("client_secret", "C6_SANDBOX_CLIENT_SECRET"),
     ("pfx_base64", "C6_SANDBOX_PFX_BASE64"), ("pfx_password", "C6_SANDBOX_PFX_PASSWORD"),
+    ("cert_pem", "C6_SANDBOX_CERT_PEM"), ("key_pem", "C6_SANDBOX_KEY_PEM"),
 ):
     valor = os.environ.get(env_fonte, "")
     if valor:
@@ -145,6 +152,8 @@ def at_01():
             "client_secret": os.environ["C6_SANDBOX_CLIENT_SECRET"],
             "pfx_base64": os.environ.get("C6_SANDBOX_PFX_BASE64", ""),
             "pfx_password": os.environ.get("C6_SANDBOX_PFX_PASSWORD", ""),
+            "cert_pem": os.environ.get("C6_SANDBOX_CERT_PEM", ""),
+            "key_pem": os.environ.get("C6_SANDBOX_KEY_PEM", ""),
         }})
 
 
@@ -727,6 +736,34 @@ CASOS = [
 # assincronia do banco, não por defeito.
 
 
+#: Campos que NUNCA saem na evidência versionada. `token` é a chave que decifra
+#: as credenciais guardadas (`core/credential_store`); `client_id` é metade do
+#: par de autenticação — e o C6 o devolve de volta no eco do cadastro de
+#: webhook, então ele entra na evidência sem ninguém ter escrito.
+#: `core/vault.py`: "NUNCA versionar em git".
+_MASCARAR = {"token": "bapi_<mascarado>", "client_id": "<mascarado>"}
+
+
+def _mascara(valor):
+    if isinstance(valor, dict):
+        return {k: (_MASCARAR[k] if k in _MASCARAR and isinstance(v, str) else _mascara(v))
+                for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_mascara(v) for v in valor]
+    return valor
+
+
+def _sem_token(item: dict) -> dict:
+    """Tira o segredo do caso antes de ele virar arquivo versionado.
+
+    Em profundidade: o corpo do banco é passthrough e aninha como quiser — uma
+    varredura só no primeiro nível deixaria passar o que estivesse um degrau
+    abaixo, que é exatamente onde ninguém procura.
+    """
+    corpo = item.get("response_body")
+    return {**item, "response_body": _mascara(corpo)} if corpo is not None else item
+
+
 def main() -> int:
     global API
     argv = sys.argv[1:]
@@ -806,7 +843,7 @@ def main() -> int:
 
     if so_json:
         print(json.dumps({"executado_em": datetime.now().isoformat(timespec="seconds"),
-                          "alvo": onde, "resultados": resultados},
+                          "alvo": onde, "resultados": [_sem_token(r) for r in resultados]},
                          ensure_ascii=False, indent=2, default=str))
     falhas = [r["caso"] for r in resultados if r.get("ok") is False]
     if falhas and not so_json:

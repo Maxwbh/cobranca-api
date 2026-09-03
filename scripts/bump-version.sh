@@ -79,6 +79,23 @@ substituir docs/openapi.yaml \
     "s/^              example: '${CURRENT_VERSION}'$/              example: '${NEW_VERSION}'/" \
     "^              example: '${NEW_VERSION}'$"
 
+# Cabeçalho da tabela de números da arquitetura. Ficou em `v2.2.0` até a 3.0.0
+# por não estar nesta lista, e dava à tabela cara de retrato datado.
+substituir docs/ARCHITECTURE.md \
+    "s/^| | v${CURRENT_VERSION} |$/| | v${NEW_VERSION} |/" \
+    "^| | v${NEW_VERSION} |$"
+
+# Exemplo de pin em produção. Este é instrução, não enfeite: parado, manda
+# fixar uma imagem antiga.
+substituir docs/index.md \
+    "s|ghcr.io/maxwbh/cobranca-api:${CURRENT_VERSION}|ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}|g" \
+    "ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}"
+
+# Swagger PUBLICADO: `docs/swagger/*` carrega a versão em quatro arquivos
+# gerados. O CI reprova com `--conferir` se ficarem atrás, e o script de
+# geração é a única fonte — não há sed a fazer aqui.
+echo -e "${YELLOW}⚠️  Rode também: PYTHONPATH=gateway python scripts/gerar-swagger-estatico.py${NC}"
+
 # CHANGELOG: abre a seção da versão logo abaixo de [Não lançado], que segue
 # existindo, vazia, para o próximo ciclo.
 if [ -f CHANGELOG.md ]; then
@@ -101,12 +118,17 @@ fi
 echo ""
 echo -e "${YELLOW}📝 Próximos passos:${NC}"
 echo "1. Mova as entradas de [Não lançado] para a seção [${NEW_VERSION}] no CHANGELOG.md"
-echo "2. Rode a suíte:"
+echo "2. Regere o Swagger publicado (o CI reprova se ficar atrás):"
+echo -e "   ${BLUE}PYTHONPATH=gateway python scripts/gerar-swagger-estatico.py${NC}"
+echo "3. Num MAJOR, confira o horizonte das depreciações:"
+echo -e "   ${BLUE}cd gateway && PYTHONPATH=. pytest tests/test_horizonte_de_depreciacao.py${NC}"
+echo "   (promessa de 'sai na ${NEW_VERSION}' fica falsa no instante da tag)"
+echo "4. Rode a suíte:"
 echo -e "   ${BLUE}cd gateway && PYTHONPATH=. pytest && cd ..${NC}"
-echo "3. Commit:"
-echo -e "   ${BLUE}git add VERSION CHANGELOG.md gateway/app/main.py docs/openapi.yaml${NC}"
+echo "5. Commit:"
+echo -e "   ${BLUE}git add -A${NC}"
 echo -e "   ${BLUE}git commit -m \"[RELEASE] Versão ${NEW_VERSION}\"${NC}"
-echo "4. Tag (só depois do merge em main):"
+echo "6. Tag (só depois do merge em main):"
 echo -e "   ${BLUE}git tag -a v${NEW_VERSION} -m \"Versão ${NEW_VERSION}\"${NC}"
 echo -e "   ${BLUE}git push origin main --tags${NC}"
 echo ""

@@ -8,7 +8,7 @@ from app.schemas import Status
 def c6_env(monkeypatch):
     monkeypatch.setenv("VAULT__empresa1__c6__client_id", "cid")
     monkeypatch.setenv("VAULT__empresa1__c6__client_secret", "sec")
-    # cobrança registrada do C6 pronta (senão cai no fallback brcobrança)
+    # cobrança registrada do C6 pronta (senão cai no fallback da engine offline)
     monkeypatch.setenv("C6_REGISTERED_READY", "true")
     # sem pfx -> contexto SSL default, não precisa de cert real no teste
 

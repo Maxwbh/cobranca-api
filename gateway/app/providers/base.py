@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from app.core.vault import CredentialNotFound
 from app.schemas import Cobranca, CobrancaOut, ConciliacaoOut, PixCobranca, PixCobrancaOut, WebhookEvent
 
 
@@ -11,6 +12,25 @@ class BankProvider(ABC):
     def __init__(self, *, account_config: dict[str, Any], credentials: dict[str, Any]) -> None:
         self.account_config = account_config
         self.credentials = credentials  # do cofre; em memória, não persiste
+
+    def credencial(self, chave: str) -> str:
+        """Credencial obrigatória, ou `424` dizendo qual falta.
+
+        Os providers liam `self.credentials["client_id"]` direto, e credencial
+        **incompleta** — presente, sem a chave — levantava `KeyError` cru, que
+        escapava dos handlers e virava **500**. Credencial **ausente** já tinha
+        o 424 de `CredentialNotFound`; a diferença entre os dois casos era o
+        chamador receber "erro do servidor" por um dado que faltava no cadastro
+        dele, sem nada dizer qual.
+
+        Não loga nem devolve o valor de credencial nenhuma — só o **nome** da
+        chave que falta.
+        """
+        valor = (self.credentials or {}).get(chave)
+        if not valor:
+            raise CredentialNotFound(
+                f"credencial '{chave}' ausente para este tenant/banco")
+        return str(valor)
 
     @abstractmethod
     def registrar(self, cobranca: Cobranca) -> CobrancaOut: ...
@@ -25,7 +45,7 @@ class BankProvider(ABC):
         raise NotImplementedError
 
     # --- capacidades opcionais (nem todo provider tem) ------------------------
-    # Os routers checam com hasattr/try antes de expor; brcobrança (offline) não
+    # Os routers checam com hasattr/try antes de expor; a engine offline não
     # implementa nenhuma delas.
 
     def pdf(self, cobranca_id: str) -> CobrancaOut:
@@ -41,6 +61,20 @@ class BankProvider(ABC):
         raise NotImplementedError
 
     def consultar_pix(self, txid: str) -> PixCobrancaOut:
+        raise NotImplementedError
+
+    def listar_cobrancas(self, *, inicio: str, fim: str, pagina: int, tamanho: int,
+                         filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Coleção de boletos do período, no formato do banco (passthrough).
+
+        Capacidade opcional: hoje só o Inter publica coleção e sumário de
+        cobranças. C6 e Sicoob emitem, consultam e baixam um título por vez.
+        """
+        raise NotImplementedError
+
+    def sumario_cobrancas(self, *, inicio: str, fim: str,
+                          filtros: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Totais do período por situação — o mesmo recorte da coleção."""
         raise NotImplementedError
 
     def listar_recebiveis(self, *, start_date: str, end_date: str, page: int, size: int) -> ConciliacaoOut:

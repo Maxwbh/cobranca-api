@@ -5,7 +5,10 @@ import urllib.parse
 import urllib.request
 import json
 
-API_URL = 'http://localhost:8000/api/boleto'
+# Mesma variável dos outros scripts: `API=https://meu-host python este.py`.
+# Antes só o generate_boleto.py a lia, e o README mandava usá-la nos três.
+API = os.environ.get('API', 'http://localhost:8000').rstrip('/')
+API_URL = f'{API}/api/boleto'
 OUTPUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test_output'))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -58,8 +61,15 @@ BASE_SICOOB = {
   "data_documento": "2026/11/26"
 }
 
-EMV_C6 = "00020101021226840014br.gov.bcb.pix2562payload-de-teste-c6-pix-12345678905204000053039865802BR5921Recebedor Teste C66009Sao Paulo62070503***6304ABCD"
-EMV_SICOOB = "00020101021226840014br.gov.bcb.pix2562payload-de-teste-sicoob-pix-12345678905204000053039865802BR5925Recebedor Teste Sicoob6009Sao Paulo62070503***63041234"
+# Bolepix: quem desenha o QR é a CHAVE, não um payload pronto. A engine monta
+# o EMV a partir de `chave_pix` (+ `tipo_chave_pix`, e `txid` se você quiser
+# rastrear a transação) e desenha o QR no PDF.
+#
+# Este script mandava `emv` e `pix_label`, herdados da era Ruby: a engine nunca
+# leu nenhum dos dois, então os seis boletos "pix" saíam IDÊNTICOS aos padrão —
+# 200, sem QR e sem aviso. Hoje esses campos respondem 400 apontando para cá.
+PIX_C6 = {"chave_pix": "33445566000186", "tipo_chave_pix": "cnpj", "txid": "C6TESTE001"}
+PIX_SICOOB = {"chave_pix": "98765432000198", "tipo_chave_pix": "cnpj", "txid": "SICOOBTESTE1"}
 
 FALHAS = []
 
@@ -111,9 +121,9 @@ for i in range(1, 4):
 # 3 pix
 for i in range(1, 4):
     c6_pix = BASE_C6.copy()
-    c6_pix.update({'emv': EMV_C6, 'pix_label': 'Pague com Pix C6'})
+    c6_pix.update(PIX_C6)
     sicoob_pix = BASE_SICOOB.copy()
-    sicoob_pix.update({'emv': EMV_SICOOB, 'pix_label': 'Pague com Pix Sicoob'})
+    sicoob_pix.update(PIX_SICOOB)
     generate_boleto('banco_c6', 'pix', i, c6_pix, 'moderno')
     generate_boleto('sicoob', 'pix', i, sicoob_pix, 'moderno')
 
@@ -128,4 +138,18 @@ if FALHAS:
         print(f"  - {f}")
     sys.exit(1)
 
+# 200 não prova QR. O defeito que estes seis boletos esconderam por meses foi
+# exatamente este: status 200, arquivo gravado, e o PDF "pix" byte a byte do
+# mesmo tamanho do padrão. Conferir o STATUS não pegaria; conferir o ARQUIVO
+# pega — o QR ocupa uns 4 KB.
+for banco in ('banco_c6', 'sicoob'):
+    for i in range(1, 4):
+        padrao = os.path.getsize(os.path.join(OUTPUT_DIR, f"{banco}_padrao_{i}.pdf"))
+        pix = os.path.getsize(os.path.join(OUTPUT_DIR, f"{banco}_pix_{i}.pdf"))
+        if pix <= padrao:
+            print(f"\nFALHOU: {banco}_pix_{i}.pdf ({pix} B) não é maior que o padrão"
+                  f" ({padrao} B) — o QR Pix não foi desenhado.")
+            sys.exit(1)
+
 print(f"Pronto! Os 12 boletos de teste foram salvos em {OUTPUT_DIR}.")
+print("Os 6 com Pix trazem o QR — conferido pelo tamanho do arquivo.")

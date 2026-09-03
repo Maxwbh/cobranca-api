@@ -312,6 +312,34 @@ NOTA_MOCK = ("sandbox do Sicoob é mock de schema: devolve dados aleatórios vá
              "normalização — não o comportamento do banco.")
 
 
+#: Campos que NUNCA saem na evidência versionada. `token` é a chave que decifra
+#: as credenciais guardadas (`core/credential_store`); `client_id` é metade do
+#: par de autenticação — e o C6 o devolve de volta no eco do cadastro de
+#: webhook, então ele entra na evidência sem ninguém ter escrito.
+#: `core/vault.py`: "NUNCA versionar em git".
+_MASCARAR = {"token": "bapi_<mascarado>", "client_id": "<mascarado>"}
+
+
+def _mascara(valor):
+    if isinstance(valor, dict):
+        return {k: (_MASCARAR[k] if k in _MASCARAR and isinstance(v, str) else _mascara(v))
+                for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_mascara(v) for v in valor]
+    return valor
+
+
+def _sem_token(item: dict) -> dict:
+    """Tira o segredo do caso antes de ele virar arquivo versionado.
+
+    Em profundidade: o corpo do banco é passthrough e aninha como quiser — uma
+    varredura só no primeiro nível deixaria passar o que estivesse um degrau
+    abaixo, que é exatamente onde ninguém procura.
+    """
+    corpo = item.get("response_body")
+    return {**item, "response_body": _mascara(corpo)} if corpo is not None else item
+
+
 def main() -> int:
     global API
     argv = sys.argv[1:]
@@ -366,7 +394,8 @@ def main() -> int:
     if so_json:
         print(json.dumps({"executado_em": datetime.now().isoformat(timespec="seconds"),
                           "alvo": onde, "banco": "sicoob", "ambiente": BASE_SANDBOX,
-                          "limitacao": NOTA_MOCK, "resultados": resultados},
+                          "limitacao": NOTA_MOCK,
+                          "resultados": [_sem_token(r) for r in resultados]},
                          ensure_ascii=False, indent=2, default=str))
     falhas = [r["caso"] for r in resultados if r.get("ok") is False]
     if falhas and not so_json:

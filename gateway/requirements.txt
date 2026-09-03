@@ -5,7 +5,23 @@ httpx>=0.27
 pydantic>=2.13.4
 cryptography>=42.0
 psycopg[binary]>=3.1
-pycobranca>=1.0.2,<2  # engine offline (100% Python) — PyPI, não git@main: build reprodutível
+# Engine offline (100% Python) — PyPI, não git: build reprodutível.
+#
+# Piso na 1.1.1 porque é dela para cima que existe o que o gateway consome:
+# o Inter (077) no contrato REST — sem ele o 19º banco offline não existe —,
+# `pix_vinculado` (que separa Bolepix de QR avulso), `pix_copia_cola` e
+# `pix_observacao` no `BoletoData`, o aviso `LayoutGenerico`, o `banco` em
+# `retorno_item_para_api` e os campos `valor_multa`/`percentual_desconto` do
+# `Pagamento`. Com a 1.1.0 a API prometeria no schema o que a engine não faz.
+#
+# Piso 1.1.2, e não 1.1.1: na 1.1.1 o `complemento()` do header do CNAB 400 do
+# Inter escrevia o sequencial com o formatador de TEXTO, dando `"42     "` no
+# header contra `CI400_001_0000042.REM` no nome — e o manual do banco (3.1)
+# condiciona o upload a serem o mesmo número. A 1.1.2 corrige, e
+# `test_o_sequencial_do_header_e_o_mesmo_do_nome` passa a exigir o alinhamento:
+# com a 1.1.1 instalada aquele caso fica VERMELHO, então o piso é dependência
+# real e não preferência.
+pycobranca>=1.1.2,<2
 pypdf>=4.0        # merge de boletos em PDF único (/api/boleto/multi)
 pyyaml>=6.0.3       # spec OpenAPI do offline
 python-multipart>=0.0.9  # uploads multipart (/api/remessa, /api/retorno, /api/ofx)
