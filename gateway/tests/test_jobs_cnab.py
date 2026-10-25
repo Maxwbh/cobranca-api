@@ -161,3 +161,37 @@ def test_webhook_e_metricas_do_job_cnab(client, monkeypatch):
 
     j = client.get(f"/jobs/cnab/remessas/{job_id}", params={"tenant_id": "empresa1"}).json()
     assert j["metricas"]["duracao_ms"] >= 0
+
+
+# --- o nome que o BANCO exige, também no lote ------------------------------------
+#
+# O arquivo em disco é nomeado pelo sublote, e continua sendo: o nome é único
+# dentro do job, e é dele que dependem o href e o zip. Mas quem baixa precisa
+# saber com que nome SUBIR — o Inter recusa o upload se o arquivo não se chamar
+# `CI400_001_<sequencial>.REM`, com o mesmo sequencial do header.
+
+CAB_INTER = {
+    "bank": "inter", "cnab_type": "cnab400",
+    "empresa_mae": "M&S DO BRASIL LTDA", "documento_cedente": "05230380000174",
+    "agencia": "0001", "conta_corrente": "123456", "digito_conta": "7",
+    "convenio": "123456", "carteira": "110", "sequencial_remessa": 42,
+}
+PAG_INTER = {**PAG, "nosso_numero": "1234567890"}
+
+
+def test_o_lote_registra_o_nome_de_upload_de_quem_tem_regra(client):
+    job_id = _cria(client, [{**CAB_INTER, "pagamentos": [PAG_INTER]}]).json()["job_id"]
+    files = client.get(f"/jobs/cnab/remessas/{job_id}/files",
+                       params={"tenant_id": "empresa1"}).json()
+    arquivo = files["arquivos"][0]
+    assert arquivo["nome"].endswith(".rem")          # em disco, pelo sublote
+    assert arquivo["nome_para_upload"] == "CI400_001_0000042.REM"
+
+
+def test_banco_sem_regra_nao_ganha_campo_de_upload(client):
+    """Só aparece onde há regra de banco. Presente em todo artefato, o campo
+    viraria ruído e quem lê passaria a ignorá-lo justamente onde importa."""
+    job_id = _cria(client, [{**CAB_BB, "pagamentos": [PAG]}]).json()["job_id"]
+    files = client.get(f"/jobs/cnab/remessas/{job_id}/files",
+                       params={"tenant_id": "empresa1"}).json()
+    assert "nome_para_upload" not in files["arquivos"][0]

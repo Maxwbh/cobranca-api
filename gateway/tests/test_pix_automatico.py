@@ -89,20 +89,28 @@ def test_solicitacao_jornada1(client, envs, monkeypatch):
 
 
 def test_cobranca_recorrente_jornada3(client, envs, monkeypatch):
+    # Datas RELATIVAS: a cobranca do ciclo e agendada para o futuro, e data fixa
+    # num teste vira falso negativo no dia em que ela vira passado.
+    from datetime import date, timedelta
+
+    venc = (date.today() + timedelta(days=30)).isoformat()
+    retent = (date.today() + timedelta(days=33)).isoformat()
+    txid = "COBR" + "0" * 22
+
     calls = _capture(monkeypatch, {"txid": "TX1", "status": "CRIADA"})
     body = {"tenant_id": "empresa1", "provider": "c6",
-            "cobranca": {"id_rec": "RR1", "valor": "1500.00", "data_vencimento": "2026-08-05",
-                         "info_adicional": "Aluguel 08/2026"}}
-    r = client.put("/pix-automatico/cobrancas/TXID123", json=body)
+            "cobranca": {"id_rec": "RR1", "valor": "1500.00", "data_vencimento": venc,
+                         "info_adicional": "Aluguel do ciclo"}}
+    r = client.put(f"/pix-automatico/cobrancas/{txid}", json=body)
     assert r.status_code == 201, r.text
     sent = calls[0]["json"]
-    assert calls[0]["path"] == "/v2/pix/cobr/TXID123" and calls[0]["method"] == "PUT"
-    assert sent == {"idRec": "RR1", "calendario": {"dataDeVencimento": "2026-08-05"},
-                    "valor": {"original": "1500.00"}, "infoAdicional": "Aluguel 08/2026"}
+    assert calls[0]["path"] == f"/v2/pix/cobr/{txid}" and calls[0]["method"] == "PUT"
+    assert sent == {"idRec": "RR1", "calendario": {"dataDeVencimento": venc},
+                    "valor": {"original": "1500.00"}, "infoAdicional": "Aluguel do ciclo"}
     # retentativa pós-vencimento
-    client.post("/pix-automatico/cobrancas/TXID123/retentativa/2026-08-08",
+    client.post(f"/pix-automatico/cobrancas/{txid}/retentativa/{retent}",
                 params={"tenant_id": "empresa1", "provider": "c6"})
-    assert calls[1]["path"] == "/v2/pix/cobr/TXID123/retentativa/2026-08-08"
+    assert calls[1]["path"] == f"/v2/pix/cobr/{txid}/retentativa/{retent}"
 
 
 def test_webhooks_pix_automatico(client, envs, monkeypatch):

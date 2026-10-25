@@ -204,26 +204,40 @@ gateway/app/
 ├── providers/         # um dialeto por banco
 ├── core/              # cofre, jobs, artefatos, engine, eventos
 └── clients/           # OAuth+mTLS e acesso à engine
-gateway/tests/         # 441 testes
+gateway/tests/         # suíte pytest — o build verifica a cobertura
 docs/openapi.yaml      # spec da superfície offline (OAS 3.0)
-postman/               # 129 requests com IDs de rastreabilidade
+postman/               # requests com IDs de rastreabilidade (BC-xxx)
 ```
 
 ---
 
 ## Números
 
-| | v2.2.0 |
+| | v3.0.0 |
 |---|---|
 | Linguagem | 100% Python |
 | Processos no container | 1 |
-| Módulos Python (`gateway/app`) | 41 |
-| Linhas em `gateway/app` | ~7.520 |
-| Providers REST | 3 (C6, Sicoob, Inter) |
-| Bancos no caminho offline | 18 |
-| Rotas online (`/docs`) | 67 |
-| Testes do gateway | 441 |
-| Requests na regressão Postman | 128 |
+| Providers REST | 4 (C6, Sicoob, Inter, Itaú) |
+| Bancos no caminho offline | 19 |
+| Rotas online (`/docs`) | 70 |
+
+<!--
+Quatro linhas saíram desta tabela: módulos, linhas de código, total de testes e
+requests na coleção Postman. Todas estavam defasadas — a de módulos por seis, a
+de linhas por mais de quatro mil, a da suíte por quase mil casos — e nenhuma
+estava errada quando foi escrita.
+
+Duas regras do repositório já diziam para tirá-las, e não alcançavam esta
+tabela: o guarda que proíbe total de suíte em vitrine procurava a contagem
+seguida da palavra "testes", e aqui ela vinha depois do rótulo, em célula
+própria; o que prende a contagem de bancos não lia este arquivo. Inventário
+parcial fica verde sobre o que não vê.
+
+O que ficou é estrutura — muda com decisão, não com commit — e está preso em
+`gateway/tests/test_numeros_da_doc.py`, inclusive o `v3.0.0` do cabeçalho,
+que o `scripts/bump-version.sh` atualiza.
+-->
+
 
 ---
 

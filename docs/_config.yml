@@ -7,7 +7,7 @@
 title: Cobranca-API
 description: >-
   Cobrança bancária brasileira em API REST: boleto, CNAB 240/400, Pix,
-  Pix Automático e OFX. 4 bancos online (C6, Sicoob, Inter, Itaú) e 18 offline,
+  Pix Automático e OFX. 4 bancos online (C6, Sicoob, Inter, Itaú) e 19 offline,
   100% Python, um container.
 theme: jekyll-theme-cayman
 lang: pt-BR
@@ -17,8 +17,15 @@ lang: pt-BR
 # link para um doc de provider (c6-rest, roadmap…) caía num `.md` cru no
 # GitHub, fora do layout. Agora são páginas do site, com índice próprio em
 # `development/`, e a separação é de navegação, não de publicação.
-exclude:
-  - openapi.yaml
+#
+# `openapi.yaml` ESTAVA excluído, e isso quebrava quatro páginas: `encargos`,
+# `gateway-python`, `ofx-parsing` e `troubleshooting` linkam `../openapi.yaml`,
+# que respondia 404 no site (no GitHub o mesmo link funciona, então o defeito
+# só aparecia para quem lia a versão publicada). Excluir não era proteção
+# contra nada: o arquivo não tem front matter, então o Jekyll o copia como
+# estático, sem tentar renderizá-lo, e o `jekyll-sitemap` não o lista porque
+# só indexa HTML. Conferido com build local antes e depois — publicado, byte a
+# byte igual ao fonte, e fora do sitemap.
 
 # Sem Gemfile: o Pages usa a versão hospedada do Jekyll. Se um dia o site
 # precisar de plugin fora da allowlist do GitHub, aí sim entra build próprio

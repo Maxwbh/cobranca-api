@@ -23,10 +23,14 @@ def test_webhook_sicoob_normaliza_pix(client, webhook_aberto):
     assert data["status"] == "liquidado"
 
 
-def test_webhook_banco_desconhecido_ignora(client, webhook_aberto):
+def test_webhook_de_banco_sem_normalizador_nao_responde_200(client, webhook_aberto):
+    """Antes: 200 com `event: "ignorado"`. E 200 diz ao banco "recebi, pode
+    parar de reentregar" -- o evento sumia em silencio. Quem nao tem
+    normalizador (o Itau, hoje) precisa falhar alto, para o erro de cadastro
+    aparecer no painel do banco em vez de virar pagamento perdido."""
     r = client.post("/webhooks/itau", json={"x": 1})
-    assert r.status_code == 200
-    assert r.json()["event"] == "ignorado"
+    assert r.status_code == 422, r.text
+    assert "c6" in r.text and "sicoob" in r.text and "inter" in r.text
 
 
 def test_webhook_c6_faz_push_do_evento(client, webhook_aberto, monkeypatch):
@@ -294,3 +298,50 @@ def test_falha_no_processamento_libera_a_marca(client, webhook_aberto, monkeypat
     r = client.post("/webhooks/c6", json=corpo)
     assert r.status_code == 200
     assert r.json()["event"] == "cobranca.atualizada"
+
+
+# --- revisao de /webhooks ---------------------------------------------------------
+
+@pytest.mark.parametrize("rota", ["/webhooks/C6", "/webhooks/C6/empresa1",
+                                  "/webhooks/Sicoob", "/webhooks/INTER"])
+def test_slug_do_banco_em_maiuscula_nao_engole_o_evento(client, webhook_aberto, rota):
+    """O pior caminho: `_check_token` faz `.upper()` e o token BATIA, enquanto o
+    `_NORMALIZERS.get("C6")` devolvia None -- o evento virava `ignorado` com
+    200. Uma maiuscula na URL cadastrada no banco e toda liquidacao sumia."""
+    r = client.post(rota, json={"id": "BOL-1", "status": "PAID"})
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize("corpo,esperado", [
+    ("texto", "str"), ([1, 2, 3], "list"), (42, "int"), (True, "bool")])
+def test_json_valido_de_forma_errada_nao_da_500(client, webhook_aberto, corpo, esperado):
+    """`"texto"` e `[1,2,3]` estouravam dentro do normalizador: 500 nao-JSON, e o
+    banco reentregando em loop um payload que nunca ia funcionar. Mesma familia
+    dos 500 corrigidos nas rotas /api/*."""
+    r = client.post("/webhooks/c6", json=corpo)
+    assert r.status_code == 422, r.text
+    assert esperado in r.json()["detail"]
+
+
+def test_corpo_vazio_nao_vira_evento_de_nada(client, webhook_aberto):
+    """`{}` produzia `cobranca.atualizada` com todos os campos nulos -- e esse
+    evento era empurrado ao consumidor ASSINADO PELA NOSSA CHAVE."""
+    r = client.post("/webhooks/c6", json={})
+    assert r.status_code == 422, r.text
+    assert "vazio" in r.json()["detail"]
+
+
+def test_corpo_valido_continua_passando(client, webhook_aberto):
+    r = client.post("/webhooks/c6", json={"id": "BOL-9", "status": "PAID"})
+    assert r.status_code == 200, r.text
+    assert r.json()["event"] == "cobranca.atualizada"
+
+
+def test_a_spec_lista_os_bancos_que_notificam(client):
+    """O slug era `str` livre: o Swagger nao dizia quais valem."""
+    spec = client.get("/openapi.json").json()["paths"]
+    for rota in ("/webhooks/{banco}", "/webhooks/{banco}/{tenant_id}"):
+        banco = next(p for p in spec[rota]["post"]["parameters"] if p["name"] == "banco")
+        assert banco["schema"]["$ref"].endswith("BancoEmissor")
+    enum = client.get("/openapi.json").json()["components"]["schemas"]["BancoEmissor"]["enum"]
+    assert sorted(enum) == ["c6", "inter", "sicoob"]

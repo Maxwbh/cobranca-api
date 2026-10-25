@@ -34,6 +34,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY gateway/app ./app
 # Spec OpenAPI da superfície offline (servida em /api/openapi.json|yaml)
 COPY docs/openapi.yaml /docs/openapi.yaml
+# Renderizador do Swagger (~1,6 MB), servido em /swagger-ui. Sem ele a página
+# busca CSS e JS na unpkg.com, e num deploy self-hosted sem essa saída o
+# Swagger não renderiza — só o cabeçalho aparece. Ausente, a página cai na CDN.
+COPY docs/swagger/vendor /swagger-ui
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app \
  && mkdir -p /app/data/jobs && chown -R app:app /app/data

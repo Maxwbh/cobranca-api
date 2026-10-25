@@ -76,7 +76,7 @@ def gerar() -> dict[Path, str]:
         SAIDA / "index.html": pagina_swagger(
             titulo="Cobranca-API — Gateway (Swagger)",
             superficie="Gateway REST · multi-banco",
-            pill="4 bancos ON · 18 OFF",
+            pill="4 bancos ON · 19 OFF",
             detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN — {_ONDE_EXECUTAR}",
             links=[("GitHub", GITHUB, False),
                    ("Offline / pyCobrança →", "./offline.html", True)],
@@ -86,7 +86,7 @@ def gerar() -> dict[Path, str]:
         SAIDA / "offline.html": pagina_swagger(
             titulo="Cobranca-API — Offline (Swagger)",
             superficie="Offline · pyCobrança",
-            pill="18 bancos · sem convênio",
+            pill="19 bancos · sem convênio",
             # Sem a versão da engine, de propósito. `pycobranca` entra por faixa
             # (>=1.0.2,<2), então ela varia com o ambiente que instalou — e o
             # CI, que roda `pip install` limpo, reprovava o arquivo commitado

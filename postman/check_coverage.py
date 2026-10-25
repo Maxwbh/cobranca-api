@@ -3,7 +3,7 @@
 
 Compara:
   1. paths+methods do OpenAPI do gateway (importa o app FastAPI); e
-  2. o inventário offline /api/* (lista OFFLINE abaixo)
+  2. a superfície offline /api/*, derivada do PRÓPRIO ROUTER
 contra os requests da coleção Postman. Uso:
   python postman/check_coverage.py            # da raiz do repo
 Saída: tabela endpoint x testado (o snapshot de cobertura da evidência).
@@ -18,16 +18,9 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COLLECTION = os.path.join(REPO, "postman", "cobranca-api.postman_collection.json")
 
-# A superfície offline /api/* agora é NATIVA (engine pyCobranca) e aparece no
-# OpenAPI interno do app — mas com include_in_schema=False (o Swagger do
-# offline é o /api/docs). Por isso o inventário permanece explícito aqui.
-OFFLINE = [
-    ("GET", "/api/health"), ("GET", "/api/info"), ("GET", "/api/metadata"),
-    ("GET", "/api/bancos"), ("GET", "/api/boleto/validate"), ("GET", "/api/boleto/data"),
-    ("GET", "/api/boleto/nosso_numero"), ("GET", "/api/boleto"),
-    ("POST", "/api/remessa"), ("POST", "/api/retorno"), ("POST", "/api/ofx/parse"),
-    ("GET", "/api/docs"),
-]
+#: Métodos que contam como superfície. `HEAD` e `OPTIONS` o Starlette registra
+#: sozinho e ninguém integra contra eles.
+METODOS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 
 def norm(path: str) -> str:
@@ -65,11 +58,37 @@ def gateway_endpoints() -> list[tuple[str, str]]:
     return sorted(set(eps))
 
 
+def offline_endpoints() -> list[tuple[str, str]]:
+    """A superfície offline sai do ROUTER, não de uma lista à mão.
+
+    A lista que havia aqui tinha SETE rotas a menos que o router: `/api/boleto/
+    multi`, as quatro `/api/render/*`, `/api/openapi.json` e `/api/openapi.yaml`.
+    Elas existiam, estavam publicadas em `docs/openapi.yaml` e não tinham request
+    nenhum — e não eram cobradas, porque rota fora do inventário não conta como
+    faltante. O relatório dizia "Cobertura: 100%": verdade sobre a lista, falso
+    sobre a superfície.
+
+    Um inventário à mão só está certo no dia em que é escrito. Este se corrige
+    sozinho quando entra rota nova — que é o único momento em que alguém precisa
+    ser avisado.
+    """
+    sys.path.insert(0, os.path.join(REPO, "gateway"))
+    from app.routers import offline  # noqa: E402
+
+    eps = {
+        (metodo, norm(rota.path))
+        for rota in offline.router.routes
+        for metodo in (getattr(rota, "methods", ()) or ())
+        if getattr(rota, "path", "").startswith("/api/") and metodo in METODOS
+    }
+    return sorted(eps)
+
+
 def main() -> int:
     tested = collection_requests()
     missing = []
     print(f"{'Endpoint':60} Testado")
-    for method, path in gateway_endpoints() + [(m, norm(p)) for m, p in OFFLINE]:
+    for method, path in gateway_endpoints() + offline_endpoints():
         ok = (method, path) in tested
         print(f"{method:7} {path:52} {'✔' if ok else '✘ FALTA'}")
         if not ok:
