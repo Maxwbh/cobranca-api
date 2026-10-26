@@ -128,12 +128,16 @@ RECURSOS = [
     ("cartao",    "#A78BFA", "Link de pagamento",      "ONLINE",  "Checkout com crédito e débito"),
 ]
 
-# 19 = 4 online (C6, Sicoob, Inter, Itaú) + 19 offline da engine, menos os 4
-# que estão nos dois caminhos. O Inter era o único banco `on` sem `off`; a
-# pyCobrança 1.1.1 implementou o layout 077, então ele passou para os dois lados
-# e o offline foi de 18 para 19 — o TOTAL segue 19, porque nenhuma instituição
-# nova entrou. Detalhamento no ALT e no site.
-PILLS = ["19 bancos", "REST + Python", "MIT Open Source"]
+# A primeira pílula dizia "19 bancos" — o TOTAL de instituições distintas, que
+# está certo: são 4 online e 19 offline, e os 4 online também estão entre os 19
+# (o Inter foi o último a entrar nos dois lados, com o layout 077 na pyCobrança
+# 1.1.1). Só que o Swagger, na mesma marca, responde "4 bancos ON · 19 OFF" à
+# mesma pergunta. Duas telas, dois números, nenhum errado — e o leitor não tem
+# como saber que contam coisas diferentes.
+#
+# Vence a forma do Swagger, porque ela diz O QUE CADA NÚMERO É. O total
+# continua no ALT e no site, onde há espaço para explicá-lo.
+PILLS = ["4 bancos ON · 19 OFF", "REST + Python", "MIT Open Source"]
 
 
 def icone(nome, x, y, px, cor):

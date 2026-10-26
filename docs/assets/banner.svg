@@ -37,9 +37,9 @@
   </g>
   <g font-family="'Liberation Sans', Arial, Helvetica, sans-serif">
     <text x="72" y="154" font-size="22" font-weight="500" fill="#CBD5E1">Boletos, Pix, CNAB 240/400 e OFX — via API REST</text>
-    <g transform="translate(72 182)"><rect width="106" height="34" rx="17.0" fill="#06B6D4"/><text x="53.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">19 bancos</text></g>
-    <g transform="translate(190 182)"><rect width="139" height="34" rx="17.0" fill="#06B6D4"/><text x="69.5" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">REST + Python</text></g>
-    <g transform="translate(341 182)"><rect width="156" height="34" rx="17.0" fill="#06B6D4"/><text x="78.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">MIT Open Source</text></g>
+    <g transform="translate(72 182)"><rect width="198" height="34" rx="17.0" fill="#06B6D4"/><text x="99.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">4 bancos ON · 19 OFF</text></g>
+    <g transform="translate(282 182)"><rect width="139" height="34" rx="17.0" fill="#06B6D4"/><text x="69.5" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">REST + Python</text></g>
+    <g transform="translate(433 182)"><rect width="156" height="34" rx="17.0" fill="#06B6D4"/><text x="78.0" y="22" font-size="15" font-weight="700" fill="#0F172A" text-anchor="middle">MIT Open Source</text></g>
     <text x="72" y="284" font-size="13" font-weight="500" fill="#94A3B8" letter-spacing="0.4">Oracle APEX · PL/SQL · Python · Java · Node · C# · PHP · Go · Delphi</text>
     <g transform="translate(730 44)">
       <rect width="398" height="248" rx="12" fill="#0B1220" fill-opacity="0.55" stroke="#334155" stroke-width="1"/>
