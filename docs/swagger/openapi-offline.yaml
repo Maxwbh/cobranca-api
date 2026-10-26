@@ -87,19 +87,20 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  # A URL do Render vem do NOME do serviço e muda se ele for renomeado,
-  # recriado ou apontado para domínio próprio — por isso é variável de servidor
-  # e não host fixo. No Swagger UI, edite o valor antes do "Try it out".
+  # Não há instância pública: este produto é self-hosted, e o host é sempre o de
+  # quem o sobe. Por isso o default é o container local — o único endereço que
+  # funciona sem ninguém configurar nada — e o host próprio entra como variável,
+  # editável no Swagger UI antes do "Try it out".
+  - url: http://localhost:8000
+    description: Local — `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
   - url: "{base_url}"
-    description: Sua instância do serviço
+    description: Sua instância hospedada
     variables:
       base_url:
-        default: https://cobranca-api-sq67.onrender.com
+        default: http://localhost:8000
         description: >-
-          Base URL da sua instância. O valor padrão é a demo pública, no plano
-          gratuito do Render — hiberna após 15 min e não é ambiente de produção.
-  - url: http://localhost:8000
-    description: Local — serviço único (docker compose up; FastAPI + pyCobranca)
+          Base URL da sua instalação. Troque pelo hostname que o seu provedor
+          de hospedagem mostrar.
 
 tags:
   - name: Health

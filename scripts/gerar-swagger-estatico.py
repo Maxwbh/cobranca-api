@@ -44,8 +44,8 @@ SITE = "https://maxwbh.github.io/cobranca-api"
 # A página publicada não tem servidor atrás: o "Try it out" do swagger-ui não
 # teria para onde mandar a chamada. Dizer isso no cabeçalho evita que o leitor
 # conclua que a API está quebrada — e entrega as duas formas de executar.
-_ONDE_EXECUTAR = ('para executar: <a href="https://cobranca-api-sq67.onrender.com/docs">demo</a>'
-                  " · <code>docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest</code>")
+_ONDE_EXECUTAR = ("para executar: <code>docker run -p 8000:8000"
+                  " ghcr.io/maxwbh/cobranca-api:latest</code> → <code>localhost:8000/docs</code>")
 
 
 # As descrições linkam a outra superfície por caminho de SERVIDOR (`/api/docs`).
