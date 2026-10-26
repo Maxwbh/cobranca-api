@@ -14,7 +14,7 @@ from pathlib import Path
 
 # A marca em 64x64, geometria idêntica a docs/assets/marca-escura.svg.
 _MARCA = (
-    '<svg class="cob-mark" width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">'
+    '<svg class="cob-mark" width="46" height="46" viewBox="0 0 64 64" aria-hidden="true">'
     '<g fill="#F8FAFC"><rect x="6" y="14" width="8" height="36" rx="1.5"/>'
     '<rect x="18" y="14" width="6" height="36" rx="1.5"/>'
     '<rect x="28" y="14" width="4" height="36" rx="1.5"/></g>'
@@ -30,11 +30,14 @@ _FAVICON = (
     "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2016%2016%22%20width=%2216%22%20height=%2216%22%20role=%22img%22%20aria-label=%22Cobranca-API%22%3E%3Cstyle%3E%20.barra%20%7B%20fill:%20#0F172A;%20%7D%20.seta%20%7B%20stroke:%20#0891B2;%20%7D%20@media%20(prefers-color-scheme:%20dark)%20%7B%20.barra%20%7B%20fill:%20#F8FAFC;%20%7D%20.seta%20%7B%20stroke:%20#06B6D4;%20%7D%20%7D%20%3C/style%3E%3Cg%20class=%22barra%22%3E%3Crect%20x=%221%22%20y=%223%22%20width=%223%22%20height=%2210%22%20rx=%220.5%22/%3E%3Crect%20x=%225.5%22%20y=%223%22%20width=%222.5%22%20height=%2210%22%20rx=%220.5%22/%3E%3C/g%3E%3Cpath%20class=%22seta%22%20d=%22M11.25%204.25%20L14%208%20L11.25%2011.75%22%20fill=%22none%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E"
 )
 
+#: O subtítulo do herói — texto IDÊNTICO ao do `docs/assets/banner.svg`, que é
+#: o que a capa mostra. Preso em `test_mesma_identidade_nas_duas_paginas.py`.
+SUBTITULO = "Boletos, Pix, CNAB 240/400 e OFX — via API REST"
+
 #: A frase de apoio do cabeçalho. É a MESMA da capa do site
 #: (`docs/assets/banner.svg` e o `description` do `_config.yml`): quem chega
 #: pelo Google numa e pela outra lê a mesma coisa.
-TAGLINE = ("Boletos, Pix, CNAB 240/400 e OFX — via API REST. Produto"
-           " <strong>self-hosted</strong>: não há instância pública, e o"
+TAGLINE = ("Produto <strong>self-hosted</strong>: não há instância pública, e o"
            " <em>Try&nbsp;it&nbsp;out</em> fala com a sua."
            '<span class="cmd">docker run -p 8000:8000'
            " ghcr.io/maxwbh/cobranca-api:latest</span>")
@@ -43,45 +46,59 @@ TAGLINE = ("Boletos, Pix, CNAB 240/400 e OFX — via API REST. Produto"
 #: (`/docs`, `/api/docs` e `/redoc`) — uma identidade só, num lugar só.
 _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
     body { margin: 0; background: #FFFFFF; }
+
+    /* O herói tem a MESMA forma da capa do site (`docs/_layouts/default.html`
+       + `docs/assets/banner.svg`): lockup grande da marca, uma frase do que o
+       produto faz, selos em pílula e a fileira de botões embaixo, com um
+       primário cheio. Antes era uma barra fina com tudo numa linha só — lia
+       como menu de aplicação, não como a capa do mesmo projeto. */
     .cob-topbar {
       background: linear-gradient(120deg, #0F172A, #152449);
-      padding: 20px 28px 18px; color: #fff; border-bottom: 3px solid #06B6D4;
+      padding: 34px 28px 28px; color: #fff; border-bottom: 3px solid #06B6D4;
       font-family: -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif;
     }
-    /* A linha de identificação é a mesma de antes; o cabeçalho é que deixou de
-       ser só ela. A capa do site abre com marca, uma frase do que o produto faz
-       e os botões — aqui também, no ritmo de uma página de referência: alta o
-       bastante para ser a mesma casa, baixa o bastante para o primeiro endpoint
-       continuar acima da dobra. */
-    .cob-topbar .linha {
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    .cob-topbar .dentro { max-width: 1080px; margin: 0 auto; }
+    .cob-topbar .linha { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .cob-topbar h1 {
+      margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.5px;
     }
-    .cob-topbar .tagline {
-      margin: 9px 0 0; color: #CBD5E1; font-size: 13.5px; max-width: 72ch;
+    .cob-topbar h1 span { color: #06B6D4; }
+    .cob-topbar .surface {
+      color: #67E8F9; font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px;
     }
-    /* O comando sai do meio da frase e vira linha própria: embutido, ele
-       quebrava entre `docker` e `run` e o fundo do chip fazia parecer dois. */
+    .cob-topbar .sub {
+      margin: 10px 0 0; color: #F8FAFC; font-size: 17px; font-weight: 400;
+    }
+    .cob-topbar .selos {
+      margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    }
+    .cob-topbar .pill {
+      background: rgba(6,182,212,.14); border: 1px solid #06B6D4;
+      color: #67E8F9; font-size: 12px; font-weight: 600;
+      border-radius: 999px; padding: 5px 13px; letter-spacing: .4px;
+    }
+    .cob-topbar small { color: #94A3B8; font-size: 12px; }
+    .cob-topbar .tagline { margin: 14px 0 0; color: #CBD5E1; font-size: 14px; max-width: 72ch; }
+    /* O comando é linha própria: embutido na frase ele quebrava entre `docker`
+       e `run`, e o fundo do chip fazia parecer dois. */
     .cob-topbar .tagline .cmd {
-      display: block; margin-top: 7px; max-width: 100%;
+      display: block; margin-top: 9px; max-width: 100%;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       background: rgba(248,250,252,.12); color: #F8FAFC;
-      border-radius: 6px; padding: 4px 10px; font-size: 12.5px;
+      border-radius: 6px; padding: 6px 12px; font-size: 12.5px;
       overflow-x: auto; white-space: nowrap;
     }
-    .cob-topbar h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .2px; }
-    .cob-topbar h1 span { color: #06B6D4; }
-    .cob-topbar .surface { color: #67E8F9; font-size: 12px; font-weight: 700;
-                           text-transform: uppercase; letter-spacing: 1.2px; }
-    .cob-topbar small { color: #94A3B8; font-size: 12px; }
-    .cob-topbar .pill { background: rgba(6,182,212,.14); border: 1px solid #06B6D4;
-                        color: #67E8F9; font-size: 11px; font-weight: 600;
-                        border-radius: 999px; padding: 3px 10px; letter-spacing: .4px; }
-    .cob-topbar .links { margin-left: auto; display: flex; gap: 8px; }
-    .cob-topbar a { color: #fff; font-size: 13px; font-weight: 600; text-decoration: none;
-                    border: 1px solid rgba(248,250,252,.4); border-radius: 6px; padding: 5px 12px; }
-    .cob-topbar a:hover { border-color: #06B6D4; background: rgba(6,182,212,.15); }
-    .cob-topbar a.primario { background: #06B6D4; border-color: #06B6D4; color: #0F172A; }
-    .cob-topbar a.primario:hover { background: #22D3EE; border-color: #22D3EE; }
+    .cob-topbar .links { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .cob-topbar a {
+      color: #F8FAFC; font-size: 14px; font-weight: 600; text-decoration: none;
+      border: 1px solid rgba(248,250,252,.4); border-radius: 6px; padding: 9px 18px;
+    }
+    .cob-topbar a:hover { border-color: rgba(248,250,252,.85); background: rgba(248,250,252,.12); }
+    /* Texto navy sobre ciano = 7,35 de contraste; branco sobre ciano reprova AA
+       — é a mesma razão e o mesmo par da capa. */
+    .cob-topbar a.primario { background: #06B6D4; border-color: #06B6D4; color: #0F172A; font-weight: 700; }
+    .cob-topbar a.primario:hover { background: #22D3EE; border-color: #22D3EE; color: #0F172A; }
     .cob-mark { flex: none; }"""
 
 _PAGINA = """<!DOCTYPE html>
@@ -209,15 +226,20 @@ __CSS_TOPBAR__
 </head>
 <body>
   <div class="cob-topbar">
-    <div class="linha">
-      __MARCA__
-      <h1>Cobranca<span>-API</span></h1>
-      <span class="surface">__SUPERFICIE__</span>
-      <span class="pill">__PILL__</span>
-      <small>__DETALHE__</small>
+    <div class="dentro">
+      <div class="linha">
+        __MARCA__
+        <h1>Cobranca<span>-API</span></h1>
+        <span class="surface">__SUPERFICIE__</span>
+      </div>
+      <p class="sub">__SUBTITULO__</p>
+      <div class="selos">
+        <span class="pill">__PILL__</span>
+        <small>__DETALHE__</small>
+      </div>
+      <p class="tagline">__TAGLINE__</p>
       <div class="links">__LINKS__</div>
     </div>
-    <p class="tagline">__TAGLINE__</p>
   </div>
   <div id="swagger-ui"></div>
   <script src="__ASSETS__/swagger-ui-bundle.js"></script>
@@ -260,15 +282,20 @@ __CSS_TOPBAR__
 </head>
 <body>
   <div class="cob-topbar">
-    <div class="linha">
-      __MARCA__
-      <h1>Cobranca<span>-API</span></h1>
-      <span class="surface">__SUPERFICIE__</span>
-      <span class="pill">__PILL__</span>
-      <small>__DETALHE__</small>
+    <div class="dentro">
+      <div class="linha">
+        __MARCA__
+        <h1>Cobranca<span>-API</span></h1>
+        <span class="surface">__SUPERFICIE__</span>
+      </div>
+      <p class="sub">__SUBTITULO__</p>
+      <div class="selos">
+        <span class="pill">__PILL__</span>
+        <small>__DETALHE__</small>
+      </div>
+      <p class="tagline">__TAGLINE__</p>
       <div class="links">__LINKS__</div>
     </div>
-    <p class="tagline">__TAGLINE__</p>
   </div>
   <redoc spec-url="__SPEC__"></redoc>
   <script src="__ASSETS__/redoc.standalone.js"></script>
@@ -313,7 +340,7 @@ def _ancoras(links: list[tuple[str, str, bool]]) -> str:
 
 
 def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
-                   tagline: str = TAGLINE,
+                   tagline: str = TAGLINE, subtitulo: str = SUBTITULO,
                    links: list[tuple[str, str, bool]], spec_url: str,
                    assets: str = ASSETS_SWAGGER) -> str:
     """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
@@ -327,13 +354,14 @@ def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
             .replace("__PILL__", pill)
             .replace("__DETALHE__", detalhe)
             .replace("__TAGLINE__", tagline)
+            .replace("__SUBTITULO__", subtitulo)
             .replace("__LINKS__", ancoras)
             .replace("__SPEC__", spec_url)
             .replace("__ASSETS__", assets.rstrip("/")))
 
 
 def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
-                 tagline: str = TAGLINE,
+                 tagline: str = TAGLINE, subtitulo: str = SUBTITULO,
                  links: list[tuple[str, str, bool]], spec_url: str,
                  assets: str = ASSETS_SWAGGER) -> str:
     """A mesma casca, com o Redoc no lugar do Swagger UI.
@@ -352,6 +380,7 @@ def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
             .replace("__PILL__", pill)
             .replace("__DETALHE__", detalhe)
             .replace("__TAGLINE__", tagline)
+            .replace("__SUBTITULO__", subtitulo)
             .replace("__LINKS__", _ancoras(links))
             .replace("__SPEC__", spec_url)
             .replace("__ASSETS__", assets.rstrip("/")))
