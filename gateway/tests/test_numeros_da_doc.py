@@ -231,6 +231,22 @@ def test_a_secao_de_fallback_cobre_a_flag_de_todo_banco_online():
     assert not faltam, f"o README do gateway não documenta as flags {faltam}"
 
 
+def test_a_tabela_de_env_lista_a_flag_de_todo_banco_online():
+    """Citar a flag na prosa não basta: quem configura o deploy lê a TABELA.
+
+    Ela listava só `C6_` e `SICOOB_` — o mesmo inventário parcial de sempre,
+    numa segunda superfície do mesmo arquivo. Quem subisse um deploy com Inter
+    ou Itaú não acharia o nome da variável onde foi procurá-lo.
+    """
+    texto = (RAIZ / "gateway" / "README.md").read_text(encoding="utf-8")
+    na_tabela = set(re.findall(r"^\| `(\w+_REGISTERED_READY)` \|", texto, re.MULTILINE))
+    assert na_tabela, "nenhuma linha de flag na tabela de env — a forma mudou"
+    faltam = sorted(f"{b.upper()}_REGISTERED_READY" for b in _bancos_online()
+                    if f"{b.upper()}_REGISTERED_READY" not in na_tabela)
+    assert not faltam, (
+        f"a tabela de configuração (env) não lista {faltam}; tem {sorted(na_tabela)}")
+
+
 def test_todo_banco_online_e_rebaixado_para_a_engine_sem_a_flag():
     """A afirmação que a seção de fallback faz, cobrada no serviço.
 

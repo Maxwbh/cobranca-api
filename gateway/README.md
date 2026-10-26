@@ -164,13 +164,38 @@ sistemaA → SUB__sistemaA__URL (Sistema 1)
 sistemaB → SUB__sistemaB__URL (Sistema 2)   # eventos roteados por tenant
 ```
 
-## Fallback — nenhum dos quatro bancos está homologado ainda
-Enquanto a cobrança **registrada** (API do banco) não está homologada, o
-caminho `on` é **rebaixado para a engine** (pyCobrança) — gera o documento
-localmente, sem credencial de banco. Quando homologar, ligue por banco:
-`C6_REGISTERED_READY=true`, `SICOOB_REGISTERED_READY=true`,
-`INTER_REGISTERED_READY=true`, `ITAU_REGISTERED_READY=true`. O roteamento fica
-em `registry.build_provider`, e a decisão em `registry.registered_ready`.
+## Fallback — o caminho `on` só vale com a flag do banco ligada
+Sem `<BANCO>_REGISTERED_READY`, o caminho `on` é **rebaixado para a engine**
+(pyCobrança): gera o documento localmente, sem credencial de banco. Com a flag,
+vai para a API do banco. O roteamento fica em `registry.build_provider`, e a
+decisão em `registry.registered_ready`.
+
+**São duas coisas diferentes, e confundi-las já rendeu uma frase errada aqui.**
+A *homologação* é do banco — acontece fora deste repositório e nada no código
+sabe dela. A *flag* é do ambiente: define quando aquele deploy passa a usar a
+via registrada. A flag nasce desligada em todo lugar, inclusive em produção
+depois de homologado, até alguém ligá-la; ela não é, e nunca foi, um registro
+de homologação.
+
+Estado da homologação em 26/10/2026 — informado pela operação, não medido
+daqui:
+
+| Banco | Homologado | Flag do ambiente |
+|---|---|---|
+| C6 | ✅ | `C6_REGISTERED_READY=true` |
+| Sicoob | ✅ | `SICOOB_REGISTERED_READY=true` |
+| Inter | ainda não | `INTER_REGISTERED_READY` — ligue quando homologar |
+| Itaú | ainda não | `ITAU_REGISTERED_READY` — ligue quando homologar |
+
+Nenhum arquivo de deploy do repositório (`docker-compose.yml`, `render.yaml`)
+define essas variáveis — é configuração do ambiente, por deploy.
+
+> **Ressalva sobre o Sicoob, que está no [registro de homologação](../docs/homologacao/README.md).**
+> O sandbox dele é **mock de schema**: a evidência atesta roteamento, contrato
+> e normalização, não comportamento do banco — nenhum boleto foi registrado e
+> nenhum Pix criado. Ligar `SICOOB_REGISTERED_READY=true` manda cobrança real
+> por um caminho cuja única prova automatizada é contra um mock. Vale uma
+> emissão de verdade, conferida no extrato, antes de abrir para volume.
 
 Medido com `provider=on` e a flag ausente, para os quatro bancos:
 
@@ -195,6 +220,8 @@ Medido com `provider=on` e a flag ausente, para os quatro bancos:
 |---|---|
 | `C6_REGISTERED_READY` | `true` usa a cobrança registrada do C6; default cai no offline |
 | `SICOOB_REGISTERED_READY` | `true` usa a cobrança registrada do Sicoob; default cai no offline |
+| `INTER_REGISTERED_READY` | `true` usa a cobrança registrada do Inter; default cai no offline |
+| `ITAU_REGISTERED_READY` | `true` usa a cobrança registrada do Itaú; default cai no offline |
 | `EVENT_WEBHOOK_URL` | webhook do consumidor **global** (push de eventos) |
 | `EVENT_WEBHOOK_SECRET` | segredo HMAC do destino global (`X-Signature`) |
 | `SUB__<tenant>__URL` | callback **por tenant** (multi-sistema) — sobrepõe o global |
