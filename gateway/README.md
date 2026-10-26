@@ -20,7 +20,7 @@ docker compose up --build   # (na raiz do repo)
 
 | | Produto | Repo / dir | Papel | Versão |
 |---|---|---|---|---|
-| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob/Inter, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
+| **Este** | **Cobranca-API** (serviço) | `gateway/` | providers C6/Sicoob/Inter/Itaú, cofre, webhook, conciliação | FastAPI `version` em `app/main.py` |
 | Outro | **pyCobrança** (engine) | biblioteca Python (pip) | boleto/CNAB/OFX/PIX-QR — chamada in-process por `app/core/pycob.py` | `pycobranca.__version__` |
 
 - A engine offline é a biblioteca [pyCobrança](https://github.com/Maxwbh/pyCobranca)
@@ -164,18 +164,31 @@ sistemaA → SUB__sistemaA__URL (Sistema 1)
 sistemaB → SUB__sistemaB__URL (Sistema 2)   # eventos roteados por tenant
 ```
 
-## Fallback — C6/Sicoob ainda não 100%
-Enquanto a cobrança **registrada** (API do banco) de C6/Sicoob não está
-homologada, o gateway **cai no caminho offline** (engine pyCobrança) — gera o
-documento localmente, sem precisar de credencial de banco. Quando homologar,
-ligue por banco: `C6_REGISTERED_READY=true` / `SICOOB_REGISTERED_READY=true`.
-O roteamento fica em `registry.build_provider`.
+## Fallback — nenhum dos quatro bancos está homologado ainda
+Enquanto a cobrança **registrada** (API do banco) não está homologada, o
+caminho `on` é **rebaixado para a engine** (pyCobrança) — gera o documento
+localmente, sem credencial de banco. Quando homologar, ligue por banco:
+`C6_REGISTERED_READY=true`, `SICOOB_REGISTERED_READY=true`,
+`INTER_REGISTERED_READY=true`, `ITAU_REGISTERED_READY=true`. O roteamento fica
+em `registry.build_provider`, e a decisão em `registry.registered_ready`.
 
-> **O Inter está fora desse mecanismo, de propósito.** A engine offline não tem
-> o layout do 077: cair nela emitiria um boleto **registrado no banco errado** —
-> falha silenciosa, e cara. Sem credencial, `provider=inter` responde `424`.
-> `registry._OFFLINE_BANK` não tem entrada para ele, e isso é a decisão, não um
-> esquecimento.
+Medido com `provider=on` e a flag ausente, para os quatro bancos:
+
+| `banco` | flag ausente | flag `=true` |
+|---|---|---|
+| `c6` | `PyCobrancaProvider` | `C6Provider` |
+| `sicoob` | `PyCobrancaProvider` | `SicoobProvider` |
+| `inter` | `PyCobrancaProvider` | `InterProvider` |
+| `itau` | `PyCobrancaProvider` | `ItauProvider` |
+
+> **Esta seção dizia o contrário sobre o Inter, e era o aviso mais caro do
+> arquivo.** O texto afirmava que o 077 estava *fora* do mecanismo de propósito,
+> porque "a engine offline não tem o layout do 077" e cair nela emitiria boleto
+> **registrado no banco errado**. A premissa deixou de valer quando o Inter
+> entrou como 19º banco da engine: `GET /bancos` publica `caminhos: ["on",
+> "off"]` e `fallback_offline: "inter"`, e `build_provider` devolve
+> `PyCobrancaProvider` — o rebaixamento que o texto garantia não acontecer.
+> Quem lesse o README decidiria sem flag confiando num `424` que não vem.
 
 ## Configuração (env)
 | Var | Para quê |
