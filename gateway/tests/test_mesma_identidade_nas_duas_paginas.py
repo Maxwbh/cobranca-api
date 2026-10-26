@@ -61,6 +61,23 @@ def test_a_cor_do_nucleo_da_marca_esta_nas_duas_paginas(cor: str, papel: str):
     assert not faltam, f"{cor} ({papel}) sumiu de {faltam}"
 
 
+def test_o_subtitulo_do_heroi_e_o_mesmo_da_capa():
+    """A frase sob a marca é a mesma nas duas páginas.
+
+    A capa serve a frase pelo `banner.svg`; o Swagger, por uma constante no
+    tema. São dois arquivos, e a única coisa que os mantinha iguais era eu ter
+    copiado e colado uma vez.
+    """
+    banner = (RAIZ / "docs" / "assets" / "banner.svg").read_text(encoding="utf-8")
+    tema = SWAGGER.read_text(encoding="utf-8")
+    achado = re.search(r'^SUBTITULO = "([^"]+)"', tema, re.MULTILINE)
+    assert achado, "a constante SUBTITULO mudou de forma — reveja este guarda"
+    frase = achado.group(1)
+    assert frase in banner, (
+        f"o herói do Swagger diz {frase!r}, que não está no banner da capa "
+        "(docs/assets/banner.svg). As duas páginas abrem com frases diferentes.")
+
+
 def test_a_tabela_da_descricao_rola_sozinha():
     """Medido com navegador a 390px: a tabela da descrição tem ~635px de
     largura natural e, com `overflow: hidden`, empurrava a PÁGINA inteira para

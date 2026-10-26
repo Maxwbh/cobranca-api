@@ -29,8 +29,16 @@ DEMO = re.compile(
 
 #: Onde procurar: o que o leitor lê. `docs/swagger/` é gerado — entra pela
 #: fonte (`scripts/gerar-swagger-estatico.py`), não por cópia.
+#:
+#: O `.html` do Jekyll entrou DEPOIS, e por ter escapado: a primeira versão
+#: deste guarda varria `.md`, `.yaml` e `.py`, ficou verde, e o botão "Demo ao
+#: vivo" do herói continuou apontando para a demo do Render — porque ele mora
+#: em `docs/_layouts/default.html`, que é o arquivo mais visível do site e não
+#: estava no inventário. Guarda que não varre onde o defeito mora passa pelo
+#: motivo errado.
 ALVOS = ("README.md", "docs/**/*.md", "docs/openapi.yaml", "scripts/*.py",
-         "examples/**/*.md", "postman/*.md")
+         "examples/**/*.md", "postman/*.md",
+         "docs/_layouts/*.html", "docs/_includes/*.html")
 
 #: Dois arquivos ENSINAM sobre hospedagem, e aí o nome do provedor é a lição,
 #: não uma dependência: `deploy.md` mostra como subir (Render incluído) e
