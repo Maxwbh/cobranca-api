@@ -158,7 +158,7 @@ ambas por **introspecção do código** (não há como envelhecer).
 | [Leitura de OFX](api/ofx-parsing.md) | Extrato v1/v2 e conciliação com os boletos emitidos |
 | [Troubleshooting](api/troubleshooting.md) | Erros comuns e o que significam |
 | [Arquitetura](ARCHITECTURE.md) | Como as peças se encaixam |
-| [Guia de deploy](deploy.md) | Imagem no GHCR, Render, variáveis de ambiente e troubleshooting |
+| [Guia de deploy](deploy.md) | Imagem no GHCR, o que o serviço pede do host, variáveis e persistência |
 | [Notas de engenharia](development/) | Roadmap de providers e o guia de integração de cada banco |
 | [**Swagger — gateway REST**](swagger/) | Todos os endpoints do gateway, publicados aqui |
 | [**Swagger — offline (`/api/*`)**](swagger/offline.html) | Boleto, CNAB e OFX sem convênio |
@@ -194,10 +194,10 @@ docker build -t cobranca-api .
 docker run -p 8000:8000 -e LOG_LEVEL=info cobranca-api
 ```
 
-Um `Dockerfile`, um processo, sem sidecar. O
-[guia de deploy](deploy.md)
-cobre o Render.com e as variáveis de ambiente — inclusive os tetos de lote
-(`LOTE_MAX_ITENS`, `JOB_MAX_ITENS`) e o que muda ao subir de plano.
+Um `Dockerfile`, um processo, sem sidecar — roda em qualquer host Docker. O
+[guia de deploy](deploy.md) cobre o que o serviço pede do host, as variáveis de
+ambiente e a persistência — inclusive os tetos de lote (`LOTE_MAX_ITENS`,
+`JOB_MAX_ITENS`) e o que muda com mais memória.
 
 <div class="cta-final">
   <h2>Teste a API agora</h2>

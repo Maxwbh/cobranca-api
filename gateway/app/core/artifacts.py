@@ -2,7 +2,8 @@
 #
 # Contrato pyCobrança doc 12: "não retornar PDFs em base64 dentro do JSON" —
 # persistir e devolver referências com hash, tamanho e expiração. Aqui o
-# storage é o disco do container (Render: /app/data, volume gravável).
+# storage é o disco do container: `/app/data`, que o Dockerfile cria com
+# `chown app` — o processo não é root e não grava em `/app`.
 #
 # Layout:
 #   <ARTIFACT_DIR>/<job_id>/items/<item_id>.pdf

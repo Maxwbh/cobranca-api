@@ -88,6 +88,43 @@ def test_o_server_default_da_spec_e_o_container_local():
                 f"a variável de servidor `{nome}` tem default {var['default']!r}")
 
 
+def test_o_merge_na_main_nao_publica_em_provedor_nenhum():
+    """`autoDeploy: true` fazia todo merge na `main` publicar numa instância do
+    Render — o repositório tinha dono de infraestrutura sem ninguém decidir
+    isso a cada release, e a instância pública da doc saía junto.
+
+    O blueprint continua no repo, válido para quem quiser repetir; o que não
+    pode voltar é o gatilho automático.
+    """
+    bp = RAIZ / "render.yaml"
+    if not bp.is_file():
+        pytest.skip("sem render.yaml — nada a cobrar")
+    cfg = yaml.safe_load(bp.read_text(encoding="utf-8"))
+    for servico in cfg.get("services") or []:
+        assert servico.get("autoDeploy") is False, (
+            f"`autoDeploy` do serviço {servico.get('name')!r} é "
+            f"{servico.get('autoDeploy')!r}; tem de ser False")
+
+
+def test_o_guia_de_deploy_nao_e_de_um_provedor_so():
+    """O guia era um passo a passo do Render: "Criar Serviço no Render",
+    "Regiões Disponíveis", "Já Configuradas no render.yaml". Um produto que é
+    um container não tem provedor de referência — o guia descreve o que o
+    serviço pede do host, e cada provedor é apêndice.
+    """
+    texto = (RAIZ / "docs" / "deploy.md").read_text(encoding="utf-8")
+    titulos = re.findall(r"^#{2,3} (.+)$", texto, re.MULTILINE)
+    assert titulos, "o guia ficou sem seções — reveja este guarda"
+    com_provedor = [t for t in titulos
+                    if re.search(r"render|heroku|fly\.io|vercel|railway", t, re.I)
+                    and "apêndice" not in t.lower()]
+    assert not com_provedor, (
+        f"seções do guia nomeiam provedor fora de um apêndice: {com_provedor}")
+    assert "docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api" in texto, (
+        "o guia deixou de abrir pela imagem pronta, que é o caminho que serve "
+        "em qualquer host")
+
+
 def test_o_guarda_reconhece_o_endereco_que_saiu(tmp_path):
     """Controle: o padrão precisa pegar a forma exata que estava publicada."""
     for url in ("https://cobranca-api-sq67.onrender.com/docs",

@@ -11,8 +11,9 @@
 #
 # Backend (auto-detectado):
 #   - Postgres/Supabase se SUPABASE_DB_URL ou DATABASE_URL estiver no ambiente;
-#   - SQLite local caso contrário (Render Free: disco efêmero — após deploy o
-#     consumidor recebe 401 e recadastra, 1 chamada).
+#   - SQLite local caso contrário. Em host de disco EFÊMERO o arquivo some a
+#     cada deploy: o consumidor recebe 401 e recadastra, 1 chamada. Para
+#     sobreviver ao redeploy, volume persistente em /app/data ou Postgres.
 from __future__ import annotations
 
 import hashlib
@@ -79,7 +80,8 @@ CREATE TABLE IF NOT EXISTS credential_tokens (
 
 
 class SqliteStore(CredentialStore):
-    """SQLite local (default no Render Free — disco efêmero, ver cabeçalho)."""
+    """SQLite local — o default. Em disco efêmero não sobrevive ao redeploy;
+    ver o cabeçalho do módulo."""
 
     def __init__(self, path: str) -> None:
         self.path = path
