@@ -30,15 +30,43 @@ _FAVICON = (
     "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2016%2016%22%20width=%2216%22%20height=%2216%22%20role=%22img%22%20aria-label=%22Cobranca-API%22%3E%3Cstyle%3E%20.barra%20%7B%20fill:%20#0F172A;%20%7D%20.seta%20%7B%20stroke:%20#0891B2;%20%7D%20@media%20(prefers-color-scheme:%20dark)%20%7B%20.barra%20%7B%20fill:%20#F8FAFC;%20%7D%20.seta%20%7B%20stroke:%20#06B6D4;%20%7D%20%7D%20%3C/style%3E%3Cg%20class=%22barra%22%3E%3Crect%20x=%221%22%20y=%223%22%20width=%223%22%20height=%2210%22%20rx=%220.5%22/%3E%3Crect%20x=%225.5%22%20y=%223%22%20width=%222.5%22%20height=%2210%22%20rx=%220.5%22/%3E%3C/g%3E%3Cpath%20class=%22seta%22%20d=%22M11.25%204.25%20L14%208%20L11.25%2011.75%22%20fill=%22none%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E"
 )
 
+#: A frase de apoio do cabeçalho. É a MESMA da capa do site
+#: (`docs/assets/banner.svg` e o `description` do `_config.yml`): quem chega
+#: pelo Google numa e pela outra lê a mesma coisa.
+TAGLINE = ("Boletos, Pix, CNAB 240/400 e OFX — via API REST. Produto"
+           " <strong>self-hosted</strong>: não há instância pública, e o"
+           " <em>Try&nbsp;it&nbsp;out</em> fala com a sua."
+           '<span class="cmd">docker run -p 8000:8000'
+           " ghcr.io/maxwbh/cobranca-api:latest</span>")
+
 #: CSS do cabeçalho, compartilhado pelas três páginas de documentação
 #: (`/docs`, `/api/docs` e `/redoc`) — uma identidade só, num lugar só.
 _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
     body { margin: 0; background: #FFFFFF; }
     .cob-topbar {
       background: linear-gradient(120deg, #0F172A, #152449);
-      padding: 13px 28px; color: #fff; border-bottom: 3px solid #06B6D4;
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 20px 28px 18px; color: #fff; border-bottom: 3px solid #06B6D4;
       font-family: -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif;
+    }
+    /* A linha de identificação é a mesma de antes; o cabeçalho é que deixou de
+       ser só ela. A capa do site abre com marca, uma frase do que o produto faz
+       e os botões — aqui também, no ritmo de uma página de referência: alta o
+       bastante para ser a mesma casa, baixa o bastante para o primeiro endpoint
+       continuar acima da dobra. */
+    .cob-topbar .linha {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .cob-topbar .tagline {
+      margin: 9px 0 0; color: #CBD5E1; font-size: 13.5px; max-width: 72ch;
+    }
+    /* O comando sai do meio da frase e vira linha própria: embutido, ele
+       quebrava entre `docker` e `run` e o fundo do chip fazia parecer dois. */
+    .cob-topbar .tagline .cmd {
+      display: block; margin-top: 7px; max-width: 100%;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: rgba(248,250,252,.12); color: #F8FAFC;
+      border-radius: 6px; padding: 4px 10px; font-size: 12.5px;
+      overflow-x: auto; white-space: nowrap;
     }
     .cob-topbar h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .2px; }
     .cob-topbar h1 span { color: #06B6D4; }
@@ -46,7 +74,7 @@ _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B
                            text-transform: uppercase; letter-spacing: 1.2px; }
     .cob-topbar small { color: #94A3B8; font-size: 12px; }
     .cob-topbar .pill { background: rgba(6,182,212,.14); border: 1px solid #06B6D4;
-                        color: #A5F3FC; font-size: 11px; font-weight: 600;
+                        color: #67E8F9; font-size: 11px; font-weight: 600;
                         border-radius: 999px; padding: 3px 10px; letter-spacing: .4px; }
     .cob-topbar .links { margin-left: auto; display: flex; gap: 8px; }
     .cob-topbar a { color: #fff; font-size: 13px; font-weight: 600; text-decoration: none;
@@ -93,13 +121,18 @@ __CSS_TOPBAR__
     .swagger-ui .info .description p code,
     .swagger-ui .info .description li code,
     .swagger-ui .info .description td code {
-      background: #E8EEF6; color: #0F172A; border-radius: 4px; padding: 1px 5px;
+      background: #F1F5F9; color: #0F172A; border-radius: 4px; padding: 1px 5px;
     }
 
     /* Tabela da descrição como cartão (igual ao site). */
     .swagger-ui .info .description table {
       border-collapse: separate; border-spacing: 0; width: 100%;
-      border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; margin: .9em 0;
+      border: 1px solid #E2E8F0; border-radius: 10px; margin: .9em 0;
+      /* `display: block` + rolagem PRÓPRIA. Com `overflow: hidden` e largura
+         natural de ~635px, no telefone ela empurrava a página inteira para
+         fora: 390 de viewport contra 681 de conteúdo, e a rolagem horizontal
+         valia para tudo, texto incluído. Agora quem rola é a tabela. */
+      display: block; overflow-x: auto; max-width: 100%;
     }
     .swagger-ui .info .description th {
       background: #0F172A; color: #F8FAFC; text-align: left;
@@ -120,7 +153,7 @@ __CSS_TOPBAR__
       color: #0F172A; text-decoration: none; margin-right: 6px;
     }
     .swagger-ui .info .info__contact a:hover, .swagger-ui .info .info__license a:hover,
-    .swagger-ui .info .info__extdocs a:hover { border-color: #06B6D4; background: #ECFEFF; }
+    .swagger-ui .info .info__extdocs a:hover { border-color: #06B6D4; background: #F0F9FF; }
 
     /* Barra de servidores/autorização */
     .swagger-ui .scheme-container { background: #F8FAFC; box-shadow: none;
@@ -176,12 +209,15 @@ __CSS_TOPBAR__
 </head>
 <body>
   <div class="cob-topbar">
-    __MARCA__
-    <h1>Cobranca<span>-API</span></h1>
-    <span class="surface">__SUPERFICIE__</span>
-    <span class="pill">__PILL__</span>
-    <small>__DETALHE__</small>
-    <div class="links">__LINKS__</div>
+    <div class="linha">
+      __MARCA__
+      <h1>Cobranca<span>-API</span></h1>
+      <span class="surface">__SUPERFICIE__</span>
+      <span class="pill">__PILL__</span>
+      <small>__DETALHE__</small>
+      <div class="links">__LINKS__</div>
+    </div>
+    <p class="tagline">__TAGLINE__</p>
   </div>
   <div id="swagger-ui"></div>
   <script src="__ASSETS__/swagger-ui-bundle.js"></script>
@@ -224,12 +260,15 @@ __CSS_TOPBAR__
 </head>
 <body>
   <div class="cob-topbar">
-    __MARCA__
-    <h1>Cobranca<span>-API</span></h1>
-    <span class="surface">__SUPERFICIE__</span>
-    <span class="pill">__PILL__</span>
-    <small>__DETALHE__</small>
-    <div class="links">__LINKS__</div>
+    <div class="linha">
+      __MARCA__
+      <h1>Cobranca<span>-API</span></h1>
+      <span class="surface">__SUPERFICIE__</span>
+      <span class="pill">__PILL__</span>
+      <small>__DETALHE__</small>
+      <div class="links">__LINKS__</div>
+    </div>
+    <p class="tagline">__TAGLINE__</p>
   </div>
   <redoc spec-url="__SPEC__"></redoc>
   <script src="__ASSETS__/redoc.standalone.js"></script>
@@ -274,6 +313,7 @@ def _ancoras(links: list[tuple[str, str, bool]]) -> str:
 
 
 def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
+                   tagline: str = TAGLINE,
                    links: list[tuple[str, str, bool]], spec_url: str,
                    assets: str = ASSETS_SWAGGER) -> str:
     """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
@@ -286,12 +326,14 @@ def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
             .replace("__SUPERFICIE__", superficie)
             .replace("__PILL__", pill)
             .replace("__DETALHE__", detalhe)
+            .replace("__TAGLINE__", tagline)
             .replace("__LINKS__", ancoras)
             .replace("__SPEC__", spec_url)
             .replace("__ASSETS__", assets.rstrip("/")))
 
 
 def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
+                 tagline: str = TAGLINE,
                  links: list[tuple[str, str, bool]], spec_url: str,
                  assets: str = ASSETS_SWAGGER) -> str:
     """A mesma casca, com o Redoc no lugar do Swagger UI.
@@ -309,6 +351,7 @@ def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
             .replace("__SUPERFICIE__", superficie)
             .replace("__PILL__", pill)
             .replace("__DETALHE__", detalhe)
+            .replace("__TAGLINE__", tagline)
             .replace("__LINKS__", _ancoras(links))
             .replace("__SPEC__", spec_url)
             .replace("__ASSETS__", assets.rstrip("/")))

@@ -8,7 +8,11 @@
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Cobranca-API"
-LABEL org.opencontainers.image.description="Cobrança multi-banco (C6/Sicoob) + engine pyCobranca — 100% Python"
+# A descrição ficou em "(C6/Sicoob)" por dois bancos online e uma major: o
+# Inter e o Itaú entraram e nada aqui cobrava o texto. Está presa ao serviço em
+# `gateway/tests/test_numeros_da_doc.py`, que a compara com o catálogo que o
+# `GET /bancos` publica — é a mesma regra dos outros números da vitrine.
+LABEL org.opencontainers.image.description="Cobrança bancária brasileira numa API REST: 4 bancos online (C6, Sicoob, Inter, Itaú) e 19 offline por CNAB — boleto, Pix, Pix Automático e OFX, 100% Python"
 LABEL org.opencontainers.image.authors="Maxwell Oliveira <maxwbh@gmail.com>"
 LABEL org.opencontainers.image.url="https://github.com/Maxwbh/cobranca-api"
 LABEL org.opencontainers.image.source="https://github.com/Maxwbh/cobranca-api"

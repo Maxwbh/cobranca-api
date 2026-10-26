@@ -57,7 +57,7 @@ de erro. A Cobranca-API existe para você integrar **uma vez**:
 Uma chamada devolve o PDF pronto:
 
 ```bash
-curl -G https://cobranca-api-sq67.onrender.com/api/boleto \
+curl -G http://localhost:8000/api/boleto \
   --data-urlencode 'bank=banco_brasil' \
   --data-urlencode 'type=pdf' \
   --data-urlencode 'data={"valor":1500.00,"cedente":"Empresa LTDA","documento_cedente":"11222333000181","sacado":"Joao da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-31"}' \
@@ -67,10 +67,9 @@ curl -G https://cobranca-api-sq67.onrender.com/api/boleto \
 Trocar `type=pdf` por `/validate`, `/data` ou `/nosso_numero` devolve validação e
 campos calculados sem gerar o PDF.
 
-> A instância pública roda no plano gratuito do Render e hiberna após 15 minutos
-> de inatividade — a **primeira** chamada pode levar até um minuto. É ambiente de
-> demonstração, não de produção, e a URL **não é fixa**: o Render a deriva do nome
-> do serviço. Na sua instalação, troque pelo hostname do seu.
+> O host é o seu: `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
+> e a API responde em `localhost:8000`, sem cadastro e sem credencial de banco.
+> Hospedando, troque pelo hostname da sua instalação.
 
 ---
 
@@ -159,19 +158,20 @@ ambas por **introspecção do código** (não há como envelhecer).
 | [Leitura de OFX](api/ofx-parsing.md) | Extrato v1/v2 e conciliação com os boletos emitidos |
 | [Troubleshooting](api/troubleshooting.md) | Erros comuns e o que significam |
 | [Arquitetura](ARCHITECTURE.md) | Como as peças se encaixam |
-| [Guia de deploy](deploy.md) | Imagem no GHCR, Render, variáveis de ambiente e troubleshooting |
+| [Guia de deploy](deploy.md) | Imagem no GHCR, o que o serviço pede do host, variáveis e persistência |
 | [Notas de engenharia](development/) | Roadmap de providers e o guia de integração de cada banco |
 | [**Swagger — gateway REST**](swagger/) | Todos os endpoints do gateway, publicados aqui |
 | [**Swagger — offline (`/api/*`)**](swagger/offline.html) | Boleto, CNAB e OFX sem convênio |
 
 O Swagger publicado é **gerado do código a cada versão** e o CI reprova se ele
-ficar para trás — não é uma cópia que envelhece. Ele mora no site porque a
-instância de demonstração hiberna: documentação que some quando o servidor
-dorme não serve para quem está decidindo integrar.
+ficar para trás — não é uma cópia que envelhece. Ele mora no site porque este
+produto é self-hosted: não existe instância pública para apontar, e quem está
+decidindo se integra precisa ler a referência **antes** de subir container
+nenhum.
 
-Para **executar** as chamadas (o `Try it out`), use a
-[demo ao vivo](https://cobranca-api-sq67.onrender.com/docs) ou suba a sua com
-um `docker run` — aí o Swagger é servido pela própria API.
+Para **executar** as chamadas (o `Try it out`), suba a sua instância com um
+`docker run` — aí o Swagger é servido pela própria API, em
+`http://localhost:8000/docs`, e o botão tem para onde mandar a chamada.
 
 ---
 
@@ -194,10 +194,10 @@ docker build -t cobranca-api .
 docker run -p 8000:8000 -e LOG_LEVEL=info cobranca-api
 ```
 
-Um `Dockerfile`, um processo, sem sidecar. O
-[guia de deploy](deploy.md)
-cobre o Render.com e as variáveis de ambiente — inclusive os tetos de lote
-(`LOTE_MAX_ITENS`, `JOB_MAX_ITENS`) e o que muda ao subir de plano.
+Um `Dockerfile`, um processo, sem sidecar — roda em qualquer host Docker. O
+[guia de deploy](deploy.md) cobre o que o serviço pede do host, as variáveis de
+ambiente e a persistência — inclusive os tetos de lote (`LOTE_MAX_ITENS`,
+`JOB_MAX_ITENS`) e o que muda com mais memória.
 
 <div class="cta-final">
   <h2>Teste a API agora</h2>
@@ -205,7 +205,7 @@ cobre o Render.com e as variáveis de ambiente — inclusive os tetos de lote
   sem convênio, sem credencial, sem cadastro.</p>
   <p>
     <a class="btn btn-primario" href="swagger/">Ver o Swagger</a>
-    <a class="btn" href="https://cobranca-api-sq67.onrender.com/docs">Testar na demo</a>
+    <a class="btn" href="deploy.html">Como hospedar</a>
     <a class="btn" href="https://github.com/Maxwbh/cobranca-api">Ver no GitHub</a>
   </p>
 </div>

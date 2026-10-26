@@ -31,9 +31,10 @@ que já existe no Oracle (`UTL_HTTP` + `APEX_JSON`, ou `APEX_WEB_SERVICE`).
 -- 2) no schema da aplicação: cria o pacote
 @cobranca_api_pkg.sql
 
--- 3) aponta para a sua instância (ou deixe a demo pública)
+-- 3) aponta para a sua instância — nao ha instancia publica: o produto e
+--    self-hosted, e o host e sempre o de quem o sobe
 BEGIN
-  cobranca_api.g_base_url := 'https://SEU-SERVICO.onrender.com';   -- troque pelo seu host
+  cobranca_api.g_base_url := 'https://SEU-HOST';             -- ou http://localhost:8000
   cobranca_api.g_wallet   := 'file:/u01/app/oracle/wallet';  -- HTTPS
 END;
 /

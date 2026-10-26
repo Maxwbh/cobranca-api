@@ -1,8 +1,8 @@
 # Guia de Deploy
 
-O guia completo — imagem pronta no GHCR, Render.com passo a passo, variáveis de
-ambiente e troubleshooting — vive no site do projeto, onde é servido como
-página, não como arquivo:
+O guia completo — imagem pronta no GHCR, o que o serviço pede do host,
+variáveis de ambiente, persistência e troubleshooting — vive no site do
+projeto, onde é servido como página, não como arquivo:
 
 **➡ [maxwbh.github.io/cobranca-api/deploy](https://maxwbh.github.io/cobranca-api/deploy)**
 

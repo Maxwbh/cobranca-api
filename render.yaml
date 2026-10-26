@@ -1,4 +1,16 @@
-# Configuração para Render.com Free Tier
+# Blueprint do Render.com — NÃO é o deploy de referência deste projeto.
+#
+# A Cobranca-API é um container e roda em qualquer host Docker; o guia
+# (docs/deploy.md) descreve o que o serviço pede do host, e o Render é um
+# apêndice ao lado dos outros. Este arquivo fica porque o projeto já foi
+# hospedado lá e o blueprint continua válido para quem quiser repetir — em
+# teste, não como a casa do produto.
+#
+# `autoDeploy` DESLIGADO de propósito: com ele ligado, todo merge na main
+# publicava numa instância do Render, e o repositório passava a ter dono de
+# infraestrutura sem ninguém decidir isso a cada release. Quem usar este
+# blueprint liga de volta no painel, ou aqui, no seu fork.
+#
 # Documentação: https://render.com/docs/blueprint-spec
 
 services:
@@ -13,8 +25,8 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
 
-    # Deploy automático
-    autoDeploy: true
+    # Ver o cabeçalho: desligado de propósito.
+    autoDeploy: false
 
     # Deploy segue a main (v2.0.0 em diante).
     branch: main

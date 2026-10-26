@@ -10,7 +10,6 @@
 <p align="center">
   <a href="https://maxwbh.github.io/cobranca-api/swagger/"><strong>Swagger (gateway) →</strong></a> &nbsp;·&nbsp;
   <a href="https://maxwbh.github.io/cobranca-api/swagger/offline.html"><strong>Swagger (offline) →</strong></a> &nbsp;·&nbsp;
-  <a href="https://cobranca-api-sq67.onrender.com/docs"><strong>Demo ao vivo →</strong></a> &nbsp;·&nbsp;
   <a href="https://github.com/Maxwbh/pyCobranca"><strong>Engine PyCobrança →</strong></a>
 </p>
 
@@ -304,10 +303,10 @@ que o título for pago.
 > passa pelo mesmo caminho da API. Refazer é um comando —
 > `PYTHONPATH=gateway python scripts/gerar-boletos-exemplo.py`.
 
-> 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>` na
-> [demo ao vivo](https://cobranca-api-sq67.onrender.com/api/docs) — instância de
-> demonstração no plano gratuito do Render. A URL vem do nome do serviço e **não é
-> fixa**: na sua instalação, use a que o Render mostrar (veja o [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy)).
+> 💡 Todos acima saíram de uma chamada `GET /api/boleto?bank=<banco>&type=pdf&data=<json>`
+> contra o container local — `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
+> e o Swagger abre em `http://localhost:8000/api/docs`. Para hospedar, o
+> [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy) cobre as opções.
 
 ## Cobranca-API × gateway de pagamento SaaS
 
@@ -543,8 +542,9 @@ Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/c
 
 | O que | Onde |
 |-------|------|
-| **Testar a API agora** | [Swagger UI (demo ao vivo)](https://cobranca-api-sq67.onrender.com/api/docs) |
-| Importar no Postman | [`/api/openapi.json`](https://cobranca-api-sq67.onrender.com/api/openapi.json) |
+| **Ler a referência agora** | [Swagger (gateway)](https://maxwbh.github.io/cobranca-api/swagger/) · [Swagger (offline)](https://maxwbh.github.io/cobranca-api/swagger/offline.html) |
+| **Executar as chamadas** | `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest` → `http://localhost:8000/api/docs` |
+| Importar no Postman | [`openapi.json` publicado](https://maxwbh.github.io/cobranca-api/swagger/openapi.json) ou `http://localhost:8000/api/openapi.json` |
 | Campos por banco | [docs/fields/all-banks.md](./docs/fields/all-banks.md) |
 | Nosso número (entrada/saída/conciliação) | [docs/fields/nosso-numero.md](./docs/fields/nosso-numero.md) |
 | PIX híbrido + Remessa PIX | [docs/api/pix.md](./docs/api/pix.md) |

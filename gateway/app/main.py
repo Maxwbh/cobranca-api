@@ -618,9 +618,8 @@ def redoc_ui() -> HTMLResponse:
 def health() -> Saude:
     """Prova que **o processo está de pé e roteando** — e só isso.
 
-    É a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o
-    `healthCheckPath` do Render consultam, e os três **matam o container**
-    quando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que
+    É a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o health
+    check do host consultam, e os três **matam o container** quando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que
     reprovasse por problema transitório reiniciaria o serviço em laço, que é
     pior que o problema detectado. Estado por banco fica em `GET /bancos`.
 

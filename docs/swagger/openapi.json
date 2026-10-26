@@ -13454,7 +13454,7 @@
           "health"
         ],
         "summary": "Sonda de disponibilidade",
-        "description": "Prova que **o processo está de pé e roteando** — e só isso.\n\nÉ a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o\n`healthCheckPath` do Render consultam, e os três **matam o container**\nquando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que\nreprovasse por problema transitório reiniciaria o serviço em laço, que é\npior que o problema detectado. Estado por banco fica em `GET /bancos`.\n\nO schema era o genérico do FastAPI (`additionalProperties: string`, sem\nexemplo): a rota mais consumida por automação era a menos especificada da\nAPI.",
+        "description": "Prova que **o processo está de pé e roteando** — e só isso.\n\nÉ a rota que o `HEALTHCHECK` do Dockerfile, o `docker-compose` e o health\ncheck do host consultam, e os três **matam o container** quando ela falha. Por isso não toca em rede, banco nem disco: uma sonda que\nreprovasse por problema transitório reiniciaria o serviço em laço, que é\npior que o problema detectado. Estado por banco fica em `GET /bancos`.\n\nO schema era o genérico do FastAPI (`additionalProperties: string`, sem\nexemplo): a rota mais consumida por automação era a menos especificada da\nAPI.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
