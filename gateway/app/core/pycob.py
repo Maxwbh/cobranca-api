@@ -83,7 +83,7 @@ def _erros(e: Exception) -> list[str]:
     (ValueError/TypeError cru), cai no texto.
     """
     lst = getattr(e, "erros", None)
-    return list(lst) if lst else [str(e)]
+    return [traduzir_erro_da_engine(m) for m in (list(lst) if lst else [str(e)])]
 
 
 def bancos_suportados() -> list[str]:
@@ -120,6 +120,38 @@ _MAPA_CAMPOS = dict(NOMES_DO_CONTRATO)
 
 #: Nome público do mapa acima, para quem monta payload para a engine.
 NOMES_DO_CONTRATO = _MAPA_CAMPOS
+
+#: Engine -> API, para a VOLTA: é o inverso do mapa acima, não uma segunda
+#: lista escrita à mão. Se a engine acrescentar um par, a tradução de erro
+#: acompanha sem ninguém lembrar.
+_NOME_NA_API = {engine: api for api, engine in _MAPA_CAMPOS.items()}
+
+#: A mensagem de documento da engine, literal (`bancos/base.py` 217 e 220).
+_DOC_INVALIDO = re.compile(r"^(?P<campo>\w+) inválido \(CPF/CNPJ\)$")
+
+
+def traduzir_erro_da_engine(mensagem: str) -> str:
+    """Devolve o erro da engine no vocabulário da API.
+
+    A engine valida com os nomes do DOMÍNIO e escreve a mensagem com eles:
+    "cedente_documento inválido (CPF/CNPJ)". O chamador mandou
+    `documento_cedente` — é o que está no Swagger — e procurava o nome do erro
+    sem achar. Dois reparos, no único ponto por onde todo erro passa:
+
+    - o primeiro token, quando é nome interno, vira o nome da API
+      (`cedente_documento` -> `documento_cedente`, `conta` -> `conta_corrente`);
+    - "inválido (CPF/CNPJ)" vira "CPF/CNPJ brasileiro inválido". O parêntese
+      não dizia a quem está em Ciudad del Este que cédula e RUC não servem.
+
+    Mensagem que já fala o nome da API passa intacta.
+    """
+    m = re.match(r"^(\w+)", mensagem)
+    if m and m.group(1) in _NOME_NA_API:
+        mensagem = _NOME_NA_API[m.group(1)] + mensagem[m.end():]
+    d = _DOC_INVALIDO.match(mensagem)
+    if d:
+        return f"{d.group('campo')}: CPF/CNPJ brasileiro inválido"
+    return mensagem
 _CAMPOS_DATA = {"data_vencimento", "data_documento", "data_processamento"}
 # A engine desenha estes campos linha a linha e espera uma LISTA. Recebendo
 # string ela itera os caracteres: o boleto sai com "A", "p", "o", "s"... um por
