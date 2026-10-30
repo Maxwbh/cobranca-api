@@ -41,11 +41,13 @@ GITHUB = "https://github.com/Maxwbh/cobranca-api"
 SITE = "https://maxwbh.github.io/cobranca-api"
 
 
-# A página publicada não tem servidor atrás: o "Try it out" do swagger-ui não
-# teria para onde mandar a chamada. Dizer isso no cabeçalho evita que o leitor
-# conclua que a API está quebrada — e entrega as duas formas de executar.
-_ONDE_EXECUTAR = ("para executar: <code>docker run -p 8000:8000"
-                  " ghcr.io/maxwbh/cobranca-api:latest</code> → <code>localhost:8000/docs</code>")
+# O "onde executar" NÃO vive mais aqui. Ele existia porque a página publicada
+# não tem servidor atrás e o "Try it out" não teria para onde mandar a chamada
+# — razão que continua valendo. O que mudou é o lugar: a frase e o comando
+# passaram para o herói do `swagger_tema`, que serve as DUAS superfícies, a
+# servida e a publicada. Mantê-lo aqui também punha o mesmo `docker run` duas
+# vezes na mesma tela, com dez pixels de distância — defeito que só aparecia no
+# site, porque ao vivo o `detalhe` nunca teve este sufixo.
 
 
 # As descrições linkam a outra superfície por caminho de SERVIDOR (`/api/docs`).
@@ -77,7 +79,7 @@ def gerar() -> dict[Path, str]:
             titulo="Cobranca-API — Gateway (Swagger)",
             superficie="Gateway REST · multi-banco",
             pill="4 bancos ON · 19 OFF",
-            detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN — {_ONDE_EXECUTAR}",
+            detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
             links=[("GitHub", GITHUB, False),
                    ("Offline / pyCobrança →", "./offline.html", True)],
             spec_url="./openapi.json",
@@ -93,7 +95,7 @@ def gerar() -> dict[Path, str]:
             # por uma diferença que não é do código. Página publicada descreve
             # o CONTRATO; a versão do que está rodando é do serviço, e sai em
             # `/api/docs` e em `GET /api/metadata`, que sabem responder por ela.
-            detalhe=f"v{app.version} — {_ONDE_EXECUTAR}",
+            detalhe=f"v{app.version} · boleto, CNAB e OFX sem convênio",
             links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
                    ("Gateway REST →", "./index.html", True)],
             spec_url="./openapi-offline.yaml",
