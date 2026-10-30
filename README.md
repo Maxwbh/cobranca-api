@@ -593,6 +593,8 @@ uvicorn app.main:app --reload --port 8000
 | **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB, lote e **link de cartão** de dentro do banco. |
 | **[exemplos APEX](./examples/apex/)** | Páginas de emissão, de lote com progresso e de **checkout com cartão** — download de PDF, zip e webhook em ORDS. |
 | **[exemplos Python](./examples/python/)** | Scripts executáveis que chamam a API por HTTP (boleto, remessa, lote). |
+| **[exemplos PHP](./examples/php/)** | Os mesmos três scripts em PHP puro (sem Composer) — boleto, 12 PDFs de teste e remessa CNAB. |
+| **[guía en español](https://maxwbh.github.io/cobranca-api/es/)** | Para empresas del Mercosur que cobran en Brasil: qué necesita antes, los dos caminos y el glosario de los campos del boleto. |
 
 ---
 

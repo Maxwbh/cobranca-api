@@ -98,13 +98,19 @@ engine passa. O reporte à pyCobrança segue em aberto.
 
 | Item | Esforço | Guarda |
 |---|---|---|
-| **Página de entrada em espanhol** (`/es/`): o que precisa antes, os dois caminhos, primeiro boleto em 5 min, **glossário dos 63 campos** | rascunho pronto | todo campo do `BoletoData` no glossário; nenhum campo inventado; os 6 obrigatórios na seção certa; links resolvem; sem instância pública |
-| **`<html lang>` por página** no layout | 1 linha | o layout lê `page.lang` |
-| **Exemplo em PHP** (`examples/php/`), espelho do `examples/python` | pequeno | o exemplo cobre as mesmas rotas que o de Python |
-| **Link na capa** para `/es/` | 1 linha | — |
+| ✅ **Página de entrada em espanhol** (`/es/`): o que precisa antes, os dois caminhos, primeiro boleto em 5 min, **glossário dos 63 campos** | feito | todo campo do `BoletoData` no glossário; nenhum campo inventado; os 6 obrigatórios na seção certa; a mensagem de erro citada é a que a API emite; as contagens de banco são as do serviço; links resolvem; sem instância pública |
+| ✅ **`<html lang>` por página** no layout | 1 linha | o layout lê `page.lang` antes de `site.lang` |
+| ✅ **Exemplo em PHP** (`examples/php/`), espelho do `examples/python` | feito | cada script PHP chama as mesmas rotas que o par em Python; lê `API`; sai ≠ 0 na falha; `php -l` passa |
+| ✅ **Link na capa** para `/es/` | 1 linha | a capa linka `es/` |
 
 A página em espanhol diz, sobre o regulatório, que **a M&S acompanha a
 abertura de empresa, conta e convênio no Brasil** — a barreira vira serviço.
+
+Medido ao fazer: o `generate_test_boletos.py` que o PHP espelharia **não
+rodava** — mandava `moeda` e `especie`, campos que a API recusa, e os 12
+boletos saíam 400. Corrigido antes de espelhar; os `.rem` gerados pelos dois
+exemplos saem idênticos byte a byte (C6) ou diferem só no horário de geração
+que o layout CNAB 240 carrega (Sicoob).
 
 ### 🔌 Fase 2 — Só com lead real
 

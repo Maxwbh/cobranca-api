@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: 'en-US' }}">
+<!-- `page.lang` primeiro: a página em espanhol (`/es/`) declara `lang: es` no
+     front matter, e sem isto o <html> saía rotulado como pt-BR — o Google e o
+     leitor de tela liam espanhol como português. -->
+<html lang="{{ page.lang | default: site.lang | default: 'en-US' }}">
   <head>
     <meta charset="UTF-8">
 {% seo %}

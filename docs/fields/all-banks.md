@@ -370,7 +370,7 @@ boleto sai com ele vazio.
 ### 4. CPF e CNPJ são validados
 
 Dígito verificador conferido: documento inventado volta `400` com
-`cedente_documento inválido (CPF/CNPJ)`. Os exemplos desta página usam
+`documento_cedente: CPF/CNPJ brasileiro inválido`. Os exemplos desta página usam
 documentos com DV correto justamente para poderem ser copiados e rodados.
 
 ### 5. O mito da linha digitável do Sicoob
