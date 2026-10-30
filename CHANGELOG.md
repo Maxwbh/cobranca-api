@@ -16,6 +16,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+### Corrigido
+- **O erro de documento fala o nome da API.** Dizia `cedente_documento inválido (CPF/CNPJ)` — nome interno da engine, que a API não expõe. Agora: `documento_cedente: CPF/CNPJ brasileiro inválido`; idem para `sacado_documento`.
+
 ## [3.0.0] - 2026-10-25
 
 ### Adicionado

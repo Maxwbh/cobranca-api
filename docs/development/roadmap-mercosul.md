@@ -86,10 +86,13 @@ quando um lead pedir — nenhuma fonte paraguaia o aponta.
 
 | Item | O que muda | Guarda |
 |---|---|---|
-| **Mensagem de documento** | `CPF/CNPJ brasileiro inválido`, citando o campo **certo** (`documento_cedente` / `sacado_documento`). O gateway reescreve a mensagem da engine antes de devolver. | Caso para cada um dos dois campos, com CI e RUC paraguaios como entrada |
+| ✅ **Mensagem de documento** | `CPF/CNPJ brasileiro inválido`, citando o campo **certo** (`documento_cedente` / `sacado_documento`). O gateway reescreve a mensagem da engine antes de devolver. | Caso para cada um dos dois campos, com CI e RUC paraguaios como entrada |
 | **Raiz na pyCobrança** | Reportar que `base.py:217` nomeia `cedente_documento`, campo que a API não expõe | — (outro repositório; não se escreve nele daqui) |
 
-É defeito em português hoje. Entra primeiro, mercado ou não.
+Era defeito em português. Entrou primeiro, mercado ou não — a mensagem agora é
+`documento_cedente: CPF/CNPJ brasileiro inválido`, traduzida em
+`core.pycob.traduzir_erro_da_engine`, o ponto único por onde todo erro da
+engine passa. O reporte à pyCobrança segue em aberto.
 
 ### 🎯 Fase 1 — Porta aberta (barato; feito antes do lead)
 
