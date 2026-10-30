@@ -465,10 +465,18 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
 
 
 @router.post("/api/retorno", include_in_schema=False)
-async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
+async def retorno(request: Request, bank: str, type: str, data: UploadFile = File(...),
+                  formato: str = "json") -> Any:
+    # `formato=csv`: a mesma lista, numa tabela para a contabilidade — com o
+    # cabeçalho no idioma do chamador (`Accept-Language`/`lang`). Conferido
+    # ANTES de ler o arquivo: formato errado não merece o parse.
+    if formato not in ("json", "csv"):
+        return JSONResponse(status_code=400, content={
+            "error": "Erro ao processar retorno",
+            "validation_errors": [f"`formato` deve ser 'json' ou 'csv' — recebi {formato!r}"]})
     try:
-        return pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type,
-                                   bank=bank)
+        itens = pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type,
+                                    bank=bank)
     except ArquivoGrandeDemais as e:
         return e.resposta()
     except pycob.DadosInvalidos as e:
@@ -478,6 +486,14 @@ async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
         return JSONResponse(status_code=400, content={
             "error": "Erro ao processar retorno",
             "validation_errors": e.erros, "details": e.erros})
+    if formato == "json":
+        return itens
+    from app.core.i18n_openapi import idioma_pedido
+    from app.core.retorno_csv import retorno_csv
+    idioma = idioma_pedido(request.headers.get("accept-language"), request.query_params.get("lang"))
+    return Response(content=retorno_csv(itens, idioma), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename=retorno-{bank}.csv",
+                             "Content-Language": idioma, "Vary": "Accept-Language"})
 
 
 # ------------------------------------------------------------------ OFX
@@ -665,11 +681,40 @@ async def render_remessa(body: dict) -> Any:
 
 
 # ------------------------------------------------------------------ docs offline
+#: A spec offline em espanhol, por (etag da spec, idioma): a MESMA árvore com
+#: os textos trocados pelo dicionário (`core.i18n_openapi`). `/api/openapi.yaml`
+#: fica só em português — promete o arquivo byte a byte, e reserializar YAML
+#: traduzido seria outro arquivo.
+_cache_spec_traduzida: dict[tuple[str, str], tuple[bytes, str]] = {}
+
+
+def _spec_json_no_idioma(idioma: str) -> tuple[bytes, str]:
+    from app.core.i18n_openapi import traduzir_spec
+    _, arvore, etag = _carregar_spec()
+    chave = (etag, idioma)
+    if chave not in _cache_spec_traduzida:
+        corpo = json.dumps(traduzir_spec(arvore, idioma), ensure_ascii=False).encode()
+        _cache_spec_traduzida.clear()  # a spec mudou: o que havia é de outra versão
+        _cache_spec_traduzida[chave] = (corpo, f"{etag}-{idioma}")
+    return _cache_spec_traduzida[chave]
+
+
+def _idioma(request: Request) -> str:
+    from app.core.i18n_openapi import idioma_pedido
+    return idioma_pedido(request.headers.get("accept-language"), request.query_params.get("lang"))
+
+
 @router.get("/api/openapi.json", include_in_schema=False)
 def api_openapi_json(request: Request) -> Response:
-    _, arvore, etag = _carregar_spec()
-    return _resposta_condicional(request, etag) or JSONResponse(
-        content=arvore, headers=_cabecalhos_spec(etag))
+    idioma = _idioma(request)
+    if idioma == "pt":
+        _, arvore, etag = _carregar_spec()
+        cab = _cabecalhos_spec(etag) | {"Content-Language": "pt", "Vary": "Accept-Language"}
+        return _resposta_condicional(request, etag) or JSONResponse(content=arvore, headers=cab)
+    corpo, etag = _spec_json_no_idioma(idioma)
+    cab = _cabecalhos_spec(etag) | {"Content-Language": idioma, "Vary": "Accept-Language"}
+    return _resposta_condicional(request, etag) or Response(
+        content=corpo, media_type="application/json", headers=cab)
 
 
 @router.get("/api/openapi.yaml", include_in_schema=False)
@@ -685,13 +730,18 @@ def api_docs(request: Request) -> HTMLResponse:
     # A página só existe para exibir a spec: sem ela, um 200 entregaria um
     # Swagger que nunca carrega e o operador ficaria olhando tela em branco.
     _carregar_spec()
+    # `?lang=es`: casca em espanhol e idioma da spec fixo na URL — ver `main._casca_no_idioma`.
+    from app.core.swagger_tema import SUBTITULO, SUBTITULO_ES, TAGLINE, TAGLINE_ES
+    es = request.query_params.get("lang", "").lower().startswith("es")
+    sufixo = "?lang=es" if es else ""
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Offline (Swagger)",
         superficie="Offline · pyCobrança",
-        pill="19 bancos · sem convênio",
+        pill="19 bancos · sin convenio" if es else "19 bancos · sem convênio",
         detalhe=f"v{request.app.version} · pycobranca {pycob.versao()}",
+        tagline=TAGLINE_ES if es else TAGLINE, subtitulo=SUBTITULO_ES if es else SUBTITULO,
         links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
-               ("Gateway REST →", "/docs", True)],
-        spec_url="/api/openapi.json",
+               ("Gateway REST →", "/docs" + sufixo, True)],
+        spec_url="/api/openapi.json" + sufixo,
     ))
 

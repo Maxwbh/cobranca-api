@@ -95,7 +95,24 @@ remesa CNAB — o registrarse por el camino online.
 
 La documentación interactiva queda en `http://localhost:8000/docs` (gateway) y
 `http://localhost:8000/api/docs` (offline), con el botón *Try it out* apuntando
-a su propia instancia.
+a su propia instancia. **Ambas hablan español:** agregue `?lang=es` a la URL,
+o deje que el navegador mande su `Accept-Language` — la referencia es la misma
+spec, con las descripciones traducidas. Sin servidor, la copia publicada está
+en el [Swagger en español](../swagger/es/).
+
+**Los errores también.** Con el header `Accept-Language: es` (o `lang=es` en
+la query), toda respuesta de error vuelve con los mensajes en español — el
+nombre del campo, el código HTTP y las claves del JSON no cambian:
+
+```json
+{"error": "Datos del boleto inválidos",
+ "validation_errors": ["sacado_documento: CPF/CNPJ brasileño inválido"]}
+```
+
+Y el **retorno CNAB** — lo que el banco devuelve diciendo qué se pagó — sale
+también como tabla: `POST /api/retorno?formato=csv` devuelve un CSV con el
+encabezado en español para la contabilidad, con las mismas diez columnas del
+JSON.
 
 Hay scripts listos, que corren contra su container, en
 [PHP](https://github.com/Maxwbh/cobranca-api/tree/main/examples/php) y en
@@ -223,8 +240,10 @@ sorprenda.
 
 ## Dónde seguir
 
-- [**Swagger — gateway**](../swagger/) — todas las rutas online y offline
-- [**Swagger — offline**](../swagger/offline.html) — boleto, CNAB y OFX sin convenio
+- [**¿Por qué sin intermediario?**](comercial.md) — el argumento comercial: MIT, en su servidor, sin comisión por venta
+- [**Swagger en español**](../swagger/es/) — la referencia completa, generada del código
+- [**Swagger — gateway**](../swagger/) — todas las rutas online y offline (portugués)
+- [**Swagger — offline**](../swagger/offline.html) — boleto, CNAB y OFX sin convenio (portugués)
 - [Guía de despliegue](../deploy.md) — qué pide el servicio del host, variables, persistencia
 - [Código en GitHub](https://github.com/Maxwbh/cobranca-api)
 

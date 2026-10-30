@@ -17,7 +17,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
-- **Página em espanhol** (`/es/` no site): para empresas do Mercosul cobrando no Brasil — o que precisa antes, os dois caminhos, primeiro boleto e **glossário dos 63 campos** do boleto, guardado contra a spec. O `<html lang>` do site passa a ler o `lang` de cada página.
+- **Swagger em espanhol.** `/openapi.json` e `/api/openapi.json` respondem em espanhol com `?lang=es` ou `Accept-Language: es`; `/docs?lang=es` e `/api/docs?lang=es` trocam a casca. É a mesma spec com os textos trocados por um dicionário (`docs/i18n/es/swagger.yaml`); cópia publicada em `docs/swagger/es/`.
+- **Erros no idioma do chamador.** Com `Accept-Language: es` (ou `lang=es`), as mensagens de erro de toda rota voltam em espanhol — `detail`, `error`, `validation_errors`, `hint` e o `422` do Pydantic. Nome de campo, status e chaves do JSON não mudam; sem o cabeçalho, nada muda.
+- **`POST /api/retorno?formato=csv`**: o retorno CNAB como tabela — as dez colunas do `RetornoItem`, sempre todas, ponto e vírgula, vírgula decimal, cabeçalho em português ou espanhol conforme o `Accept-Language`.
+- **Página em espanhol** (`/es/` no site): para empresas do Mercosul cobrando no Brasil — o que precisa antes, os dois caminhos, primeiro boleto e **glossário dos 63 campos** do boleto, guardado contra a spec. Mais a landing `/es/comercial` ("cobre en Brasil sin intermediario"). O `<html lang>` do site passa a ler o `lang` de cada página.
 - **Exemplos em PHP** (`examples/php/`): os três scripts do `examples/python`, rota a rota, em PHP puro sem Composer.
 
 ### Corrigido

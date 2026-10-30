@@ -42,6 +42,15 @@ TAGLINE = ("Produto <strong>self-hosted</strong>: não há instância pública, 
            '<span class="cmd">docker run -p 8000:8000'
            " ghcr.io/maxwbh/cobranca-api:latest</span>")
 
+#: As mesmas duas frases em espanhol, para `/docs?lang=es` e para a cópia
+#: publicada em `docs/swagger/es/`. A spec vem do dicionário
+#: `docs/i18n/es/swagger.yaml`; a casca vem daqui.
+SUBTITULO_ES = "Boletos, Pix, CNAB 240/400 y OFX — vía API REST"
+TAGLINE_ES = ("Producto <strong>self-hosted</strong>: no hay instancia pública, y el"
+              " <em>Try&nbsp;it&nbsp;out</em> habla con la suya."
+              '<span class="cmd">docker run -p 8000:8000'
+              " ghcr.io/maxwbh/cobranca-api:latest</span>")
+
 #: CSS do cabeçalho, compartilhado pelas três páginas de documentação
 #: (`/docs`, `/api/docs` e `/redoc`) — uma identidade só, num lugar só.
 _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
