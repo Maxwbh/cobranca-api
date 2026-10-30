@@ -14,6 +14,7 @@ integrar começa pela [documentação da API](../).
 | Página | O que traz |
 |---|---|
 | [Roadmap de providers](roadmap-providers.md) | Fila de bancos e PSPs, princípio de esforço e a régua de escopo (o que nunca entra) |
+| [Roadmap Mercosul](roadmap-mercosul.md) | Empresa paraguaia cobrando no Brasil: o que foi medido, linguagens da região, fases e o que fica fora |
 | [Separação em 3 produtos](separacao-3-produtos.md) | Como API, engine e integrações se dividem |
 | [Plano de jobs em lote](plano-jobs-lote.md) | Desenho do processamento assíncrono |
 | [Serviços online por banco](servicos-online-por-banco.md) | O que cada um dos 19 bancos do catálogo offline oferece de API online, um a um |
