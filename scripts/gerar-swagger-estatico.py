@@ -86,7 +86,7 @@ def _spec_do_gateway(idioma: str = "pt") -> str:
 def _spec_offline(idioma: str = "pt") -> str:
     """Em português, o YAML byte a byte (com comentários). Em espanhol é
     reserializado: os comentários do fonte são do mantenedor, não do leitor."""
-    cru = SPEC_OFFLINE.read_text()
+    cru = SPEC_OFFLINE.read_text(encoding="utf-8")
     if idioma == "pt":
         return _para_o_site(cru)
     arvore = traduzir_spec(yaml.safe_load(cru), idioma)
@@ -102,7 +102,7 @@ def _paginas_es() -> dict[Path, str]:
             superficie="Gateway REST · multibanco",
             pill="4 bancos ON · 19 OFF",
             detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
-            tagline=TAGLINE_ES, subtitulo=SUBTITULO_ES,
+            tagline=TAGLINE_ES, subtitulo=SUBTITULO_ES, lang="es",
             links=[("GitHub", GITHUB, False),
                    ("Português →", "../index.html", False),
                    ("Offline / pyCobrança →", "./offline.html", True)],
@@ -114,7 +114,7 @@ def _paginas_es() -> dict[Path, str]:
             superficie="Offline · pyCobrança",
             pill="19 bancos · sin convenio",
             detalhe=f"v{app.version} · boleto, CNAB y OFX sin convenio",
-            tagline=TAGLINE_ES, subtitulo=SUBTITULO_ES,
+            tagline=TAGLINE_ES, subtitulo=SUBTITULO_ES, lang="es",
             links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
                    ("Português →", "../offline.html", False),
                    ("Gateway REST →", "./index.html", True)],
@@ -159,9 +159,11 @@ def gerar() -> dict[Path, str]:
 
 
 def _faltam_es() -> int:
-    offline = yaml.safe_load(SPEC_OFFLINE.read_text())
-    pendentes = faltam(app.openapi()) + [t for t in faltam(offline) if t not in faltam(app.openapi())]
-    orfas = sobram([app.openapi(), offline])
+    offline = yaml.safe_load(SPEC_OFFLINE.read_text(encoding="utf-8"))
+    gateway = app.openapi()
+    do_gateway = faltam(gateway)
+    pendentes = do_gateway + [t for t in faltam(offline) if t not in set(do_gateway)]
+    orfas = sobram([gateway, offline])
     for t in pendentes:
         print(f"SEM TRADUÇÃO: {t[:110]!r}")
     for t in orfas:
@@ -180,13 +182,13 @@ def main() -> int:
     arquivos = gerar()
     divergentes = []
     for caminho, conteudo in arquivos.items():
-        atual = caminho.read_text() if caminho.exists() else None
+        atual = caminho.read_text(encoding="utf-8") if caminho.exists() else None
         if atual == conteudo:
             continue
         divergentes.append(caminho.relative_to(REPO))
         if not conferir:
             caminho.parent.mkdir(parents=True, exist_ok=True)
-            caminho.write_text(conteudo)
+            caminho.write_text(conteudo, encoding="utf-8")
 
     if conferir:
         if divergentes:

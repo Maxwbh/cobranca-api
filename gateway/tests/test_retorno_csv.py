@@ -29,7 +29,7 @@ def _post(client, headers=None, **params):
 
 
 def _linhas(texto: str) -> list[list[str]]:
-    assert texto.startswith("﻿"), "sem BOM o Excel abre o UTF-8 com acento quebrado"
+    assert texto.startswith("\ufeff"), "sem BOM o Excel abre o UTF-8 com acento quebrado"
     return list(csv.reader(io.StringIO(texto[1:]), delimiter=";"))
 
 
@@ -90,6 +90,20 @@ def test_formato_desconhecido_e_400_nos_dois_idiomas(client):
     assert es.json()["validation_errors"] == ["`formato` debe ser 'json' o 'csv' — recibí 'xlsx'"]
 
 
+@pytest.mark.parametrize("bank", ["bancó", "x\r\nX-Inj: 1", "../../etc", "xpto"])
+def test_bank_desconhecido_e_400_e_nunca_chega_ao_header(client, bank):
+    """`bank` só era conferido contra o header do arquivo quando o slug era
+    conhecido; desconhecido, passava — e no CSV ia para o `Content-Disposition`:
+    acento dava 500 (header é latin-1), CRLF entrava no cabeçalho da resposta."""
+    for formato in ("csv", "json"):
+        r = _post(client, formato=formato, bank=bank)
+        assert r.status_code == 400, (bank, formato, r.status_code)
+        assert r.json()["validation_errors"] == [f"bank {bank!r} não corresponde a banco suportado"]
+        assert "content-disposition" not in r.headers
+    es = _post(client, headers={"Accept-Language": "es"}, formato="csv", bank=bank)
+    assert es.json()["validation_errors"] == [f"bank {bank!r} no corresponde a un banco soportado"]
+
+
 def test_retorno_csv_puro():
     itens = [{"nosso_numero": "1", "valor_pago": 10.5, "layout_generico": True},
              {"nosso_numero": "2", "valor_pago": 0.0, "layout_generico": False, "motivo_ocorrencia": "a;b"}]
@@ -97,4 +111,4 @@ def test_retorno_csv_puro():
     assert linhas[1][0] == "1" and linhas[1][5] == "10,50" and linhas[1][9] == "sí"
     assert linhas[2][8] == "a;b", "ponto e vírgula dentro do valor é escapado pelo csv"
     assert len(linhas) == 3 and all(len(l) == len(COLUNAS) for l in linhas)
-    assert retorno_csv([], "xx").startswith("﻿Nosso número;"), "idioma desconhecido cai em pt"
+    assert retorno_csv([], "xx").startswith("\ufeffNosso número;"), "idioma desconhecido cai em pt"

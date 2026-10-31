@@ -71,6 +71,27 @@ REGRAS: list[tuple[str, str, str]] = [
      "instrucoes: máximo 100 caracteres por linha em moderno (linha 2 tem 140)"),
     (r"^Banco não registrado na engine: (?P<r>.+)$", r"Banco no registrado en la engine: \g<r>",
      "Banco não registrado na engine: 'xpto' (999)"),
+    (r"^Banco não suportado: (?P<r>.+)$", r"Banco no soportado: \g<r>", "Banco não suportado: 'xpto'"),
+    # --- gateway: `hint` das rotas (texto literal; o guarda estático varre os routers) ---
+    (r"^Corrija os erros de validação antes de gerar o boleto$",
+     "Corrija los errores de validación antes de generar el boleto",
+     "Corrija os erros de validação antes de gerar o boleto"),
+    (r"^divida o arquivo \(o teto vem de UPLOAD_MAX_BYTES\)$",
+     "divida el archivo (el tope viene de UPLOAD_MAX_BYTES)",
+     "divida o arquivo (o teto vem de UPLOAD_MAX_BYTES)"),
+    (r"^divida o lote \(processamento assíncrono: ver docs/development/plano-jobs-lote\.md\)$",
+     "divida el lote (procesamiento asincrónico: ver docs/development/plano-jobs-lote.md)",
+     "divida o lote (processamento assíncrono: ver docs/development/plano-jobs-lote.md)"),
+    (r"^o item_id vem de external_id, seu_numero ou numero_documento — cada item( do lote)? precisa de um valor distinto$",
+     lambda m: "el item_id viene de external_id, seu_numero o numero_documento — cada ítem"
+               + (" del lote" if m.group(1) else "") + " necesita un valor distinto",
+     "o item_id vem de external_id, seu_numero ou numero_documento — cada item do lote precisa de um valor distinto"),
+    (r"^falha no agrupamento determinístico de títulos — reporte o caso$",
+     "falla en el agrupamiento determinístico de títulos — reporte el caso",
+     "falha no agrupamento determinístico de títulos — reporte o caso"),
+    (r"^`desenhar` é um callback Python \(recebe a tela do PDF\) e não trafega por JSON\. Use o nível 1 \(`itens`\) ou o nível 2 \(`fatura\.blocos`\); para arte livre, chame a engine pyCobrança in-process na própria aplicação\.$",
+     "`desenhar` es un callback Python (recibe el lienzo del PDF) y no viaja por JSON. Use el nivel 1 (`itens`) o el nivel 2 (`fatura.blocos`); para arte libre, llame a la engine pyCobrança in-process en la propia aplicación.",
+     "`desenhar` é um callback Python (recebe a tela do PDF) e não trafega por JSON. Use o nível 1 (`itens`) ou o nível 2 (`fatura.blocos`); para arte livre, chame a engine pyCobrança in-process na própria aplicação."),
     (r"^Arquivo de retorno inválido: (?P<r>.+)$", r"Archivo de retorno inválido: \g<r>",
      "Arquivo de retorno inválido: header ausente"),
     (r"^O arquivo é retorno do banco (?P<a>.+?), mas o request pediu (?P<b>.+?)\. Cada banco põe os campos em posições diferentes: ler com o layout errado devolveria valores plausíveis e errados\. Confira o `bank` ou o arquivo\.$",
@@ -328,23 +349,31 @@ REGRAS: list[tuple[str, str, str]] = [
 #: palavras inequívocas, por fronteira de palavra, e com crases/aspas/nomes de
 #: banco protegidos antes. Não tenta ser gramática; tenta não deixar
 #: português óbvio passar.
-VOCABULARIO: list[tuple[str, str]] = [
-    (r"\bnão suportad([oa]s?)\b", r"no soportad\1"),
+#:
+#: Aplicado em UMA passada, como alternativas de um regex só, casando sempre
+#: sobre o texto ORIGINAL: a versão sequencial traduzia "não" para "no" e, três
+#: regras depois, lia esse "no" como o português de "em o" — "Banco não
+#: suportado" virava "Banco en el soportado", e a negação sumia da frase. A
+#: ordem ainda importa: alternativa mais longa antes do seu prefixo.
+VOCABULARIO: list[tuple[str, str | Any]] = [
+    (r"\bnão suportad[oa]s?\b", lambda s: "no soportad" + s[len("não suportad"):]),
     (r"\bdeve ter no máximo\b", "debe tener como máximo"),
     (r"\bdeve ter no mínimo\b", "debe tener como mínimo"),
     (r"\bdevem? ter\b", "debe tener"),
     (r"\bdevem? ser\b", "debe ser"),
     (r"\bdevem? conter\b", "debe contener"),
+    (r"\bnão pode ser\b", "no puede ser"),
+    (r"\bpode ser\b", "puede ser"),
+    (r"\bzero\b", "cero"),
     (r"\bé obrigatória\b", "es obligatoria"),
     (r"\bé obrigatório\b", "es obligatorio"),
     (r"\bsão obrigatóri[oa]s\b", "son obligatorios"),
     (r"\bobrigatóri[oa]\b", "obligatorio"),
     (r"\buse uma de:", "use una de:"),
     (r"\buse um de:", "use uno de:"),
-    (r"\bdesconhecid([oa])\b", r"desconocid\1"),
+    (r"\bdesconhecid[oa]\b", lambda s: "desconocid" + s[-1]),
     (r"\bconvênio\b", "convenio"),
-    (r"\bnosso número\b", "nosso número"),
-    (r"\barquivos?\b", lambda m: "archivos" if m.group(0).endswith("s") else "archivo"),
+    (r"\barquivos?\b", lambda s: "archivos" if s.endswith("s") else "archivo"),
     (r"\bitens\b", "ítems"),
     (r"\bacima do limite de\b", "por encima del límite de"),
     (r"\bvazi[oa]\b", "vacío"),
@@ -377,7 +406,15 @@ VOCABULARIO: list[tuple[str, str]] = [
 ]
 
 _REGRAS = [(re.compile(p), r) for p, r, _ in REGRAS]
-_VOCAB = [(re.compile(p), r) for p, r in VOCABULARIO]
+#: Um regex só, uma alternativa nomeada por entrada do vocabulário.
+_VOCAB_UNICO = re.compile("|".join(f"(?P<v{i}>{p})" for i, (p, _) in enumerate(VOCABULARIO)))
+
+
+def _substituir_vocabulo(m: re.Match) -> str:
+    _, subst = VOCABULARIO[int(m.lastgroup[1:])]
+    return subst(m.group(0)) if callable(subst) else subst
+
+
 _PROTEGIDO = re.compile(r"`[^`]*`|'[^']*'|\"[^\"]*\"")
 
 
@@ -421,8 +458,7 @@ def traduzir_mensagem(texto: str, idioma: str = "es") -> str:
         if nome in protegido:
             guardados.append(nome)
             protegido = protegido.replace(nome, f"\x00{len(guardados) - 1}\x00")
-    for regex, subst in _VOCAB:
-        protegido = regex.sub(subst, protegido)
+    protegido = _VOCAB_UNICO.sub(_substituir_vocabulo, protegido)
     return re.sub(r"\x00(\d+)\x00", lambda m: guardados[int(m.group(1))], protegido)
 
 
@@ -447,10 +483,26 @@ def traduzir_corpo(dados: Any, idioma: str) -> Any:
     return dados
 
 
+#: Respostas que carregam erro por ITEM dentro de um 200: o estado de um job
+#: (`GET /jobs/...`) lista cada item falhado com `errors`. É erro para quem lê,
+#: com outro status — entra pelo caminho, não pelo código.
+_PREFIXOS_COM_ERRO_NO_200 = ("/jobs/",)
+
+
+def _vale_traduzir(status: int, caminho: str, tipo: str) -> bool:
+    if "json" not in tipo:
+        return False
+    if status >= 400 or status == 201:
+        return True
+    return status == 200 and caminho.startswith(_PREFIXOS_COM_ERRO_NO_200)
+
+
 class ErrosNoIdiomaDoChamador:
     """Middleware ASGI puro: reescreve o corpo das respostas de erro em JSON
     quando o chamador pediu outro idioma. Sem `Accept-Language`/`lang`, não
-    toca em nada — nem lê o corpo."""
+    toca em nada — nem lê o corpo. Quando lê e nada muda, devolve a resposta
+    como veio, sem `Content-Language`: rotular de `es` um corpo que continua
+    igual mentiria para cache e cliente."""
 
     def __init__(self, app):
         self.app = app
@@ -464,6 +516,7 @@ class ErrosNoIdiomaDoChamador:
         if idioma == "pt":
             return await self.app(scope, receive, send)
 
+        caminho = scope.get("path", "")
         inicio: dict | None = None
         corpo = bytearray()
 
@@ -471,9 +524,7 @@ class ErrosNoIdiomaDoChamador:
             nonlocal inicio
             if mensagem["type"] == "http.response.start":
                 tipo = Headers(raw=mensagem["headers"]).get("content-type", "")
-                # 201 entra porque `POST /cobranca` responde 201 com `status: "erro"`
-                # (por compatibilidade) — é erro com outro número.
-                if "json" in tipo and (mensagem["status"] >= 400 or mensagem["status"] == 201):
+                if _vale_traduzir(mensagem["status"], caminho, tipo):
                     inicio = mensagem
                     return
                 return await send(mensagem)
@@ -481,18 +532,24 @@ class ErrosNoIdiomaDoChamador:
                 corpo.extend(mensagem.get("body", b""))
                 if mensagem.get("more_body"):
                     return
-                novo = bytes(corpo)
-                try:
-                    dados = json.loads(novo)
-                    traduzido = traduzir_corpo(dados, idioma)
-                    if traduzido != dados:
-                        novo = json.dumps(traduzido, ensure_ascii=False).encode()
-                except ValueError:
-                    pass
-                h = MutableHeaders(raw=inicio["headers"])
-                h["content-length"] = str(len(novo))
-                h["content-language"] = idioma
-                h.append("vary", "Accept-Language")
+                original = bytes(corpo)
+                novo = original
+                # O 201 só interessa quando é o `status: "erro"` do POST /cobranca
+                # (erro com outro número). Um 201 de sucesso nem é parseado.
+                if inicio["status"] != 201 or b'"erro"' in original:
+                    try:
+                        dados = json.loads(original)
+                        if inicio["status"] != 201 or dados.get("status") == "erro":
+                            traduzido = traduzir_corpo(dados, idioma)
+                            if traduzido != dados:
+                                novo = json.dumps(traduzido, ensure_ascii=False).encode()
+                    except (ValueError, AttributeError):
+                        pass
+                if novo is not original:
+                    h = MutableHeaders(raw=inicio["headers"])
+                    h["content-length"] = str(len(novo))
+                    h["content-language"] = idioma
+                    h.append("vary", "Accept-Language")
                 await send(inicio)
                 return await send({"type": "http.response.body", "body": novo})
             return await send(mensagem)

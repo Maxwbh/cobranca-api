@@ -157,6 +157,94 @@ def test_o_201_com_status_erro_tambem_sai_em_espanhol(client):
     assert "sacado_documento: CPF/CNPJ brasileño inválido" in erros, erros
 
 
+def test_accept_language_malformado_nao_derruba_a_rota(client):
+    """`float("1.0.0")` estourava dentro do middleware — e o middleware roda para
+    TODA requisição: um `q=` torto de qualquer proxy virava 500 em toda a API,
+    inclusive para quem não pediu tradução."""
+    for valor in ("es;q=1.0.0", "es;q=.", "pt;q=abc", ";;;", "es;q=1.5", "x" * 5000):
+        r = client.get("/health", headers={"Accept-Language": valor})
+        assert r.status_code == 200, (valor, r.status_code)
+
+
+def test_a_negacao_nao_some_no_vocabulario_de_reserva(client):
+    """A reserva traduzia "não" → "no" e, regras depois, lia esse "no" como o
+    português de "em o": "Banco não suportado" virava "Banco en el soportado",
+    e a negação sumia. Uma passada só, sobre o texto original."""
+    assert traduzir_mensagem("Banco não suportado: 'xpto'", "es") == "Banco no soportado: 'xpto'"
+    assert traduzir_mensagem("valor não pode ser zero", "es") == "valor no puede ser cero"
+    r = client.get("/api/boleto/validate", headers=ES, params={"bank": "xpto", "data": "{}"})
+    assert r.status_code == 400
+    assert r.json()["validation_errors"] == ["Banco no soportado: 'xpto'"], r.json()
+    assert r.json()["hint"] == "Corrija los errores de validación antes de generar el boleto"
+
+
+#: `"hint": "…"`, `"error": "…"`, `"detail": "…"` literais nos routers e no
+#: `core/pycob.py`. Strings quebradas em duas linhas (`"a" "b"`) são juntadas.
+_LITERAL = re.compile(r'"(?:hint|error|detail)"\s*:\s*f?("(?:[^"\\]|\\.)*"(?:\s*\n?\s*"(?:[^"\\]|\\.)*")*)')
+
+
+def _mensagens_literais() -> list[tuple[str, str]]:
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parents[1] / "app"
+    achadas = []
+    for arq in sorted(list((raiz / "routers").glob("*.py")) + [raiz / "core" / "pycob.py"]):
+        texto = arq.read_text(encoding="utf-8")
+        for m in _LITERAL.finditer(texto):
+            import ast
+            # Lê cada pedaço como o Python lê o literal — preserva o UTF-8 e
+            # resolve `\"` e `\n`; `decode("unicode_escape")` estragava os acentos.
+            msg = "".join(ast.literal_eval(p) for p in re.findall(r'"(?:[^"\\]|\\.)*"', m.group(1)))
+            # f-string: troca cada `{expr}` por um valor plausível
+            msg = re.sub(r"\{[^}]*\}", "1", msg)
+            if msg.strip():
+                achadas.append((arq.name, msg))
+    return achadas
+
+
+def test_existe_mensagem_literal_para_varrer():
+    assert len(_mensagens_literais()) > 20, "a varredura de literais não achou nada — o padrão quebrou"
+
+
+@pytest.mark.parametrize("arquivo,msg", _mensagens_literais(), ids=lambda x: str(x)[:60])
+def test_toda_mensagem_literal_dos_routers_sai_sem_portugues(arquivo, msg):
+    """A página em espanhol promete que TODA resposta de erro volta traduzida.
+    O guarda por regra só prova a regra; este varre o que as rotas de fato
+    escrevem — `hint` incluído, que ficava em português — e cobra que nenhuma
+    saia com palavra portuguesa. Mensagem nova sem regra reprova aqui."""
+    es = traduzir_mensagem(msg, "es")
+    assert not _sem_portugues(es), f"{arquivo}: {msg!r} -> {es!r}"
+
+
+def test_201_de_sucesso_nao_e_rotulado_como_traduzido(client):
+    """Só o `status: "erro"` interessa no 201. Um 201 de sucesso saía com
+    `Content-Language: es` sobre um corpo que não mudou — mentira para cache."""
+    r = client.post("/cobranca", headers=ES, json={
+        "tenant_id": "t", "provider": "off", "banco": "itau",
+        "account_config": {"agencia": "3073", "conta_corrente": "12345", "carteira": "109",
+                           "convenio": "1234567", "cedente": "X", "documento_cedente": "05230380000174"},
+        "cobranca": {"valor": "10.00", "vencimento": "2027-12-31", "nosso_numero": "1",
+                     "pagador": {"nome": "Juan", "documento": "52998224725"}}})
+    assert r.status_code == 201 and r.json()["status"] == "registrado", r.text
+    assert "content-language" not in r.headers, "201 de sucesso não foi traduzido — não pode ser rotulado"
+
+
+def test_erro_por_item_num_200_de_job_tambem_sai_em_espanhol(client, tmp_path, monkeypatch):
+    """O estado do job é 200 e carrega `errors` por item falhado: é erro para
+    quem lê, com outro status. Entra pelo caminho (`/jobs/`), não pelo código."""
+    monkeypatch.setenv("JOB_DB_PATH", str(tmp_path / "jobs.db"))
+    monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path / "artifacts"))
+    item = {**CAMPOS, "bank": "banco_brasil", "sacado_documento": "80012345-6", "external_id": "RUIM"}
+    job_id = client.post("/jobs/boletos", json={"tenant_id": "t", "boletos": [item]}).json()["job_id"]
+    falhas = client.get(f"/jobs/boletos/{job_id}/items", headers=ES,
+                        params={"tenant_id": "t", "status": "failed"})
+    assert falhas.status_code == 200
+    erros = falhas.json()["items"][0]["resultado"]["errors"]
+    assert "sacado_documento: CPF/CNPJ brasileño inválido" in erros, erros
+    assert falhas.headers["content-language"] == "es"
+    pt = client.get(f"/jobs/boletos/{job_id}/items", params={"tenant_id": "t", "status": "failed"})
+    assert "sacado_documento: CPF/CNPJ brasileiro inválido" in pt.json()["items"][0]["resultado"]["errors"]
+
+
 def test_traduzir_corpo_so_toca_nas_chaves_de_mensagem():
     corpo = {"detail": "banco indisponível ou tempo esgotado",
              "upstream": {"body": {"message": "mantido? não: é mensagem", "codigo": "não muda"}},

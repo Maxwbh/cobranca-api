@@ -390,7 +390,8 @@ app.router.routes = [r for r in app.router.routes
 # (`core.i18n_openapi`). Cache por idioma, pelo mesmo motivo do cache original:
 # o que pesa é serializar.
 from app.core.i18n_erros import ErrosNoIdiomaDoChamador  # noqa: E402
-from app.core.i18n_openapi import idioma_pedido, traduzir_spec  # noqa: E402
+from app.core.i18n_openapi import idioma_do_request, traduzir_spec  # noqa: E402
+from app.core.swagger_tema import casca_no_idioma  # noqa: E402
 
 _spec_serializada: dict[str, tuple[int, bytes, str]] = {}
 
@@ -405,13 +406,9 @@ def _spec_bytes(idioma: str = "pt") -> tuple[bytes, str]:
     return atual[1], atual[2]
 
 
-def _idioma(request: Request) -> str:
-    return idioma_pedido(request.headers.get("accept-language"), request.query_params.get("lang"))
-
-
 @app.get(app.openapi_url, include_in_schema=False)
 def openapi_json(request: Request) -> Response:
-    idioma = _idioma(request)
+    idioma = idioma_do_request(request)
     corpo, etag = _spec_bytes(idioma)
     cabecalhos = {"ETag": f'"{etag}"', "Cache-Control": "no-cache",
                   "Content-Language": idioma, "Vary": "Accept-Language"}
@@ -599,27 +596,16 @@ if VENDOR_SWAGGER is not None:
     app.mount("/swagger-ui", StaticFiles(directory=VENDOR_SWAGGER), name="swagger-ui")
 
 
-def _casca_no_idioma(request: Request) -> dict:
-    """`?lang=es` explícito troca a casca (tagline/subtítulo) e fixa o idioma
-    da spec na URL — o `Accept-Language` do navegador já faria o XHR da spec
-    sair em espanhol, mas a casca é HTML servido antes, e um link compartilhado
-    tem de abrir igual em qualquer navegador."""
-    from app.core.swagger_tema import SUBTITULO, SUBTITULO_ES, TAGLINE, TAGLINE_ES
-    if request.query_params.get("lang", "").lower().startswith("es"):
-        return {"tagline": TAGLINE_ES, "subtitulo": SUBTITULO_ES, "sufixo": "?lang=es"}
-    return {"tagline": TAGLINE, "subtitulo": SUBTITULO, "sufixo": ""}
-
-
 @app.get("/docs", include_in_schema=False)
 def swagger_ui(request: Request) -> HTMLResponse:
     """Swagger UI do gateway com a identidade visual da plataforma."""
-    casca = _casca_no_idioma(request)
+    casca = casca_no_idioma(request)
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Gateway (Swagger)",
         superficie="Gateway REST · multi-banco",
         pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
-        tagline=casca["tagline"], subtitulo=casca["subtitulo"],
+        tagline=casca["tagline"], subtitulo=casca["subtitulo"], lang=casca["lang"],
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
                ("Offline / pyCobrança →", "/api/docs" + casca["sufixo"], True)],
         spec_url="/openapi.json" + casca["sufixo"],
@@ -629,13 +615,13 @@ def swagger_ui(request: Request) -> HTMLResponse:
 @app.get("/redoc", include_in_schema=False)
 def redoc_ui(request: Request) -> HTMLResponse:
     """A mesma spec do `/docs`, em leitura linear — útil numa spec de 67 rotas."""
-    casca = _casca_no_idioma(request)
+    casca = casca_no_idioma(request)
     return HTMLResponse(pagina_redoc(
         titulo="Cobranca-API — Gateway (Redoc)",
         superficie="Gateway REST · referência",
         pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · leitura linear da mesma spec",
-        tagline=casca["tagline"], subtitulo=casca["subtitulo"],
+        tagline=casca["tagline"], subtitulo=casca["subtitulo"], lang=casca["lang"],
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
                ("Swagger →", "/docs" + casca["sufixo"], True)],
         spec_url=app.openapi_url + casca["sufixo"],

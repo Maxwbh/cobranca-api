@@ -26,8 +26,21 @@ from typing import Any
 
 import yaml
 
-REPO = Path(__file__).resolve().parents[3]
-DICIONARIO = REPO / "docs" / "i18n" / "es" / "swagger.yaml"
+def _dicionario_path() -> Path:
+    """Repo (dev) e imagem (produção: `COPY docs/i18n /docs/i18n`) — o mesmo
+    par de candidatos que `routers.offline._spec_path()` usa para a spec.
+
+    Só o caminho do repositório existia, e na imagem `parents[3]` é `/`:
+    `/docs/i18n/...` não era isso, o dicionário não era achado, e
+    `?lang=es` respondia a spec em português com `Content-Language: es`."""
+    for p in (Path(__file__).resolve().parents[3] / "docs" / "i18n" / "es" / "swagger.yaml",
+              Path("/docs/i18n/es/swagger.yaml")):
+        if p.exists():
+            return p
+    return Path("/docs/i18n/es/swagger.yaml")
+
+
+DICIONARIO = _dicionario_path()
 
 #: Chaves cujo valor é texto para humano. `title` fica de fora: na spec do
 #: gateway é o nome do campo em Title Case ("Tenant Id"), não descrição.
@@ -106,14 +119,20 @@ def traduzir_spec(spec: dict, idioma: str = "es") -> dict:
     return novo
 
 
-_Q = re.compile(r"^\s*([A-Za-z]{1,8})(?:-[A-Za-z0-9]{1,8})*\s*(?:;\s*q\s*=\s*([0-9.]+))?\s*$")
+#: `es-PY;q=0.9`. O `q` segue a RFC 9110: `0`/`1` com até três decimais. Fora
+#: disso a parte é IGNORADA, não convertida: `float("1.0.0")` estourava, e como
+#: isto roda no middleware para toda requisição, um `q=` torto de qualquer
+#: proxy ou extensão virava 500 em toda a API — inclusive para quem nem pediu
+#: tradução.
+_Q = re.compile(r"^\s*([A-Za-z]{1,8})(?:-[A-Za-z0-9]{1,8})*\s*(?:;\s*q\s*=\s*([01](?:\.\d{0,3})?))?\s*$")
 
 
 def idioma_pedido(accept_language: str | None, query_lang: str | None = None) -> str:
     """`?lang=es` manda; senão o `Accept-Language` decide entre `pt` e `es`.
 
     Só o idioma primário conta (`es-PY`, `es-AR`, `es-419` são `es`). Em
-    empate ou ausência, português — a língua do código e da API.
+    empate, ausência ou cabeçalho malformado, português — a língua do código
+    e da API. Nunca levanta exceção: é chamado para toda requisição.
     """
     if query_lang:
         q = query_lang.strip().lower()[:2]
@@ -121,14 +140,25 @@ def idioma_pedido(accept_language: str | None, query_lang: str | None = None) ->
     if not accept_language:
         return "pt"
     melhor, peso = "pt", 0.0
-    for parte in accept_language.split(","):
+    for parte in str(accept_language).split(","):
         m = _Q.match(parte)
         if not m:
             continue
         lingua = m.group(1).lower()
-        q = float(m.group(2)) if m.group(2) else 1.0
+        try:
+            q = float(m.group(2)) if m.group(2) else 1.0
+        except ValueError:
+            continue
         if lingua in IDIOMAS and q > peso:
             melhor, peso = lingua, q
         elif lingua in IDIOMAS and q == peso and lingua == "pt":
             melhor = "pt"
     return melhor
+
+
+def idioma_do_request(request: Any) -> str:
+    """O idioma de UMA requisição (Starlette `Request`): `?lang=` e depois
+    `Accept-Language`. Um lugar só — as rotas da spec, do Swagger e do CSV
+    chamavam `idioma_pedido(request.headers…, request.query_params…)` cada
+    uma por si."""
+    return idioma_pedido(request.headers.get("accept-language"), request.query_params.get("lang"))

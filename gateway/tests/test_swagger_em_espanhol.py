@@ -117,6 +117,7 @@ def test_a_casca_do_docs_acompanha_o_lang(client):
     assert SUBTITULO_ES in es and SUBTITULO not in es
     assert "/openapi.json?lang=es" in es, "a casca em espanhol tem de fixar o idioma da spec na URL"
     assert "/openapi.json?lang=es" not in pt
+    assert '<html lang="es">' in es and '<html lang="pt-BR">' in pt, "o <html lang> da casca não acompanha o idioma"
     es_offline = client.get("/api/docs?lang=es").text
     assert SUBTITULO_ES in es_offline and "/api/openapi.json?lang=es" in es_offline
 
@@ -134,21 +135,51 @@ def test_as_copias_publicadas_em_espanhol_existem_e_estao_em_dia():
     spec.loader.exec_module(mod)
     gerado = mod.gerar()
     for nome in ("openapi.json", "openapi-offline.yaml"):
-        assert (PUBLICADO_ES / nome).read_text() == gerado[PUBLICADO_ES / nome], (
+        assert (PUBLICADO_ES / nome).read_text(encoding="utf-8") == gerado[PUBLICADO_ES / nome], (
             f"docs/swagger/es/{nome} está defasado — rode scripts/gerar-swagger-estatico.py")
-    publicado = (PUBLICADO_ES / "openapi.json").read_text()
+    publicado = (PUBLICADO_ES / "openapi.json").read_text(encoding="utf-8")
     assert "Respuesta exitosa" in publicado and "Successful Response" not in publicado
 
 
 @pytest.mark.parametrize("pagina", ["index.html", "offline.html"])
 def test_a_casca_publicada_em_espanhol_nao_repete_o_docker_run(pagina):
     """Mesma regra de `test_cabecalho_do_swagger_nao_repete`, para as cópias ES."""
-    html = (PUBLICADO_ES / pagina).read_text()
+    html = (PUBLICADO_ES / pagina).read_text(encoding="utf-8")
+    assert '<html lang="es">' in html, "a casca em es/ declara o idioma errado no <html lang>"
     topo = re.search(r'<div class="cob-topbar">(.*?)</div>\s*<div id="swagger-ui">', html, re.S)
     assert topo, "o cabeçalho mudou de marcação — reveja o guarda"
     assert topo.group(1).count("docker run -p 8000:8000") == 1
     assert "habla con la suya" in html, "a casca publicada em es/ não está em espanhol"
     assert "../vendor" in html, "a cópia em es/ tem de buscar o renderizador um nível acima"
+
+
+def test_o_dicionario_chega_a_imagem_docker():
+    """`.dockerignore` deixava `docs/i18n` passar, mas o Dockerfile só copiava
+    `docs/openapi.yaml`: na imagem o dicionário não existia, `dicionario()`
+    devolvia `{}` (cacheado para sempre) e `?lang=es` respondia português com
+    `Content-Language: es`. Nenhum teste via, porque todos rodam do checkout."""
+    dockerfile = (RAIZ / "Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"^COPY docs/i18n /docs/i18n$", dockerfile, re.MULTILINE), (
+        "o Dockerfile não copia docs/i18n para /docs/i18n — a spec em espanhol não existe na imagem")
+    ignore = (RAIZ / ".dockerignore").read_text(encoding="utf-8")
+    assert "!docs/i18n/**" in ignore
+    # e o módulo procura no caminho da imagem, não só no do repositório
+    from app.core import i18n_openapi
+    import inspect
+    assert '"/docs/i18n/es/swagger.yaml"' in inspect.getsource(i18n_openapi._dicionario_path)
+
+
+def test_o_304_da_spec_offline_tambem_declara_o_idioma(client):
+    """Cache compartilhado que revalida sem `Vary` pode servir o português a
+    quem pediu espanhol. O 304 leva os mesmos metadados que o 200."""
+    r = client.get("/api/openapi.json", headers={"Accept-Language": "es"})
+    r304 = client.get("/api/openapi.json", headers={"Accept-Language": "es", "If-None-Match": r.headers["etag"]})
+    assert r304.status_code == 304
+    assert r304.headers.get("content-language") == "es"
+    assert "Accept-Language" in r304.headers.get("vary", "")
+    # e o ETag do espanhol não serve o português
+    pt = client.get("/api/openapi.json", headers={"If-None-Match": r.headers["etag"]})
+    assert pt.status_code == 200 and pt.headers["content-language"] == "pt"
 
 
 def test_o_guarda_reconhece_um_texto_sem_traducao():

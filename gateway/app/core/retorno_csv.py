@@ -60,4 +60,4 @@ def retorno_csv(itens: list[dict[str, Any]], idioma: str = "pt") -> str:
     for item in itens:
         escritor.writerow([_celula(item.get(c), idioma) for c in COLUNAS])
     # BOM: é o que faz o Excel abrir UTF-8 com acento certo sem perguntar.
-    return "﻿" + saida.getvalue()
+    return "\ufeff" + saida.getvalue()
