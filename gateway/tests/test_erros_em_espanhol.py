@@ -23,7 +23,8 @@ from app.core.i18n_erros import CHAVES_DE_MENSAGEM, REGRAS, traduzir_corpo, trad
 PORTUGUES = re.compile(
     r"\b(não|é|são|deve|devem|você|destes|obrigatóri[oa]|desconhecid[oa]|aceito|quis|dizer|"
     r"arquivos?|itens|vazi[oa]|corpo|chave|acima|limite|mesmo|em|ou|do|dos|das|na|nas|nos|"
-    r"esgotado|indisponível|recusou|atingido|digitável|convênio|conteúdo|preenchidos|estão)\b",
+    r"esgotado|indisponível|recusou|atingido|digitável|convênio|conteúdo|preenchidos|estão|"
+    r"os|erros|gerar|teto|vem|cada item)\b",
     re.IGNORECASE)
 _PROTEGIDO = re.compile(r"`[^`]*`|'[^']*'|\"[^\"]*\"")
 
@@ -211,6 +212,11 @@ def test_toda_mensagem_literal_dos_routers_sai_sem_portugues(arquivo, msg):
     O guarda por regra só prova a regra; este varre o que as rotas de fato
     escrevem — `hint` incluído, que ficava em português — e cobra que nenhuma
     saia com palavra portuguesa. Mensagem nova sem regra reprova aqui."""
+    # Regra EXPLÍCITA, não a reserva: a reserva deixou "Corrija os erros de
+    # validação antes de gerar o boleto" intacto e o marcador de português não
+    # viu — uma regra por mensagem que a casa escreve é o mínimo cobrável.
+    assert any(re.match(p, msg) for p, _, _ in REGRAS), (
+        f"{arquivo}: {msg!r} não casa com nenhuma regra de i18n_erros.REGRAS — acrescente uma")
     es = traduzir_mensagem(msg, "es")
     assert not _sem_portugues(es), f"{arquivo}: {msg!r} -> {es!r}"
 
