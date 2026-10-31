@@ -907,6 +907,21 @@ paths:
           required: true
           schema:
             $ref: '#/components/schemas/CnabType'
+        - name: formato
+          in: query
+          required: false
+          description: |
+            `json` (padrão) ou `csv`. O CSV traz as **mesmas dez colunas** do
+            `RetornoItem`, sempre todas — vazias quando o arquivo não trouxe o
+            campo —, separadas por ponto e vírgula e com vírgula decimal: abre
+            direto na planilha. O **cabeçalho** sai no idioma do chamador
+            (`Accept-Language: es` ou `lang=es`); os **valores**, não — a
+            ocorrência fica no vocabulário do banco, e as datas como ele as
+            gravou.
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
       requestBody:
         required: true
         content:
@@ -927,6 +942,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RetornoResponse'
+            text/csv:
+              schema:
+                type: string
+              example: |
+                Nosso número;Número do documento;Data do crédito;Data da ocorrência;Valor do título;Valor pago;Tarifa;Código da ocorrência;Ocorrência;Layout genérico
+                00000012345678901;;;150726;1500,00;1500,00;0,00;06;Liquidação normal;não
         '400':
           description: Erro de processamento
           content:

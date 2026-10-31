@@ -45,13 +45,14 @@
   <a href="https://github.com/Maxwbh/cobranca-api/issues">Reportar Bug</a>
   <br /><br />
   <sub>
-    Os links de Swagger apontam para um <strong>ambiente de demonstração</strong>
-    (Render free tier), que pode sair do ar ou mudar de endereço — não é produção.
+    O Swagger acima é <strong>publicado do código</strong> a cada versão, para ler a
+    referência antes de subir nada. Para executar as chamadas, suba o seu container:
+    <code>docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest</code>.
+    Não há instância pública — o produto é self-hosted.
+    <br />
+    🇵🇾 🇦🇷 🇺🇾 <a href="https://maxwbh.github.io/cobranca-api/es/"><strong>¿Habla español?</strong></a>
+    Guía, Swagger y mensajes de error en español.
   </sub>
-</p>
-
-<p align="center">
-  <a href="https://render.com/deploy"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" /></a>
 </p>
 
 <p align="center">
@@ -101,8 +102,9 @@ Imagem pronta no GHCR — sem clonar, sem buildar, sem Python instalado:
 docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest
 
 # Swagger UI
-open http://localhost:8000/docs       # gateway REST (C6, Sicoob, Inter, Pix)
+open http://localhost:8000/docs       # gateway REST (C6, Sicoob, Inter, Itaú, Pix)
 open http://localhost:8000/api/docs   # offline (boleto/CNAB/OFX)
+# acrescente ?lang=es a qualquer dos dois para a referência em espanhol
 ```
 
 Cada release publica `ghcr.io/maxwbh/cobranca-api:<versão>` (amd64 + arm64);
@@ -181,7 +183,7 @@ open source **100% Python** — como **engine oficial de cobrança**, responsáv
 |---|:---:|:---:|
 | **REST API** (qualquer linguagem) | ✅ | — |
 | **Docker** / deploy pronto | ✅ | — |
-| **Gateway bancário** (C6, Sicoob, Inter: boleto registrado, Pix, conciliação) | ✅ | — |
+| **Gateway bancário** (C6, Sicoob, Inter, Itaú: boleto registrado, Pix, conciliação) | ✅ | — |
 | **Lote assíncrono** (jobs, artefatos, webhook) | ✅ | — |
 | **Cofre de credenciais** multi-tenant | ✅ | — |
 | Uso **direto em Python** (import) | ✅ | ✅ |
@@ -353,9 +355,9 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 - **Lote assíncrono** — `POST /jobs/boletos` e `/jobs/cnab/remessas`: 202 + `job_id`, falha por item isolada, artefatos com `sha256` e webhook de conclusão
 - **Credenciais zero-knowledge** — token `bapi_`; o servidor não decifra sem ele
 - **Carnê 3-vias** — N parcelas em PDF A4
-- **Dois modelos de boleto** — `moderno` (padrão) e `classico`, mesma chamada; faixa de marca opcional (logo, cor, marca d'água, rodapé) e faixa de totalizadores FEBRABAN com o valor cobrado somado
-- **Swagger UI** — interativo em `/docs` (gateway) e `/api/docs` (offline)
-- **Docker ready** — imagem única, deploy em 1 minuto no Render, Railway ou qualquer cloud
+- **Dois modelos de boleto** — `moderno` (padrão) e `classico`, mesma chamada; faixa de marca opcional (logo, cor, marca d'água, rodapé). A faixa de totalizadores FEBRABAN sai **em branco**, de propósito — quem a preenche é o caixa, na data do pagamento
+- **Swagger UI** — interativo em `/docs` (gateway) e `/api/docs` (offline); em **espanhol** com `?lang=es` ou `Accept-Language: es`, e os **erros** também voltam traduzidos com o mesmo cabeçalho
+- **Docker ready** — imagem única (amd64 + arm64) no GHCR; roda em qualquer host Docker
 
 ---
 
@@ -370,7 +372,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | `/api/boleto` | GET | Gerar PDF. `include_data=true` → JSON + base64 |
 | `/api/boleto/multi` | POST | Múltiplos boletos em 1 arquivo |
 | `/api/remessa` | POST | Remessa CNAB 240/400. `pix=true` → com segmento PIX |
-| `/api/retorno` | POST | Processar retorno CNAB → JSON |
+| `/api/retorno` | POST | Processar retorno CNAB → JSON, ou CSV para a contabilidade (`formato=csv`) |
 | `/api/ofx/parse` | POST | Extrato OFX → JSON com nosso_numero extraído |
 | `/api/render/boleto` | POST | Corpo JSON → dados + PDF base64 (uso interno) |
 
@@ -437,6 +439,7 @@ Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar p
 | Sicoob | 756 | ✅ | 400 + 240 | 240 | ✅ |
 | Banrisul | 041 | ✅ | 400 | 400 | — |
 | Unicred | 136 | ✅ | 400 + 240 | 400 | — |
+| Inter | 077 | ✅ | 400 | 400 | — |
 | + 8 bancos | — | ✅ | — | — | — |
 
 > Use `GET /api/bancos` para capacidades completas em tempo real, incluindo carteiras aceitas e formatos PIX.
@@ -517,9 +520,11 @@ curl -X POST http://localhost:8000/carne -H 'Content-Type: application/json' -d 
 | **Imagem pronta (GHCR)** | `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest` |
 | **Build local** | `docker build -t cobranca-api . && docker run -p 8000:8000 cobranca-api` |
 | **Docker Compose** | `docker compose up --build` |
-| **Render.com** | [![Deploy](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy) |
 
-Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/cobranca-api/deploy).
+Detalhes, variáveis de ambiente e o que o serviço pede do host no
+[guia de deploy](https://maxwbh.github.io/cobranca-api/deploy) — o `render.yaml`
+do repositório é um apêndice ali, para subir uma instância de teste; não é o
+deploy de referência.
 
 ---
 
@@ -542,7 +547,7 @@ Detalhes e variáveis de ambiente no [guia de deploy](https://maxwbh.github.io/c
 
 | O que | Onde |
 |-------|------|
-| **Ler a referência agora** | [Swagger (gateway)](https://maxwbh.github.io/cobranca-api/swagger/) · [Swagger (offline)](https://maxwbh.github.io/cobranca-api/swagger/offline.html) |
+| **Ler a referência agora** | [Swagger (gateway)](https://maxwbh.github.io/cobranca-api/swagger/) · [Swagger (offline)](https://maxwbh.github.io/cobranca-api/swagger/offline.html) · [en español](https://maxwbh.github.io/cobranca-api/swagger/es/) |
 | **Executar as chamadas** | `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest` → `http://localhost:8000/api/docs` |
 | Importar no Postman | [`openapi.json` publicado](https://maxwbh.github.io/cobranca-api/swagger/openapi.json) ou `http://localhost:8000/api/openapi.json` |
 | Campos por banco | [docs/fields/all-banks.md](./docs/fields/all-banks.md) |
@@ -589,10 +594,12 @@ uvicorn app.main:app --reload --port 8000
 | Projeto | O que é |
 |---|---|
 | **[PyCobrança](https://github.com/Maxwbh/pyCobranca)** | A **engine** desta plataforma — boletos, CNAB, PIX e PDF em Python puro. Use direto se sua app é Python. |
-| **[coleção Postman](./postman/README.md)** | 98 requests com IDs de rastreabilidade — smoke (<5 min) e regressão completa. |
+| **[coleção Postman](./postman/README.md)** | 146 requests com IDs de rastreabilidade — smoke (<5 min) e regressão completa. |
 | **[exemplos Oracle](./examples/oracle/)** | Pacote PL/SQL `COBRANCA_API` + ACL/wallet — boleto, CNAB, lote e **link de cartão** de dentro do banco. |
 | **[exemplos APEX](./examples/apex/)** | Páginas de emissão, de lote com progresso e de **checkout com cartão** — download de PDF, zip e webhook em ORDS. |
 | **[exemplos Python](./examples/python/)** | Scripts executáveis que chamam a API por HTTP (boleto, remessa, lote). |
+| **[exemplos PHP](./examples/php/)** | Os mesmos três scripts em PHP puro (sem Composer) — boleto, 12 PDFs de teste e remessa CNAB. |
+| **[guía en español](https://maxwbh.github.io/cobranca-api/es/)** | Para empresas del Mercosur que cobran en Brasil: qué necesita antes, los dos caminos y el glosario de los campos del boleto. |
 
 ---
 

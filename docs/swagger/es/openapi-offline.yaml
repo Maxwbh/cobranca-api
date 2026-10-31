@@ -1,0 +1,3371 @@
+openapi: 3.0.3
+info:
+  title: Cobranca-API — Offline (engine pyCobranca)
+  description: "Superficie **offline** de la plataforma **Cobranca-API** (servicio único **100% Python**):\n\
+    generación de boletos bancarios brasileños, archivos CNAB y parsing de extractos OFX —\nservida **nativamente**\
+    \ por la engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)\ndentro del propio proceso FastAPI\
+    \ (sin sidecar, sin proxy).\n\n> **Nota de versión (v2.0.0):** los contratos de esta superficie (paths,\
+    \ campos,\n> headers `X-*`) siguen compatibles con la v1.x. El único cambio de alcance es\n> el formato\
+    \ de salida: la engine emite **PDF** — `jpg`/`png`/`tif` responden\n> **400**.\n\n## Offline (`/api/*`)\
+    \ × Gateway (raíz) — cuándo usar cada uno\n\n| | **Offline (esta doc)** | **Gateway REST** ([Swagger\
+    \ `/docs`](./index.html)) |\n|---|---|---|\n| Qué hace | GENERA el documento (boleto/CNAB) localmente | REGISTRA\
+    \ la cobranza en la API online del banco (C6, Sicoob, Inter, Itaú) |\n| Boleto | No registrado (el\
+    \ banco solo lo conoce en el pago) | **Registrado** (CIP, en tiempo real) + Pix, Bolepix, webhooks\
+    \ |\n| Autenticación | **Ninguna** (por diseño — no toca banco ni secreto) | Token `bapi_` (`POST\
+    \ /credenciais`) |\n| Conciliación | Retorno CNAB / OFX (archivos) | Webhooks + consultas online |\n\
+    \n> **Autenticación:** esta superficie no tiene `securitySchemes` a propósito.\n> El mecanismo `bapi_`\
+    \ pertenece al gateway y está documentado en el\n> [Swagger del gateway](./index.html).\n\n## Cómo probar\n\
+    \n```bash\ncurl {base}/api/health                          # salud del servicio\ncurl -G {base}/api/boleto\
+    \ -o boleto.pdf \\\n  --data-urlencode 'bank=banco_brasil' --data-urlencode 'type=pdf' \\\n  --data-urlencode\
+    \ 'data={\"valor\":150.0,\"cedente\":\"Empresa\",\"documento_cedente\":\"11222333000181\",\"sacado\"\
+    :\"Cliente\",\"sacado_documento\":\"52998224725\",\"agencia\":\"3073\",\"conta_corrente\":\"12345678\"\
+    ,\"convenio\":\"1234567\",\"carteira\":\"18\",\"nosso_numero\":\"123\",\"data_vencimento\":\"2027-12-30\"\
+    }'\n```\n\n**Links:** [Repositorio](https://github.com/Maxwbh/cobranca-api) ·\n[CHANGELOG](https://github.com/Maxwbh/cobranca-api/blob/main/CHANGELOG.md)\
+    \ ·\n[Guías por banco](https://github.com/Maxwbh/cobranca-api/tree/main/docs/development)\n\n## Funcionalidades\n\
+    \n- **Boletos**: Generación de boletos en **PDF** — 19 bancos, sin convenio\n- **Remesa**: Generación\
+    \ de archivos CNAB 240 y 400\n- **Retorno**: Parsing de archivos de retorno CNAB 240 y 400\n- **OFX**:\
+    \ Parsing de extractos bancarios OFX v1 (SGML) y v2 (XML) con extracción automática de nosso_numero\n\
+    \n## Bancos Soportados\n\nLos 18, tal como la engine responde hoy. `GET /api/bancos` devuelve esta\
+    \ misma\nmatriz por introspección del código — si las dos discrepan, la respuesta\nmanda.\n\n| Banco\
+    \ | Código | Boleto | CNAB 240 | CNAB 400 | PIX en la remesa |\n|-------|--------|--------|----------|----------|-----|\n\
+    | Banco do Brasil | 001 | ✅ | ✅ | ✅ | ✅ |\n| Banco do Nordeste | 004 | ✅ | — | ✅ | — |\n| Banestes\
+    \ | 021 | ✅ | — | — | — |\n| Santander | 033 | ✅ | ✅ | ✅ | ✅ |\n| Banrisul | 041 | ✅ | — | ✅ | — |\n\
+    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Ailos | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097\
+    \ | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n| Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco\
+    \ | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — | ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC\
+    \ | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — | — | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n|\
+    \ Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para\
+    \ los 18. Las otras tres columnas son del **archivo de\nremesa**: un banco sin CNAB aquí emite el\
+    \ boleto, pero no genera remesa por\nesta superficie.\n"
+  version: 3.0.0
+  contact:
+    name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
+    email: maxwbh@gmail.com
+    url: https://msbrasil.inf.br
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+- url: http://localhost:8000
+  description: Local — `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
+- url: '{base_url}'
+  description: Su instancia alojada
+  variables:
+    base_url:
+      default: http://localhost:8000
+      description: Base URL de su instalación. Cámbiela por el hostname que muestre su proveedor de hosting.
+tags:
+- name: Health
+  description: Verificación de salud de la API
+- name: Boleto
+  description: Operaciones con boletos bancarios
+- name: Remessa
+  description: Generación de archivos de remesa CNAB
+- name: Retorno
+  description: Parsing de archivos de retorno CNAB
+- name: OFX
+  description: 'Parsing de extractos bancarios OFX (v1 SGML y v2 XML) por la engine.
+
+    El `nosso_numero` sale del memo con regla **por banco**, no con una regex genérica.
+
+    '
+- name: Render
+  description: '**USO INTERNO** — renderizado con cuerpo JSON y respuesta normalizada,
+
+    consumido por el propio gateway (provider offline). Los consumidores externos
+
+    deben preferir las rutas de `Boleto`/`Remessa` o el gateway.
+
+    '
+paths:
+  /api/health:
+    get:
+      tags:
+      - Health
+      summary: Verificar el status de la API
+      description: 'Sonda de disponibilidad de la superficie offline. Responde sin tocar
+
+        red, banco ni disco: prueba que **el proceso está en pie y enrutando**, y
+
+        solo eso. No verifica credencial, volumen de artefactos ni engine — una
+
+        sonda que fallara por un problema transitorio reiniciaría el container en
+
+        bucle, que es peor que el problema que detectaría.
+
+        '
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API funcionando normalmente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: OK
+                timestamp: '2026-08-19T05:32:47.446605+00:00'
+  /api/info:
+    get:
+      tags:
+      - Health
+      summary: Información de la API
+      description: Devuelve nombre, versión, bancos soportados y formatos
+      operationId: getInfo
+      responses:
+        '200':
+          description: Información de la API
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoResponse'
+  /api/metadata:
+    get:
+      tags:
+      - Health
+      summary: Metadatos de la API y de la engine pyCobrança
+      description: 'Devuelve detalles de la API (nombre, versión, engine), de la engine pyCobrança
+
+        (versión, repositorio) y la lista completa de endpoints disponibles.
+
+        '
+      operationId: getMetadata
+      responses:
+        '200':
+          description: Metadatos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataResponse'
+  /api/bancos:
+    get:
+      tags:
+      - Health
+      summary: Lista los bancos soportados con capacidades detalladas
+      description: 'Devuelve los 19 bancos soportados, con el código bancario, los layouts CNAB
+
+        de remesa disponibles y si hay remesa con PIX.
+
+
+        Los datos vienen dinámicamente de la engine pyCobrança (`Bancos`).
+
+        '
+      operationId: listBancos
+      responses:
+        '200':
+          description: Lista de bancos con capacidades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    example: 18
+                  engine:
+                    type: string
+                    example: pycobranca
+                  bancos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BancoInfo'
+  /api/boleto/validate:
+    get:
+      tags:
+      - Boleto
+      summary: Validar los datos del boleto
+      description: 'Valida los datos sin generar el archivo. En error devuelve **400** con
+
+        `validation_errors` — una **lista**, un ítem por campo violado.
+
+        Reglas por banco (tipos/tamaños/carteras/especiales) en
+
+        [validacao-campos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/validacao-campos.md).
+
+        '
+      operationId: validateBoleto
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        description: Código del banco
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: data
+        in: query
+        required: true
+        description: 'Datos del título en JSON, URL-encoded — los campos del schema
+
+          `BoletoData`. Un campo fuera de él responde `400` nombrando el campo.
+
+          '
+        schema:
+          type: string
+          format: json
+        example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João
+          da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+      responses:
+        '200':
+          description: Datos válidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationSuccess'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  /api/boleto/data:
+    get:
+      tags:
+      - Boleto
+      summary: Obtener los datos calculados del boleto
+      description: 'Devuelve todos los datos calculados del boleto sin generar el archivo,
+
+        incluyendo código de barras, línea digitable y nosso número formateado.
+
+        '
+      operationId: getBoletoData
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: data
+        in: query
+        required: true
+        description: 'Datos del título en JSON, URL-encoded — los campos del schema
+
+          `BoletoData`. Un campo fuera de él responde `400` nombrando el campo.
+
+          '
+        schema:
+          type: string
+          format: json
+        example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João
+          da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+      responses:
+        '200':
+          description: Datos del boleto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoletoResponse'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/boleto/nosso_numero:
+    get:
+      tags:
+      - Boleto
+      summary: Generar nosso número
+      description: Genera solo el nosso número y los campos relacionados
+      operationId: getNossoNumero
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: data
+        in: query
+        required: true
+        schema:
+          type: string
+          format: json
+      responses:
+        '200':
+          description: Nosso número generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NossoNumeroResponse'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/boleto:
+    get:
+      tags:
+      - Boleto
+      summary: Generar boleto · 📄 respuesta binaria + headers X-*
+      description: Genera el boleto en PDF (engine pyCobranca)
+      operationId: generateBoleto
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: type
+        in: query
+        required: true
+        description: Formato de salida
+        schema:
+          $ref: '#/components/schemas/OutputType'
+      - name: data
+        in: query
+        required: true
+        description: 'Datos del título en JSON, URL-encoded — los campos del schema
+
+          `BoletoData`. Un campo fuera de él responde `400` nombrando el campo.
+
+          '
+        schema:
+          type: string
+          format: json
+        example: '{"valor":150.0,"cedente":"Empresa Teste LTDA","documento_cedente":"11222333000181","sacado":"João
+          da Silva","sacado_documento":"52998224725","agencia":"3073","conta_corrente":"12345678","convenio":"1234567","carteira":"18","nosso_numero":"123","data_vencimento":"2027-12-30"}'
+      - name: include_data
+        in: query
+        required: false
+        description: 'Si es `true`, devuelve JSON con todos los datos del boleto + archivo
+
+          en base64 (una sola llamada para PDF + metadatos).
+
+          Si se omite (default), devuelve el binario puro + headers X-*.
+
+          '
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+          default: 'false'
+      - name: template
+        in: query
+        required: false
+        description: 'Modelo visual del PDF. El default es `moderno`, que trae **el logo del
+
+          banco emisor** en el encabezado — vale para todos los bancos con marca
+
+          empaquetada en la engine (Citibank no la tiene, y cae en la sigla). Envíe
+
+          `logo` en `data` para usar su propia imagen.
+
+
+          `classico` también está disponible en esta ruta. El template `carne`
+
+          (3 vías por A4) vale en `/api/boleto/multi` y `/api/render/carne`.
+
+
+          La franja de marca opcional se monta a partir de los campos pasados en
+
+          `data` (ver schema `BoletoData`: `logo_empresa`, `cor_marca`,
+
+          `marca_dagua`, `rodape_contato`, `parcela_atual`, `total_parcelas`)
+
+          y **solo existe en el `moderno`** — pedirla con `classico` responde `400`
+
+          en vez de devolver un boleto sin marca alguna.
+
+          '
+        schema:
+          type: string
+          enum:
+          - moderno
+          - classico
+          default: moderno
+      responses:
+        '200':
+          description: 'Sin include_data: archivo binario + headers `X-Nosso-Numero*`.
+
+            Con include_data=true: JSON con los datos + `content_base64`.
+
+            '
+          headers:
+            X-Nosso-Numero:
+              schema:
+                type: string
+              description: 'Nosso número tal como vino en el payload — la API **no** completa con
+
+                ceros a la izquierda; quien pide `123` recibe `123`. El relleno
+
+                aparece en el formateado.
+
+                '
+              example: '123'
+            X-Nosso-Numero-Formatado:
+              schema:
+                type: string
+              description: Nosso número formateado (impreso en el boleto).
+              example: '12345670000000123'
+            X-Nosso-Numero-DV:
+              schema:
+                type: string
+              description: 'Dígito verificador del nosso número, cuando el banco lo calcula por
+
+                separado. Viene **vacío** en los bancos que ya lo embeben en el formateado —
+
+                Banco do Brasil es uno de ellos.
+
+                '
+              example: ''
+            X-Codigo-Barras:
+              schema:
+                type: string
+              description: Código de barras (44 dígitos).
+              example: 00198204100000150000000001234567000000012318
+            X-Linha-Digitavel:
+              schema:
+                type: string
+              description: Línea digitable formateada.
+              example: 00190.00009 01234.567004 00000.123182 8 20410000015000
+            X-Pix-Copia-Cola:
+              schema:
+                type: string
+              description: 'BR Code (EMV) del Bolepix — **solo aparece cuando el payload trae
+
+                `chave_pix`**. El cuerpo de esta respuesta es el PDF, así que este es el
+
+                único camino por donde sale el copia y pega: sin él el QR va
+
+                impreso y no hay texto para mostrar al lado, que es como paga
+
+                quien está en el celular (no se puede escanear la propia pantalla).
+
+                ASCII por especificación del BR Code.
+
+                '
+              example: 00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E
+                LTDA6006BRASIL62070503***63048B92
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoletoWithFileResponse'
+              examples:
+                with_include_data:
+                  summary: Respuesta con include_data=true
+                  value:
+                    bank: banco_brasil
+                    nosso_numero: '123'
+                    nosso_numero_formatado: '12345670000000123'
+                    nosso_numero_dv: ''
+                    codigo_barras: 00198204100000150000000001234567000000012318
+                    linha_digitavel: 00190.00009 01234.567004 00000.123182 8 20410000015000
+                    content_base64: JVBERi0xLjQK...
+                    content_type: application/pdf
+                    filename: boleto-banco_brasil.pdf
+        '400':
+          description: 'Error de validación. `validation_errors` es siempre una **lista plana**
+
+            de mensajes — nunca un objeto por campo.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Dados do boleto inválidos
+                validation_errors:
+                - convênio deve ter 4, 6 ou 7 dígitos
+                - 'carteira ''18'' não suportada (use uma de: 104, 109, 112, 115, 175, 177, 188)'
+                hint: Verifique se todos os campos obrigatórios estão preenchidos
+  /api/boleto/multi:
+    post:
+      tags:
+      - Boleto
+      summary: Generar múltiples boletos · 📄 respuesta binaria
+      description: 'Genera múltiples boletos en un único archivo.
+
+
+        **Lote resiliente:** la falla de un ítem **no** cancela el lote. El PDF sale
+
+        con los ítems válidos y el resultado por ítem viene en los headers
+
+        `X-Boletos-Info` (ok), `X-Boletos-Errors`, `X-Boletos-Failed` y
+
+        `X-Batch-Status` (`completed` | `partially_completed`). Con
+
+        `include_data=true`, el JSON trae `{status, total, completed, failed,
+
+        boletos, erros}`. **400** solo cuando ningún ítem es válido.
+
+
+        ⚠️ **Límite**: `LOTE_MAX_ITENS` (default **200**) — por encima de eso responde
+
+        **413**; para lotes mayores use el procesamiento asincrónico
+
+        (ver `docs/development/plano-jobs-lote.md`).
+
+        '
+      operationId: generateMultipleBoletos
+      parameters:
+      - name: type
+        in: query
+        required: false
+        description: Formato de salida (solo `pdf`; cualquier otro responde 400).
+        schema:
+          $ref: '#/components/schemas/OutputType'
+      - name: include_data
+        in: query
+        required: false
+        description: 'Si es `true`, devuelve JSON con los metadatos de cada boleto + el PDF
+
+          combinado en base64. En caso contrario, devuelve el binario + los
+
+          headers `X-Boletos-*`.
+
+          '
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+          default: 'false'
+      - name: template
+        in: query
+        required: false
+        description: 'Modelo visual. Además de `moderno`/`classico`, esta ruta acepta
+
+          `carne` (3 vías por A4) — que `GET /api/boleto` rechaza.
+
+          '
+        schema:
+          type: string
+          enum:
+          - moderno
+          - classico
+          - carne
+          default: moderno
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: string
+                  format: binary
+                  description: 'Archivo JSON con un **array** de boletos — cada ítem tiene los
+
+                    campos del schema `BoletoData` más el `bank`. Otra forma
+
+                    (objeto, texto, número) responde **400** diciendo qué
+
+                    llegó; un identificador repetido responde **422**.
+
+                    '
+      responses:
+        '200':
+          description: 'Sin include_data: archivo binario + headers `X-Boletos-Info` y `X-Boletos-Count`.
+
+            Con include_data=true: JSON con el array `boletos` + `content_base64`.
+
+            '
+          headers:
+            X-Boletos-Count:
+              schema:
+                type: integer
+              description: 'Boletos **generados** — no el tamaño del lote enviado. En un lote
+
+                de 3 con 1 falla, vale 2 (y `X-Boletos-Failed` vale 1).
+
+                '
+              example: 2
+            X-Boletos-Info:
+              schema:
+                type: string
+                format: json
+              description: 'Array JSON con el registro de cada boleto generado: `item_id`,
+
+                `indice`, `bank`, `status`, `nosso_numero`,
+
+                `nosso_numero_formatado`, `nosso_numero_dv`, `codigo_barras` y
+
+                `linha_digitavel`.
+
+                '
+              example: '[{"item_id":"0","indice":0,"bank":"banco_brasil","status":"completed","nosso_numero":"123","nosso_numero_formatado":"12345670000000123","nosso_numero_dv":"","codigo_barras":"...","linha_digitavel":"..."}]'
+            X-Boletos-Failed:
+              schema:
+                type: integer
+              description: Cantidad de ítems que fallaron en la validación.
+              example: 1
+            X-Boletos-Errors:
+              schema:
+                type: string
+                format: json
+              description: 'Array JSON con los ítems que fallaron (`item_id`, `indice`,
+
+                `bank`, `status`, `errors`). `[]` cuando no hay fallas.
+
+                '
+              example: '[{"item_id":"2","indice":2,"bank":"itau","status":"failed","errors":["conta_corrente
+                invalido"]}]'
+            X-Batch-Status:
+              schema:
+                type: string
+                enum:
+                - completed
+                - partially_completed
+              description: Resultado global del lote.
+              example: partially_completed
+            X-Boletos-Info-Truncado:
+              schema:
+                type: string
+                enum:
+                - 'true'
+              description: 'Presente **solo** cuando `X-Boletos-Info` no cupo en el header y
+
+                se volvió `[]`. El PDF sigue entregándose y los contadores
+
+                (`X-Boletos-Count`, `X-Boletos-Failed`) siguen válidos —
+
+                para el detalle por ítem, use `include_data=true`.
+
+
+                Por qué existe: el metadato crece ~300 B por boleto (100 ítems
+
+                ≈ 30 KB, 200 ≈ 60 KB). Por encima de ~64 KB el `http.client` de Python
+
+                rechaza la respuesta **entera** y el cliente pierde hasta el PDF.
+
+                Con `LOTE_MAX_ITENS` en el default (200) esto **nunca** se dispara;
+
+                ajuste `HEADER_JSON_MAX_BYTES` (ej.: `6144`) si está detrás de
+
+                nginx (8 KB) o ALB (16 KB).
+
+                '
+            X-Boletos-Errors-Truncado:
+              schema:
+                type: string
+                enum:
+                - 'true'
+              description: 'Lo mismo que `X-Boletos-Info-Truncado`, para `X-Boletos-Errors`.
+
+                '
+            X-Boletos-Detalhe:
+              schema:
+                type: string
+              description: Dónde buscar el detalle cuando hubo truncamiento.
+              example: use include_data=true (metadados no corpo)
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultiBoletoResponse'
+              examples:
+                with_include_data:
+                  summary: Respuesta con include_data=true (lote de 3, 1 falla)
+                  value:
+                    total: 3
+                    completed: 2
+                    failed: 1
+                    status: partially_completed
+                    boletos:
+                    - item_id: '0'
+                      indice: 0
+                      bank: banco_brasil
+                      status: completed
+                      nosso_numero: '123'
+                      nosso_numero_formatado: '12345670000000123'
+                      nosso_numero_dv: ''
+                      codigo_barras: 00198204100000150000000001234567000000012318
+                      linha_digitavel: 00190.00009 01234.567004 00000.123182 8 20410000015000
+                    - item_id: '1'
+                      indice: 1
+                      bank: sicoob
+                      status: completed
+                      nosso_numero: '7890'
+                      nosso_numero_formatado: 00078900
+                      nosso_numero_dv: ''
+                      codigo_barras: '75691204100000250001432701022938500078900001'
+                      linha_digitavel: 75691.43279 01022.938508 00789.000015 1 20410000025000
+                    erros:
+                    - item_id: '2'
+                      indice: 2
+                      bank: itau
+                      status: failed
+                      errors:
+                      - conta deve ter no máximo 5 dígitos
+                    content_base64: JVBERi0xLjQK...
+                    content_type: application/pdf
+                    filename: boletos-multi.pdf
+        '400':
+          description: 'Ningún ítem del lote es válido, `data` no es un array de objetos, o
+
+            `type`/`template` fuera de los valores aceptados.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: 'Lote por encima del límite `LOTE_MAX_ITENS` (default **200**), o archivo
+
+            por encima de `UPLOAD_MAX_BYTES` (default **10 MB**). El tope de bytes se
+
+            verifica ANTES de cargar el contenido.
+
+            Para volúmenes mayores, use el procesamiento asincrónico
+
+            (`POST /jobs/boletos`, en el gateway).
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Lote acima do limite de 200 itens
+                  recebidos:
+                    type: integer
+                    example: 350
+                  hint:
+                    type: string
+        '422':
+          $ref: '#/components/responses/LoteDuplicado'
+  /api/remessa:
+    post:
+      tags:
+      - Remessa
+      summary: Generar archivo de remesa · 📄 archivo CNAB (texto)
+      description: 'Genera el archivo de remesa CNAB 240 o 400.
+
+        Con `pix=true`, genera la remesa con segmento PIX (boleto híbrido).
+
+
+        **El nombre del archivo importa en algunos bancos.** El `Content-Disposition`
+
+        trae el nombre que el BANCO exige cuando el layout lo define — en **Inter**,
+
+        `CI400_001_<sequencial>.REM`, con el mismo secuencial grabado en el header,
+
+        y el Internet Banking rechaza la subida si los dos divergen. En los demás
+
+        sigue el descriptivo (`remessa-<banco>-<tipo>.rem`), que no es exigencia
+
+        de nadie. **Suba el archivo con el nombre que vino en el header.**
+
+
+        **Cargos por pago** — cada uno es un **trío** código/tipo → valor →
+
+        fecha (la fecha es opcional). Use los nombres exactos; no hay alias:
+
+
+        | Cargo | Código/tipo | Valor | Fecha |
+
+        |---|---|---|---|
+
+        | Multa | `codigo_multa` (`0` exento, `1` valor fijo, `2` porcentual) | `percentual_multa` · `valor_multa`
+        (solo Inter) | `data_multa` |
+
+        | Intereses/Mora | `tipo_mora` (`1` valor/día, `2` tasa mensual %, `3` exento) | `valor_mora`
+        (400) · `percentual_mora` (240 e Inter) | `data_mora` |
+
+        | Descuento 1º/2º/3º | `cod_desconto` (`4` = porcentual, solo Inter) | `valor_desconto` · `percentual_desconto`
+        (solo Inter) | `data_desconto` … |
+
+        | IOF | — | `valor_iof` | — |
+
+        | Rebaja | — | `valor_abatimento` | — |
+
+        | Protesto | `codigo_protesto` | `dias_protesto` | — |
+
+
+        > **La unidad (% o R\$) cambia por layout — y la API valida.** En el
+
+        > **CNAB 240** el código/tipo se graba en el archivo, así que el banco sabe la
+
+        > unidad: multa `codigo_multa` (`1` valor fijo, `2` porcentual), mora
+
+        > `tipo_mora` (`1` valor/día, `2` tasa mensual %). En el **CNAB 400** el
+
+        > código **no** se graba — la unidad es fija: multa siempre porcentual,
+
+        > mora siempre valor/día. Por eso, en el 400, `codigo_multa=1`,
+
+        > `tipo_mora=2` y `percentual_mora` solo responden **400** (se
+
+        > cobrarían en la unidad equivocada — R\$ 50 leído como 50%). Los bancos donde la
+
+        > multa va por instrucción (BB e Itaú en el 400) no tienen posición de multa.
+
+        >
+
+        > **Inter (077) es la excepción en los tres ejes.** Su layout tiene los
+
+        > **dos** campos de cada cargo (ítems 10/11, 14/15 y 30/31 del registro
+
+        > tipo 1) y elige por el código, así que `valor_multa`, `percentual_mora` y
+
+        > `percentual_desconto` valen ahí — y **solo ahí**, en el CNAB 400. Medido A/B
+
+        > en todos los layouts: en los otros el campo entra, no se graba y desaparece.
+
+        > Por eso la API rechaza en vez de dejar que el cargo desaparezca; el error dice quién
+
+        > graba el campo.
+
+
+        📖 **Guía completa con la matriz por banco:** [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/encargos.md)
+
+
+        > **Un campo no reconocido responde 400** con la pista del trío correcto.
+
+        > Antes se descartaba en silencio: la API devolvía 200 y el archivo iba
+
+        > al banco **sin el cargo pedido**.
+
+        '
+      operationId: generateRemessa
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: type
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/CnabType'
+      - name: pix
+        in: query
+        required: false
+        description: 'Si es `true`, usa la clase PIX del banco para agregar el segmento PIX
+
+          en la remesa CNAB. CNAB 400 PIX: Bradesco, Itaú, C6, Santander.
+
+          CNAB 240 PIX: Sicoob, Caixa, Banco do Brasil.
+
+          '
+        schema:
+          type: string
+          enum:
+          - 'true'
+          - 'false'
+          default: 'false'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: string
+                  format: binary
+                  description: Archivo JSON con los datos de la remesa y los pagos
+            examples:
+              c6_cnab400:
+                summary: Banco C6 — CNAB 400
+                description: 'Use `codigo_beneficiario` (obligatorio). NO enviar `convenio`. Campos del
+                  pago: `nome_sacado`, `documento_sacado`, dirección separada.
+
+                  '
+                value:
+                  data: "{\n  \"empresa_mae\": \"Empresa C6 LTDA\",\n  \"documento_cedente\": \"33445566000186\"\
+                    ,\n  \"agencia\": \"0001\",\n  \"conta_corrente\": \"1234567\",\n  \"digito_conta\"\
+                    : \"0\",\n  \"carteira\": \"10\",\n  \"codigo_beneficiario\": \"0012345678\",\n  \"\
+                    pagamentos\": [{\n    \"nosso_numero\": \"12345678\",\n    \"data_vencimento\": \"\
+                    2026/12/31\",\n    \"valor\": 1500.00,\n    \"nome_sacado\": \"Joao da Silva\",\n\
+                    \    \"documento_sacado\": \"12345678909\",\n    \"endereco_sacado\": \"Rua Teste,\
+                    \ 100\",\n    \"bairro_sacado\": \"Centro\",\n    \"cep_sacado\": \"01000000\",\n\
+                    \    \"cidade_sacado\": \"Sao Paulo\",\n    \"uf_sacado\": \"SP\"\n  }]\n}\n"
+              sicoob_cnab240:
+                summary: Sicoob — CNAB 240
+                description: 'NO enviar `variacao` (campo del boleto, no existe en la remesa CNAB240 Sicoob).
+
+                  '
+                value:
+                  data: "{\n  \"empresa_mae\": \"Cooperativa Teste\",\n  \"documento_cedente\": \"98765432000198\"\
+                    ,\n  \"agencia\": \"4327\",\n  \"conta_corrente\": \"417270\",\n  \"convenio\": \"\
+                    229385\",\n  \"carteira\": \"1\",\n  \"pagamentos\": [{\n    \"nosso_numero\": \"\
+                    7890\",\n    \"data_vencimento\": \"2026/12/31\",\n    \"valor\": 2500.00,\n    \"\
+                    nome_sacado\": \"Maria Santos\",\n    \"documento_sacado\": \"98765432100\",\n   \
+                    \ \"endereco_sacado\": \"Av. Principal, 50\",\n    \"bairro_sacado\": \"Centro\",\n\
+                    \    \"cep_sacado\": \"20000000\",\n    \"cidade_sacado\": \"Rio de Janeiro\",\n \
+                    \   \"uf_sacado\": \"RJ\"\n  }]\n}\n"
+      responses:
+        '200':
+          description: Archivo de remesa generado
+          headers:
+            X-Remessa-Avisos:
+              description: '⚠️ Presente **solo cuando hay aviso** — JSON con lo que el layout
+
+                **no grabó** de lo que usted mandó.
+
+
+                `carteira` está en la base de toda remesa, pero **ocho layouts no
+
+                tienen ese campo**: CrediSIS y Santander en el CNAB 400, y seis
+
+                de los siete en el 240, donde la FEBRABAN separa el *código de la cartera*
+
+                (posición 58 del segmento P) de la *modalidad* del banco.
+
+
+                Quien monta la remesa con el mismo diccionario del boleto — el
+
+                camino natural — creía haber elegido la cartera, y el
+
+                archivo salía con la del default. **El archivo está correcto**; lo que
+
+                faltaba era la señal. El aviso nombra el campo que ese layout
+
+                graba de verdad (`codigo_carteira`, `modalidade_carteira`…).
+
+                '
+              schema:
+                type: string
+              example: '[{"aviso": "RemessaSicoob240: `carteira` não é gravada neste layout (use ''modalidade_carteira'')"}]'
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: Contenido del archivo CNAB
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: 'Archivo por encima de `UPLOAD_MAX_BYTES` (default **10 MB**). El tope se
+
+            verifica ANTES de cargar el contenido — sin él, un envío grande
+
+            tumbaba el proceso por memoria antes de cualquier validación.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
+  /api/retorno:
+    post:
+      tags:
+      - Retorno
+      summary: Procesar archivo de retorno
+      description: 'Hace el parsing del archivo de retorno CNAB 240 o 400.
+
+
+        El **banco sale del header del archivo**, no del `bank` del request: de él
+
+        dependen el layout y el sentido de cada ocurrencia. Cuando los dos
+
+        discrepan la respuesta es `400` — antes el `bank` era exigido y nunca leído,
+
+        así que subir el retorno del banco equivocado devolvía `200` con campos leídos
+
+        por el layout de otro banco.
+
+
+        Cada ítem trae `layout_generico`: `true` avisa que la engine no tenía el
+
+        mapa de ese banco y leyó con un layout de reserva.
+
+        '
+      operationId: processRetorno
+      parameters:
+      - name: bank
+        in: query
+        required: true
+        description: 'Banco esperado. Verificado contra el header del archivo; una divergencia
+
+          responde `400` en vez de leer con el layout equivocado.
+
+          '
+        schema:
+          $ref: '#/components/schemas/BankCode'
+      - name: type
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/CnabType'
+      - name: formato
+        in: query
+        required: false
+        description: '`json` (default) o `csv`. El CSV trae las **mismas diez columnas** del
+
+          `RetornoItem`, siempre todas — vacías cuando el archivo no trajo el
+
+          campo —, separadas por punto y coma y con coma decimal: se abre
+
+          directo en la planilla. El **encabezado** sale en el idioma de quien llama
+
+          (`Accept-Language: es` o `lang=es`); los **valores**, no — la
+
+          ocurrencia queda en el vocabulario del banco, y las fechas como él las
+
+          grabó.
+
+          '
+        schema:
+          type: string
+          enum:
+          - json
+          - csv
+          default: json
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: string
+                  format: binary
+                  description: Archivo de retorno CNAB
+      responses:
+        '200':
+          description: Retorno procesado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetornoResponse'
+            text/csv:
+              schema:
+                type: string
+              example: 'Nosso número;Número do documento;Data do crédito;Data da ocorrência;Valor do título;Valor
+                pago;Tarifa;Código da ocorrência;Ocorrência;Layout genérico
+
+                00000012345678901;;;150726;1500,00;1500,00;0,00;06;Liquidação normal;não
+
+                '
+        '400':
+          description: Error de procesamiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: 'Archivo por encima de `UPLOAD_MAX_BYTES` (default **10 MB**). El tope se
+
+            verifica ANTES de cargar el contenido — sin él, un envío grande
+
+            tumbaba el proceso por memoria antes de cualquier validación.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
+  /api/ofx/parse:
+    post:
+      tags:
+      - OFX
+      summary: Parsear archivo OFX (extracto bancario)
+      description: 'Parsea el archivo OFX y devuelve JSON estructurado con:
+
+        - Datos del banco (ORG, FID)
+
+        - Datos de la cuenta (sucursal, número, tipo)
+
+        - Período del extracto
+
+        - Saldo
+
+        - Lista de transacciones clasificadas (crédito/débito)
+
+        - Extracción automática de `nosso_numero` del campo memo por banco
+
+        - Resumen con totales de créditos y débitos
+
+
+        **Recursos:**
+
+        - Soporta OFX v1 (SGML) y v2 (XML)
+
+        - Conversión automática de encoding Latin-1 → UTF-8
+
+        - Extracción por regex para Sicoob, Itaú, Banco do Brasil, Bradesco y Caixa
+
+        - Fallback genérico para otros bancos
+
+
+        **Filtros opcionales:**
+
+        - `somente_creditos=true`: devuelve solo transacciones de crédito
+
+        '
+      operationId: parseOfx
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Archivo OFX (extracto bancario)
+                somente_creditos:
+                  type: string
+                  enum:
+                  - 'true'
+                  - 'false'
+                  default: 'false'
+                  description: Si es 'true', devuelve solo transacciones de crédito
+      responses:
+        '201':
+          description: Archivo OFX parseado con éxito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfxResponse'
+              example:
+                banco:
+                  org: ITAU
+                  fid: '341'
+                conta:
+                  agencia: '341'
+                  numero: 56789-0
+                  tipo: CHECKING
+                periodo:
+                  inicio: '2025-02-05'
+                  fim: '2025-02-10'
+                saldo:
+                  valor: 5230.75
+                  data: '2025-02-28'
+                transacoes:
+                - tipo: credito
+                  valor: 150.0
+                  data: '2025-02-05'
+                  memo: PAGTO BOLETO 01234567000000123
+                  nosso_numero: '000000123'
+                resumo:
+                  total_creditos: 150.0
+                  total_debitos: 0.0
+                  quantidade: 1
+        '400':
+          description: Archivo OFX inválido o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfxError'
+        '413':
+          description: 'Archivo por encima de `UPLOAD_MAX_BYTES` (default **10 MB**). El tope se
+
+            verifica ANTES de cargar el contenido — sin él, un envío grande
+
+            tumbaba el proceso por memoria antes de cualquier validación.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  campo:
+                    type: string
+                  recebidos:
+                    type: integer
+                  hint:
+                    type: string
+  /api/render/boleto:
+    post:
+      tags:
+      - Render
+      summary: Renderizar boleto (datos + PDF base64)
+      description: 'Registra/calcula los datos del boleto (línea digitable, código de barras,
+
+        nosso número) y devuelve el PDF en base64. Cuerpo JSON, renderizado
+
+        in-process por la engine pyCobrança. Consumido por el provider offline del gateway.
+
+        '
+      operationId: renderBoleto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bank
+              - data
+              properties:
+                bank:
+                  type: string
+                  example: itau
+                data:
+                  allOf:
+                  - $ref: '#/components/schemas/BoletoData'
+                  description: 'Datos del título. Un campo fuera de este schema responde `400`
+
+                    nombrando el campo y sugiriendo el parecido.
+
+
+                    ⚠️ La franja FEBRABAN (`desconto_abatimento`,
+
+                    `outras_deducoes`, `mora_multa`, `outros_acrescimos`,
+
+                    `valor_cobrado`) es **aceptada y no enviada al boleto** — sale
+
+                    en blanco en el PDF, porque depende de la fecha del pago. La
+
+                    regla va en `instrucoes` y el valor en la remesa CNAB.
+
+                    '
+                template:
+                  type: string
+                  enum:
+                  - moderno
+                  - classico
+                  default: moderno
+                  description: Modelo visual. El default `moderno` trae el logo del banco emisor en el
+                    encabezado.
+            example:
+              bank: banco_brasil
+              template: moderno
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: 1B4F8A
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
+      responses:
+        '200':
+          description: Boleto renderizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nosso_numero:
+                    type: string
+                    example: '00000001'
+                  linha_digitavel:
+                    type: string
+                  codigo_barras:
+                    type: string
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: 'BR Code del QR dibujado en el PDF; `null` cuando el boleto no
+
+                      tiene PIX. Sin él el QR sale en el papel y la integración no tiene el
+
+                      texto para mostrar al lado.
+
+                      '
+                  pix_vinculado:
+                    type: boolean
+                    nullable: true
+                    description: '¿El QR **liquida el título**? `true` = Bolepix (vino del banco,
+
+                      en `data.pix_copia_cola`); `false` = QR **suelto**, montado
+
+                      de `data.chave_pix`, que acredita la clave y deja el título
+
+                      **en abierto**; `null` = boleto sin PIX.
+
+                      '
+                  pdf_base64:
+                    type: string
+                    description: PDF en base64
+        '400':
+          description: Datos del boleto inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/render/carne:
+    post:
+      tags:
+      - Render
+      summary: Renderizar carnet (N boletos) en PDF
+      description: 'Genera el carnet a partir de una lista de boletos, en el layout `carne`
+
+        (3 vías por A4) de la engine pyCobrança.
+
+
+        ⚠️ **Timeout**: los carnets con muchas cuotas tardan varios segundos —
+
+        timeout del cliente ≥ 60s.
+
+        '
+      operationId: renderCarne
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - boletos
+              properties:
+                bank:
+                  type: string
+                  description: Banco común a todos (si cada boleto no trae el suyo)
+                  example: itau
+                boletos:
+                  type: array
+                  description: 'Una cuota por ítem. Otra forma — o un ítem que no sea
+
+                    objeto — responde **400** diciendo qué llegó. Dos
+
+                    cuotas con el mismo identificador responden **422**: el
+
+                    `item_id` sale de `external_id`, `seu_numero` o
+
+                    `numero_documento`, y en el carnet la repetida saldría impresa
+
+                    por duplicado mientras la sobrescrita nunca se cobraría.
+
+                    '
+                  items:
+                    allOf:
+                    - $ref: '#/components/schemas/BoletoData'
+                    - type: object
+                      properties:
+                        bank:
+                          type: string
+                          description: Banco de esta cuota; cae en el `bank` de la raíz.
+                          example: itau
+                        external_id:
+                          type: string
+                          description: Identificador de la cuota dentro del lote.
+                          example: CTR-2027-0042/1
+                        seu_numero:
+                          type: string
+                          description: Ídem `external_id`, en la grafía del CNAB.
+                template:
+                  type: string
+                  enum:
+                  - carne
+                  default: carne
+            example:
+              bank: banco_brasil
+              boletos:
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1050'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 1 de 3 do contrato CTR-2027-0042.
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/1
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1051'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-10-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 2 de 3 do contrato CTR-2027-0042.
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/2
+              - agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1052'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-11-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Parcela 3 de 3 do contrato CTR-2027-0042.
+                chave_pix: '11222333000181'
+                external_id: CTR-2027-0042/3
+      responses:
+        '200':
+          description: Carnet renderizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - pdf_base64
+                - itens
+                properties:
+                  pdf_base64:
+                    type: string
+                    description: PDF del carnet en base64
+                  itens:
+                    type: array
+                    description: 'Una entrada **por cuota**, en el orden en que fueron
+
+                      enviadas. Es con `linha_digitavel` y `nosso_numero` que se
+
+                      registra la cobranza y se concilia el pago después — el
+
+                      PDF solo no cierra la integración. `item_id` viene de
+
+                      `external_id`, `seu_numero` o `numero_documento` y es lo
+
+                      que liga la cuota impresa al registro del cliente.
+
+                      '
+                    items:
+                      allOf:
+                      - $ref: '#/components/schemas/BoletoResponse'
+                      - type: object
+                        properties:
+                          item_id:
+                            type: string
+                            example: CTR-00
+                          indice:
+                            type: integer
+                            example: 0
+                          status:
+                            type: string
+                            enum:
+                            - completed
+        '400':
+          description: Falla al generar el carnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: 'Lote por encima del límite `LOTE_MAX_ITENS` (default **200**). El tope es el
+
+            mismo de `/api/boleto/multi` — las dos rutas renderizan por el mismo
+
+            camino, de forma sincrónica.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Lote acima do limite de 200 itens
+                  recebidos:
+                    type: integer
+                    example: 350
+                  hint:
+                    type: string
+        '422':
+          $ref: '#/components/responses/LoteDuplicado'
+  /api/render/fatura:
+    post:
+      tags:
+      - Render
+      summary: Renderizar factura (cuerpo libre) + boleto en PDF
+      description: "Genera la **factura**: un cuerpo libre en la parte superior de la página y el **boleto\
+        \ de\npago** justo debajo, en un único PDF (engine pyCobrança\n`render_fatura_pdf`).\n\n**Passthrough**:\
+        \ el gateway no suma ni calcula nada — el `valor` del\nboleto y los totales vienen listos en el\
+        \ payload de la aplicación. Dos niveles de\ncuerpo, expresables por JSON:\n- **Nivel 1 — `itens`**:\
+        \ tabla simple de líneas\n  `{descricao, quantidade, valor_unitario}`.\n- **Nivel 2 — `fatura.blocos`**:\
+        \ cuerpo declarativo (bloques `campos`,\n  `tabela`, `texto`, `total`, `separador`, `espaco`).\n\
+        \nPrecedencia de la engine: `fatura.blocos` > `itens`. Sin `itens` ni\n`fatura`, la engine devuelve\
+        \ el boleto solo.\n\nEl **nivel 3** (`fatura.desenhar`) es un callback Python y **no** viaja\n\
+        por JSON: enviar `fatura.desenhar` devuelve **400** (la API rechaza en vez\nde pasar un valor\
+        \ inútil a la engine). Para arte libre, llame a la engine\npyCobrança in-process en la aplicación.\n"
+      operationId: renderFatura
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bank
+              - data
+              properties:
+                bank:
+                  type: string
+                  example: itau
+                data:
+                  allOf:
+                  - $ref: '#/components/schemas/BoletoData'
+                  description: 'Datos del título que va debajo del cuerpo de la factura, incluyendo
+
+                    el `valor` — la API no suma los ítems.
+
+
+                    ⚠️ La franja FEBRABAN es **aceptada y no enviada al boleto**;
+
+                    ver `BoletoData`.
+
+                    '
+                itens:
+                  type: array
+                  description: Nivel 1 — líneas de la factura (pasadas a la engine).
+                  items:
+                    type: object
+                    required:
+                    - descricao
+                    properties:
+                      descricao:
+                        type: string
+                        example: Mensalidade — agosto/2026
+                      quantidade:
+                        type: number
+                        default: 1
+                        example: 2
+                      valor_unitario:
+                        type: number
+                        example: 199.9
+                fatura:
+                  type: object
+                  description: Nivel 2 — cuerpo declarativo (`titulo`, `blocos`), pasado a la engine.
+            example:
+              bank: banco_brasil
+              data:
+                agencia: '3073'
+                conta_corrente: '12345678'
+                convenio: '1234567'
+                carteira: '18'
+                nosso_numero: '1042'
+                numero_documento: NF-2027-0042
+                valor: 1279.5
+                data_vencimento: '2027-09-10'
+                cedente: Empresa Exemplo Servicos LTDA
+                documento_cedente: '11222333000181'
+                sacado: Maria Aparecida de Souza
+                sacado_documento: '52998224725'
+                sacado_endereco: Rua Presidente Kennedy, 126A, Canaa, Sete Lagoas, MG, CEP 35701206
+                instrucoes:
+                - Apos o vencimento, multa de 2% e juros de 1% ao mes.
+                - Nao receber apos 30 dias; decorrido o prazo, protestar.
+                chave_pix: '11222333000181'
+                logo_empresa: EXEMPLO
+                cor_marca: 1B4F8A
+                rodape_contato: financeiro@exemplo.com.br - (31) 3333-0000
+              itens:
+              - descricao: Mensalidade — setembro/2027
+                quantidade: 1
+                valor_unitario: 1279.5
+      responses:
+        '200':
+          description: Factura renderizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nosso_numero:
+                    type: string
+                    example: '00000001'
+                  linha_digitavel:
+                    type: string
+                  codigo_barras:
+                    type: string
+                  pix_copia_cola:
+                    type: string
+                    nullable: true
+                    description: 'BR Code del QR dibujado en el boleto de la factura; `null` cuando
+
+                      el payload no trae PIX.
+
+                      '
+                  pix_vinculado:
+                    type: boolean
+                    nullable: true
+                    description: '¿El QR **liquida el título**? `true` = Bolepix (vino del banco,
+
+                      en `data.pix_copia_cola`); `false` = QR **suelto**, montado
+
+                      de `data.chave_pix`, que acredita la clave y deja el título
+
+                      **en abierto**; `null` = sin PIX.
+
+                      '
+                  pdf_base64:
+                    type: string
+                    description: PDF (factura + boleto) en base64
+        '400':
+          description: Datos del boleto inválidos, o `fatura.desenhar` (nivel 3) enviado vía REST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/render/remessa:
+    post:
+      tags:
+      - Render
+      summary: Renderizar archivo de remesa CNAB (texto)
+      description: Genera el contenido de la remesa CNAB 240/400 con cuerpo JSON.
+      operationId: renderRemessa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bank
+              - type
+              - data
+              properties:
+                bank:
+                  type: string
+                  example: itau
+                type:
+                  type: string
+                  enum:
+                  - cnab400
+                  - cnab240
+                data:
+                  allOf:
+                  - $ref: '#/components/schemas/RemessaRequest'
+                  description: 'Encabezado de la remesa y la lista de `pagamentos`. Un campo de
+
+                    pago fuera del schema responde `400` con la pista del nombre
+
+                    correcto — un cargo no tiene alias, porque la semántica cambia
+
+                    por layout.
+
+                    '
+                pix:
+                  type: boolean
+                  default: false
+                  description: Segmento PIX (boleto híbrido)
+            example:
+              bank: banco_brasil
+              type: cnab240
+              pix: false
+              data:
+                empresa_mae: Empresa Teste LTDA
+                documento_cedente: '11222333000181'
+                agencia: '3073'
+                conta_corrente: '12345678'
+                digito_conta: '0'
+                convenio: '1234567'
+                carteira: '18'
+                variacao_carteira: '017'
+                sequencial_remessa: 1
+                pagamentos:
+                - nosso_numero: '123456789'
+                  numero_documento: DOC-2026-001
+                  data_vencimento: '2027-12-31'
+                  valor: 1500.0
+                  sacado: Joao da Silva
+                  sacado_documento: '52998224725'
+                  sacado_endereco: Rua Teste, 100
+                  sacado_bairro: Centro
+                  sacado_cidade: Sao Paulo
+                  sacado_uf: SP
+                  sacado_cep: '01000000'
+      responses:
+        '200':
+          description: Remesa generada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cnab:
+                    type: string
+                    description: Contenido del archivo CNAB
+        '400':
+          description: Error al generar la remesa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  responses:
+    LoteDuplicado:
+      description: 'Dos ítems con el mismo identificador — el `item_id` sale de
+
+        `external_id`, `seu_numero` o `numero_documento`. Es el mismo título
+
+        emitido dos veces: el segundo sobrescribe al primero y desaparece del lote
+
+        sin aviso, así que el lote se rechaza entero.
+
+        '
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Itens com identificador duplicado no lote
+              hint:
+                type: string
+              duplicados:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    item_id:
+                      type: string
+                      example: NF-1042
+                    indices:
+                      type: array
+                      items:
+                        type: integer
+                      example:
+                      - 0
+                      - 3
+  schemas:
+    BankCode:
+      type: string
+      enum:
+      - banco_brasil
+      - itau
+      - bradesco
+      - caixa
+      - santander
+      - sicoob
+      - sicredi
+      - banrisul
+      - banestes
+      - banco_nordeste
+      - banco_brasilia
+      - banco_c6
+      - unicred
+      - credisis
+      - safra
+      - citibank
+      - hsbc
+      - ailos
+      - inter
+      description: 'Código del banco soportado (19 bancos brasileños).
+
+
+        **Inter** (077) entró en pyCobrança 1.1.1 y es el 19º. Solo la cartera
+
+        `110` en el boleto: en las `112` y `121` quien numera es el banco, y el nosso
+
+        número solo existe en el archivo de retorno.
+
+        '
+    OutputType:
+      type: string
+      enum:
+      - pdf
+      default: pdf
+      description: 'Formato de salida del boleto. La engine pyCobrança emite **PDF**;
+
+        `jpg`/`png`/`tif` (v1.x) responden **400**.
+
+        '
+    CnabType:
+      type: string
+      enum:
+      - cnab240
+      - cnab400
+      description: Tipo de archivo CNAB
+    HealthResponse:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - OK
+          description: '**En mayúsculas aquí.** El `GET /health` del gateway responde `"ok"`
+
+            en minúsculas — son sondas de superficies distintas y los dos formatos
+
+            tienen consumidor: este mantiene el contrato de la v1.x, y el del gateway es el
+
+            que `examples/oracle/cobranca_api_pkg.sql` compara. Comparando
+
+            exacto, use el valor de la superficie que usted llamó.
+
+            '
+          example: OK
+        timestamp:
+          type: string
+          format: date-time
+          description: 'Instante de la respuesta en ISO 8601, con **offset `+00:00`** y
+
+            microsegundos — no el sufijo `Z`. Es lo que
+
+            `datetime.now(timezone.utc).isoformat()` produce.
+
+            '
+          example: '2026-08-19T05:32:47.446605+00:00'
+    InfoResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Cobranca-API — Offline (pyCobranca)
+        version:
+          type: string
+          description: 'Versión de la **engine pyCobrança** — no la de la API. La versión de la API
+
+            está en `GET /api/metadata` (`api.version`), y las dos no van
+
+            juntas.
+
+            '
+          example: 1.1.2
+        engine:
+          type: string
+          example: pycobranca
+        supported_banks:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankCode'
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutputType'
+        cnab:
+          type: array
+          items:
+            $ref: '#/components/schemas/CnabType'
+    MetadataResponse:
+      type: object
+      properties:
+        api:
+          type: object
+          properties:
+            name:
+              type: string
+              example: Cobranca-API — Offline (pyCobranca)
+            version:
+              type: string
+              description: Versión de la Cobranca-API
+              example: 3.0.0
+            engine:
+              type: string
+              example: python
+        pycobranca:
+          type: object
+          properties:
+            version:
+              type: string
+              example: 1.1.2
+            repository:
+              type: string
+              example: https://github.com/Maxwbh/pyCobranca
+        endpoints:
+          type: object
+          additionalProperties:
+            type: string
+    BancoInfo:
+      type: object
+      description: 'Capacidades de un banco, extraídas dinámicamente de la engine pyCobrança.
+
+        '
+      properties:
+        slug:
+          type: string
+          description: Identificador snake_case usado en el parámetro `bank`
+          example: banco_brasil
+        codigo:
+          type: string
+          description: Código bancario oficial (COMPE)
+          example: '001'
+        boleto:
+          type: boolean
+          description: Emite boleto (PDF)
+          example: true
+        cnab:
+          type: array
+          items:
+            $ref: '#/components/schemas/CnabType'
+          description: Layouts de remesa disponibles para el banco
+          example:
+          - cnab240
+          - cnab400
+        pix_remessa:
+          type: boolean
+          description: Tiene layout de remesa con PIX (Bolepix)
+          example: true
+    BoletoWithFileResponse:
+      type: object
+      description: 'Respuesta devuelta cuando GET /api/boleto se llama con `include_data=true`.
+
+        Incluye todos los datos del boleto + archivo en base64.
+
+        '
+      allOf:
+      - $ref: '#/components/schemas/BoletoResponse'
+      - type: object
+        properties:
+          content_base64:
+            type: string
+            format: base64
+            description: Contenido del archivo (PDF/JPG/PNG/TIF) en base64
+          content_type:
+            type: string
+            example: application/pdf
+          filename:
+            type: string
+            example: boleto-banco_brasil.pdf
+    MultiBoletoResponse:
+      type: object
+      description: 'Respuesta devuelta cuando POST /api/boleto/multi se llama con `include_data=true`.
+
+        '
+      properties:
+        total:
+          type: integer
+          description: Ítems **recibidos** en el lote (válidos + fallidos).
+          example: 3
+        completed:
+          type: integer
+          description: Ítems que se volvieron boleto.
+          example: 2
+        failed:
+          type: integer
+          description: Ítems rechazados en la validación.
+          example: 1
+        status:
+          type: string
+          enum:
+          - completed
+          - partially_completed
+          description: '`partially_completed` cuando al menos un ítem falló. Un lote sin
+
+            ningún ítem válido no llega aquí — responde 400.
+
+            '
+          example: partially_completed
+        boletos:
+          type: array
+          description: Un registro por ítem generado.
+          items:
+            $ref: '#/components/schemas/BoletoMetadata'
+        erros:
+          type: array
+          description: 'Un registro por ítem rechazado — el lote no se cancela por causa
+
+            de ellos. Mismo contenido del header `X-Boletos-Errors`.
+
+            '
+          items:
+            $ref: '#/components/schemas/BoletoFalho'
+        content_base64:
+          type: string
+          format: base64
+          description: Archivo combinado (multipágina) en base64
+        content_type:
+          type: string
+          example: application/pdf
+        filename:
+          type: string
+          example: boletos-multi.pdf
+    BoletoMetadata:
+      type: object
+      description: Metadatos de un boleto en el array `boletos` o en el header `X-Boletos-Info`
+      properties:
+        item_id:
+          type: string
+          description: 'Identificador del ítem — sale de `external_id`, `seu_numero` o
+
+            `numero_documento`; a falta de los tres, del índice.
+
+            '
+          example: '0'
+        indice:
+          type: integer
+          description: Posición en el lote enviado.
+          example: 0
+        status:
+          type: string
+          enum:
+          - completed
+        bank:
+          $ref: '#/components/schemas/BankCode'
+        nosso_numero:
+          type: string
+          example: '123'
+        nosso_numero_formatado:
+          type: string
+          example: '12345670000000123'
+        nosso_numero_dv:
+          type: string
+          example: ''
+        codigo_barras:
+          type: string
+        linha_digitavel:
+          type: string
+    BoletoFalho:
+      type: object
+      description: 'Ítem rechazado en el lote, en el array `erros` o en el header `X-Boletos-Errors`.
+
+        '
+      properties:
+        item_id:
+          type: string
+          example: '2'
+        indice:
+          type: integer
+          example: 2
+        bank:
+          type: string
+          example: itau
+        status:
+          type: string
+          enum:
+          - failed
+        errors:
+          type: array
+          items:
+            type: string
+          example:
+          - conta deve ter no máximo 5 dígitos
+    BoletoData:
+      type: object
+      description: 'Datos del título. `agencia` y `conta_corrente` **no** son obligatorios
+
+        para todo banco: Santander identifica al beneficiario por el convenio y
+
+        Caixa por el código del beneficiario, sin cuenta en el campo libre. Exigirlos
+
+        en el schema volvía inexpresables a esos dos. La obligatoriedad real es
+
+        **por banco** y sale de `validar()` en la engine, con el nombre del campo que
+
+        faltó.
+
+        '
+      required:
+      - nosso_numero
+      - valor
+      - cedente
+      - documento_cedente
+      - sacado
+      - sacado_documento
+      properties:
+        agencia:
+          type: string
+          description: Número de la sucursal (sin dígito)
+          example: '3073'
+        conta_corrente:
+          type: string
+          description: Número de la cuenta corriente
+          example: '12345678'
+        nosso_numero:
+          type: string
+          description: Nosso número del boleto
+          example: '123456789'
+        valor:
+          type: number
+          format: float
+          description: Valor del boleto en reales
+          example: 1500.0
+        cedente:
+          type: string
+          description: Nombre del cedente (beneficiario)
+          example: Empresa LTDA
+        documento_cedente:
+          type: string
+          description: CNPJ/CPF del cedente
+          example: '12345678000100'
+        sacado:
+          type: string
+          description: Nombre del sacado (pagador)
+          example: João da Silva
+        sacado_documento:
+          type: string
+          description: CNPJ/CPF del sacado
+          example: '12345678900'
+        convenio:
+          type: string
+          description: Número del convenio (cuando aplica)
+          example: '01234567'
+        carteira:
+          type: string
+          description: Código de la cartera
+          example: '18'
+        data_documento:
+          type: string
+          description: 'Fecha de emisión del título (`AAAA-MM-DD`). Obligatoria en **Sicredi**,
+
+            que toma de ella el año del nosso número.
+
+            '
+          example: '2027-09-10'
+        digito_conta:
+          type: string
+          description: 'DV de la cuenta, cuando el banco lo exige por separado. Obligatorio en
+
+            **Unicred**, **Banco do Nordeste**, **Banestes** y **Safra**.
+
+            '
+          example: '7'
+        digito_agencia:
+          type: string
+          description: DV de la sucursal. Obligatorio en **Safra**.
+          example: '2'
+        digito_convenio:
+          type: string
+          description: DV del convenio, usado en la impresión por **Banrisul**.
+          example: '40'
+        variacao:
+          type: string
+          description: Variación de la cartera (**Banestes**, **Sicoob**).
+          example: '01'
+        incremento:
+          type: string
+          description: 'Incremento de 3 posiciones del campo libre. Obligatorio en **BRB**.
+
+            '
+          example: '000'
+        portfolio:
+          type: string
+          description: 'Portafolio de 3 posiciones del campo libre (**Citibank**). Sin él el
+
+            código de barras sale con las tres posiciones en cero — válido en
+
+            estructura, equivocado en el destino, y sin error.
+
+            '
+          example: '123'
+        posto:
+          type: string
+          description: Puesto de la cooperativa (**Sicredi**).
+          example: 09
+        byte_idt:
+          type: string
+          description: 'Byte identificador del nosso número. Obligatorio en **Sicredi**.
+
+            '
+          example: '2'
+        quantidade:
+          type: string
+          description: 'Número de cuotas del carnet. **En Sicoob entra en el campo libre del
+
+            código de barras** — es el único banco donde cambia el código, y por
+
+            eso está en esta franja y no entre los campos de impresión.
+
+
+            El default es `001`: omitirlo en un carnet de tres cuotas produce un código
+
+            de barras que dice **una**, estructuralmente válido y con DV
+
+            recalculado sobre el dígito equivocado — ningún verificador de estructura
+
+            lo acusa. En los demás bancos solo se imprime.
+
+            '
+          example: '003'
+        desconto_abatimento:
+          type: number
+          description: "⚠️ **No se envía al boleto y no se imprime.** El campo es\naceptado y descartado\
+            \ en la emisión: la franja FEBRABAN\n— `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor\
+            \ cobrado` —\nsale **en blanco** en el PDF, siempre.\n\nDescuento, multa e intereses dependen\
+            \ de la **fecha del pago**, que no\nse sabe en la emisión: quien calcula y escribe en la franja\
+            \ es el cajero, en el\nacto. Un número impreso antes de eso induce al pagador a error, y estaría\n\
+            equivocado en cualquier fecha que no fuera la supuesta.\n\nEl campo se acepta porque el mismo\
+            \ registro de cobranza suele\nalimentar el boleto **y** la remesa; rechazarlo obligaría a\
+            \ montar dos\nobjetos para el mismo título. Dónde tiene efecto de verdad:\n\n- la **regla**\
+            \ va en `instrucoes`, impresa en el boleto (\"después del\n  vencimiento, multa del 2% e intereses\
+            \ del 1% mensual\");\n- el **valor** va en la remesa CNAB (`POST /api/remessa`), en el\n \
+            \ `Pagamento` — es el archivo que el banco procesa para calcular en la\n  fecha en que el\
+            \ título sea pagado.\n\n  Aquí: `cod_desconto` + `valor_desconto` + `data_desconto`.\n"
+          example: 150.0
+        outras_deducoes:
+          type: number
+          description: "⚠️ **No se envía al boleto y no se imprime.** El campo es\naceptado y descartado\
+            \ en la emisión: la franja FEBRABAN\n— `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor\
+            \ cobrado` —\nsale **en blanco** en el PDF, siempre.\n\nDescuento, multa e intereses dependen\
+            \ de la **fecha del pago**, que no\nse sabe en la emisión: quien calcula y escribe en la franja\
+            \ es el cajero, en el\nacto. Un número impreso antes de eso induce al pagador a error, y estaría\n\
+            equivocado en cualquier fecha que no fuera la supuesta.\n\nEl campo se acepta porque el mismo\
+            \ registro de cobranza suele\nalimentar el boleto **y** la remesa; rechazarlo obligaría a\
+            \ montar dos\nobjetos para el mismo título. Dónde tiene efecto de verdad:\n\n- la **regla**\
+            \ va en `instrucoes`, impresa en el boleto (\"después del\n  vencimiento, multa del 2% e intereses\
+            \ del 1% mensual\");\n- el **valor** va en la remesa CNAB (`POST /api/remessa`), en el\n \
+            \ `Pagamento` — es el archivo que el banco procesa para calcular en la\n  fecha en que el\
+            \ título sea pagado.\n\n  Aquí: `valor_abatimento`.\n"
+        mora_multa:
+          type: number
+          description: "⚠️ **No se envía al boleto y no se imprime.** El campo es\naceptado y descartado\
+            \ en la emisión: la franja FEBRABAN\n— `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor\
+            \ cobrado` —\nsale **en blanco** en el PDF, siempre.\n\nDescuento, multa e intereses dependen\
+            \ de la **fecha del pago**, que no\nse sabe en la emisión: quien calcula y escribe en la franja\
+            \ es el cajero, en el\nacto. Un número impreso antes de eso induce al pagador a error, y estaría\n\
+            equivocado en cualquier fecha que no fuera la supuesta.\n\nEl campo se acepta porque el mismo\
+            \ registro de cobranza suele\nalimentar el boleto **y** la remesa; rechazarlo obligaría a\
+            \ montar dos\nobjetos para el mismo título. Dónde tiene efecto de verdad:\n\n- la **regla**\
+            \ va en `instrucoes`, impresa en el boleto (\"después del\n  vencimiento, multa del 2% e intereses\
+            \ del 1% mensual\");\n- el **valor** va en la remesa CNAB (`POST /api/remessa`), en el\n \
+            \ `Pagamento` — es el archivo que el banco procesa para calcular en la\n  fecha en que el\
+            \ título sea pagado.\n\n  Aquí: `codigo_multa`/`percentual_multa`/`data_multa` y\n  `tipo_mora`\
+            \ + `valor_mora` o `percentual_mora`/`data_mora`.\n"
+          example: 8.0
+        outros_acrescimos:
+          type: number
+          description: "⚠️ **No se envía al boleto y no se imprime.** El campo es\naceptado y descartado\
+            \ en la emisión: la franja FEBRABAN\n— `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor\
+            \ cobrado` —\nsale **en blanco** en el PDF, siempre.\n\nDescuento, multa e intereses dependen\
+            \ de la **fecha del pago**, que no\nse sabe en la emisión: quien calcula y escribe en la franja\
+            \ es el cajero, en el\nacto. Un número impreso antes de eso induce al pagador a error, y estaría\n\
+            equivocado en cualquier fecha que no fuera la supuesta.\n\nEl campo se acepta porque el mismo\
+            \ registro de cobranza suele\nalimentar el boleto **y** la remesa; rechazarlo obligaría a\
+            \ montar dos\nobjetos para el mismo título. Dónde tiene efecto de verdad:\n\n- la **regla**\
+            \ va en `instrucoes`, impresa en el boleto (\"después del\n  vencimiento, multa del 2% e intereses\
+            \ del 1% mensual\");\n- el **valor** va en la remesa CNAB (`POST /api/remessa`), en el\n \
+            \ `Pagamento` — es el archivo que el banco procesa para calcular en la\n  fecha en que el\
+            \ título sea pagado.\n\n  Aquí: `valor_iof`.\n"
+        valor_cobrado:
+          type: number
+          description: "⚠️ **No se envía al boleto y no se imprime.** El campo es\naceptado y descartado\
+            \ en la emisión: la franja FEBRABAN\n— `(-) Desconto/Abatimento`, `(+) Mora/Multa`, `(=) Valor\
+            \ cobrado` —\nsale **en blanco** en el PDF, siempre.\n\nDescuento, multa e intereses dependen\
+            \ de la **fecha del pago**, que no\nse sabe en la emisión: quien calcula y escribe en la franja\
+            \ es el cajero, en el\nacto. Un número impreso antes de eso induce al pagador a error, y estaría\n\
+            equivocado en cualquier fecha que no fuera la supuesta.\n\nEl campo se acepta porque el mismo\
+            \ registro de cobranza suele\nalimentar el boleto **y** la remesa; rechazarlo obligaría a\
+            \ montar dos\nobjetos para el mismo título. Dónde tiene efecto de verdad:\n\n- la **regla**\
+            \ va en `instrucoes`, impresa en el boleto (\"después del\n  vencimiento, multa del 2% e intereses\
+            \ del 1% mensual\");\n- el **valor** va en la remesa CNAB (`POST /api/remessa`), en el\n \
+            \ `Pagamento` — es el archivo que el banco procesa para calcular en la\n  fecha en que el\
+            \ título sea pagado.\n\n  El total es del cajero: él suma en la fecha del pago.\n"
+        data_vencimento:
+          type: string
+          description: Fecha de vencimiento (YYYY/MM/DD)
+          example: 2025/12/31
+        numero_documento:
+          type: string
+          description: Número del documento
+          example: NF-2025-001
+        sacado_endereco:
+          type: string
+          description: Dirección completa del sacado (pagador)
+          example: Rua Teste, 100, Centro, São Paulo, SP
+        cedente_endereco:
+          type: string
+          description: 'Dirección del beneficiario, impresa debajo del nombre. Sin ella la línea
+
+            sale vacía — no hay default.
+
+            '
+          example: Av. Afonso Pena, 1500, Centro, Belo Horizonte, MG
+        sacador_avalista:
+          type: string
+          description: 'Librador/avalista del título, impreso en el campo propio de la ficha. En el
+
+            modelo `classico` el rótulo sale siempre, con `—` cuando está ausente.
+
+            '
+          example: Fiadora Exemplo LTDA
+        local_pagamento:
+          type: string
+          description: 'Texto del campo *Local de pagamento*. Default:
+
+            `Pagável em qualquer banco até o vencimento`. Sustituirlo es lo que
+
+            permite instruir a la red ("pagable solo en la red X") — el texto se
+
+            imprime como vino, sin validación del banco.
+
+            '
+          example: Pagável em qualquer banco até o vencimento
+        especie_documento:
+          type: string
+          description: 'Tipo del documento en la ficha (`DM` duplicata mercantil, `NP` pagaré,
+
+            `RC` recibo…). Default `DM`. Solo impresión: no cambia el
+
+            código de barras ni la forma de cobranza.
+
+            '
+          example: DM
+        especie_moeda:
+          type: string
+          description: 'Moneda impresa en la ficha. Default `R$`.
+
+
+            ⚠️ **Solo cambia el rótulo.** El valor en el código de barras es siempre en
+
+            reales, en el factor FEBRABAN — escribir `USD` imprime un boleto que dice
+
+            dólar y cobra el mismo número en reales.
+
+            '
+          example: R$
+        aceite:
+          type: string
+          description: 'Aceptación del pagador en la ficha. Default `N`.
+
+            '
+          example: N
+        instrucoes:
+          description: 'Bloque de instrucciones del beneficiario — **es este el campo que la engine
+
+            dibuja**. Acepta una lista de líneas o un texto único con saltos
+
+            (`\n`); las dos formas producen el mismo PDF.
+
+
+            Cuántas líneas caben y qué ancho soporta cada una **depende del
+
+            modelo** y de haber Bolepix: el marco del `moderno` se encoge cerca de
+
+            un cuarto con el QR al lado. El gateway mide el límite en la propia
+
+            engine y **rechaza** el excedente, con el número exacto en el mensaje —
+
+            reescribir el texto de un documento de cobranza es del cliente, que
+
+            sabe dónde se puede cortar la frase.
+
+            '
+          oneOf:
+          - type: string
+          - type: array
+            items:
+              type: string
+          example:
+          - Não receber após o vencimento
+          - Após o vencimento, multa de 2% e juros de 1% ao mês
+        demonstrativo:
+          type: string
+          description: 'Texto del demostrativo, con las mismas reglas de `instrucoes`
+
+            (lista o texto con saltos, medido y rechazado si no cabe).
+
+            '
+        instrucao1:
+          type: string
+          description: 'Primera línea del bloque de instrucciones. `instrucao1`..`instrucao6`
+
+            se juntan en orden y se vuelven `instrucoes`; enviar las dos formas en el
+
+            mismo payload responde `400`, porque una de ellas se descartaría.
+
+            '
+          example: Não receber após o vencimento
+        instrucao2:
+          type: string
+          description: Segunda línea del bloque de instrucciones.
+        instrucao3:
+          type: string
+          description: Tercera línea del bloque de instrucciones.
+        instrucao4:
+          type: string
+          description: Cuarta línea del bloque de instrucciones.
+        instrucao5:
+          type: string
+          description: Quinta línea del bloque de instrucciones.
+        instrucao6:
+          type: string
+          description: Sexta línea del bloque de instrucciones.
+        emv:
+          type: string
+          deprecated: true
+          description: '**Responde 400.** La engine nunca leyó este campo: existía solo en el
+
+            schema, heredado de la era Ruby, y el boleto salía sin QR con `200`. Use
+
+            `chave_pix`.
+
+            '
+        pix_label:
+          type: string
+          deprecated: true
+          description: '**Responde 400.** La leyenda del QR es del modelo, no del payload.
+
+            '
+        chave_pix:
+          type: string
+          description: 'Clave PIX del beneficiario (CPF, CNPJ, e-mail, teléfono o
+
+            aleatoria). Genera un QR en el PDF.
+
+
+            ⚠️ **Este QR no es Bolepix y no liquida el título.** El BR Code
+
+            montado a partir de la clave es **estático**: quien paga acredita su
+
+            clave, pero el banco no sabe que ese PIX pagó *este* boleto — el
+
+            título queda **en abierto**, con riesgo de segunda cobranza o de
+
+            protesto de un boleto ya pagado.
+
+
+            Bolepix exige QR **dinámico**, generado por el banco en el registro de la
+
+            cobranza. Para tenerlo: registre por el camino `on` y mande el EMV que el
+
+            banco devolvió en `pix_copia_cola` (abajo), que tiene precedencia
+
+            sobre este campo y funciona en cualquier banco.
+
+
+            La respuesta dice cuál de los dos salió en el papel, en `pix_vinculado`.
+
+
+            Solo en los siete bancos para los que la engine sabe montar el BR Code — Banco do
+
+            Brasil, Bradesco, Caixa, Itaú, Santander, Sicoob y C6. En los demás
+
+            responde `400` (`banco 041 (Banrisul) não suporta PIX`) en vez de
+
+            imprimir el boleto sin el QR pedido.
+
+            '
+          example: '11222333000181'
+        codigo_barras:
+          type: string
+          description: '⚠️ **Verificado, no usado.** El código de barras que el **banco** ya
+
+            asignó al título. El boleto sigue saliendo del cálculo local; este
+
+            campo solo dice *"el resultado tiene que ser este"*, y la API responde `400`
+
+            cuando los dos discrepan.
+
+
+            Existe porque los dos caminos se superponen. Registrar en el `on` y
+
+            renderizar el PDF en el `off` es el ciclo que da el QR que liquida
+
+            (`pix_copia_cola`) — y en él el papel sale de un cálculo **nuestro**
+
+            mientras el título registrado es del **banco**. Divergir imprime un
+
+            boleto que no corresponde al título: PDF perfecto, pago que
+
+            no concilia, y el error solo aparece semanas después.
+
+
+            No es una hipótesis remota: en **Inter** el camino `on` nunca envía nosso
+
+            número — quien numera es el banco —, así que renderizar con su propio
+
+            número produce **otro título**. Use el `nossoNumero` que la consulta
+
+            devolvió.
+
+
+            Compara solo los dígitos: puntuación y espacios no son divergencia.
+
+            '
+          example: 07796193000000150000001110012345621437830237
+        linha_digitavel:
+          type: string
+          description: '⚠️ **Verificado, no usado** — igual que `codigo_barras`, para quien tiene
+
+            a mano la línea en vez del código. Formateada o cruda, da lo mismo.
+
+            '
+          example: 07790.00116 10012.345621 43783.023706 6 19300000015000
+        pix_copia_cola:
+          type: string
+          description: 'Payload EMV que el **banco** devolvió al registrar la cobranza — el
+
+            Bolepix de verdad: QR dinámico, vinculado al título, con baja
+
+            automática.
+
+
+            Va al QR tal como vino, tiene **precedencia sobre `chave_pix`** y
+
+            funciona en cualquier banco (el dibujo no depende de que la engine sepa
+
+            montar el BR Code de ese layout).
+
+
+            Es el campo que cierra el ciclo entre los dos caminos: registre por el
+
+            `on` (C6, Sicoob, Inter o Itaú), tome el `pix_copia_cola` de la
+
+            respuesta y renderice el PDF por el `off` con el QR que liquida.
+
+            '
+          example: 00020101021226870014br.gov.bcb.pix2565qrcode.exemplo/pix/v2/cobv/9d36b84f
+        pix_observacao:
+          type: string
+          maxLength: 40
+          description: 'Texto libre en el campo 26-02 del BR Code, para describir la cobranza a
+
+            quien paga. Hasta 40 caracteres.
+
+            '
+          example: Mensalidade 09/2027
+        tipo_chave_pix:
+          type: string
+          description: 'Aceptado y **descartado** — la engine deduce el tipo del valor de la clave.
+
+            Mantenido porque no cambia el resultado; no cuente con que vuelva.
+
+            '
+          enum:
+          - cpf
+          - cnpj
+          - email
+          - telefone
+          - aleatoria
+          example: cnpj
+        txid:
+          type: string
+          maxLength: 25
+          pattern: ^[A-Za-z0-9]{1,25}$
+          description: 'Identificador de la transacción Pix, grabado **dentro del BR Code**. Hasta
+
+            25 alfanuméricos. Vacío, la engine lo deriva del nosso número — antes iba
+
+            `***` y el crédito llegaba huérfano a la conciliación por OFX.
+
+
+            ⚠️ **No es el mismo `txid` del Pix cob/cobv**, que el BACEN define con
+
+            26 a 35 caracteres — y que el gateway exige en ese tamaño en las rutas
+
+            `/pix/*`. Los dos límites no se superponen: copiar el txid de una
+
+            cobranza Pix aquí responde `400` explicando la diferencia.
+
+            '
+          example: PEDIDO000000000042
+        logo_empresa:
+          type: string
+          description: 'Franja de marca — **texto** de la marca del beneficiario, dibujado en la franja
+
+            (no es ruta de archivo: la engine no lee archivos del servidor).
+
+            Rellena también el nombre de la empresa cuando este no viene.
+
+
+            Solo en el modelo `moderno` y en la factura.
+
+            '
+          example: LAGOA REAL
+        cor_marca:
+          type: string
+          description: 'Franja de marca — color en hexadecimal `RRGGBB`, con o sin `#`. El
+
+            contraste del texto se calcula automáticamente.
+
+
+            Solo en el modelo `moderno` y en la factura.
+
+            '
+          pattern: ^#?[0-9A-Fa-f]{6}$
+          example: 006B3F
+        marca_dagua:
+          type: string
+          description: 'Franja de marca — texto de la marca de agua diagonal antifraude,
+
+            posicionada fuera de las zonas del código de barras/QR.
+
+
+            Solo en el modelo `moderno` y en la factura.
+
+            '
+          example: CÓPIA - SEM VALOR FISCAL
+        rodape_contato:
+          type: string
+          description: 'Franja de marca — pie con el contacto de la empresa.
+
+
+            Solo en el modelo `moderno` y en la factura.
+
+            '
+          example: Empresa Lagoa Real • (71) 3333-0000
+        fonte_ttf:
+          type: string
+          deprecated: true
+          description: '**Responde 400.** Nunca hubo soporte — ni aquí, ni en la engine, que
+
+            lista el campo entre los que ignora. El PDF se dibuja con las fuentes
+
+            estándar del formato (Helvetica), que ya cubren la acentuación.
+
+            '
+        logo:
+          type: string
+          deprecated: true
+          description: '**Responde 400.** No es la marca del beneficiario: es el logotipo del
+
+            **banco**, que ya viene cargado — la engine empaqueta el PNG por
+
+            código FEBRABAN y el boleto sale con la marca sin que se pida.
+
+
+            Cambiarlo es capacidad real, pero solo en proceso: la engine acepta
+
+            bytes o `ImageReader`, y por JSON solo llega **texto** — que se leía
+
+            como **ruta de archivo en el disco del servidor**. Una ruta de
+
+            imagen legible por el proceso devolvía `200` con ese archivo
+
+            embebido en el PDF; una ruta que no es imagen estallaba en `500` con la
+
+            ruta en el mensaje.
+
+
+            Para marcar el boleto de quien emite use `logo_empresa` (texto),
+
+            `cor_marca` y `marca_dagua`.
+
+            '
+        parcela_atual:
+          type: integer
+          description: 'Franja de marca — número de la cuota, en el sello "Parcela n/N". Tiene que
+
+            venir junto con `total_parcelas`.
+
+
+            Solo en el modelo `moderno` y en la factura: el carnet **no** dibuja la franja.
+
+            '
+          example: 1
+        total_parcelas:
+          type: integer
+          description: 'Franja de marca — total de cuotas, en el sello "Parcela n/N".
+
+            '
+          example: 12
+        external_id:
+          type: string
+          description: '⚠️ **No se imprime en el boleto.** Identifica el **ítem dentro de un
+
+            lote**: es una de las fuentes del `item_id` que acusa cuota duplicada en
+
+            `POST /api/boleto/multi` y `POST /api/render/carne` — dos ítems con
+
+            el mismo identificador son el mismo título emitido dos veces, y el
+
+            sobrescrito nunca se cobraría.
+
+
+            En el boleto suelto se acepta y se ignora, porque el mismo registro
+
+            suele alimentar el lote y la emisión unitaria.
+
+            '
+          example: EXT-2027-000042
+        seu_numero:
+          type: string
+          description: '⚠️ **No se imprime en el boleto.** Misma función que `external_id` —
+
+            identifica el ítem en el lote. El campo impreso en la ficha es
+
+            `numero_documento`.
+
+
+            En el camino `on` de **Inter** `seuNumero` es el identificador del
+
+            título en el banco; aquí, en el `off`, no llega al papel.
+
+            '
+          example: PEDIDO-4242
+        cedente_cidade:
+          type: string
+          description: '⚠️ **Aceptado y no dibujado** en ninguno de los dos modelos. Existe en el
+
+            constructor de la engine y queda guardado en el objeto, sin consumidor en el
+
+            layout. La ciudad va dentro de `cedente_endereco`, que sí se imprime.
+
+            '
+          example: Belo Horizonte
+        numero_contrato:
+          type: string
+          description: '⚠️ **Aceptado y no dibujado** en ninguno de los dos modelos — misma
+
+            situación que `cedente_cidade`. Para llevar el contrato al papel use
+
+            `instrucoes` o `demonstrativo`.
+
+            '
+          example: '998877'
+    BoletoResponse:
+      type: object
+      required:
+      - bank
+      - nosso_numero
+      - nosso_numero_formatado
+      - nosso_numero_dv
+      - codigo_barras
+      - linha_digitavel
+      properties:
+        bank:
+          type: string
+          example: banco_brasil
+        nosso_numero:
+          type: string
+          description: 'El valor **tal como vino** en el payload — la API no completa con ceros a la
+
+            izquierda. El relleno aparece en el formateado.
+
+            '
+          example: '123'
+        nosso_numero_formatado:
+          type: string
+          description: 'Nosso número IMPRESO en el boleto (con cartera, convenio y/o DV,
+
+            según la regla del banco). Use este campo para mostrar y conciliar.
+
+            '
+          example: '12345670000000123'
+        nosso_numero_dv:
+          type: string
+          description: 'Dígito verificador aislado, en los bancos que lo calculan por separado.
+
+            **Vacío** cuando el banco ya lo embebe en el formateado — es el caso de
+
+            Banco do Brasil, y no es error.
+
+            '
+          example: ''
+        codigo_barras:
+          type: string
+          description: Código de barras (44 dígitos)
+          example: 00198204100000150000000001234567000000012318
+        linha_digitavel:
+          type: string
+          description: Línea digitable formateada
+          example: 00190.00009 01234.567004 00000.123182 8 20410000015000
+        pix_copia_cola:
+          type: string
+          nullable: true
+          description: 'BR Code (EMV) del QR dibujado en el boleto. **`null` cuando el payload
+
+            no trae PIX** — un boleto sin QR no tiene copia y pega, y la API no
+
+            inventa uno.
+
+
+            Viene de `data.pix_copia_cola` cuando se informa (el EMV del banco), o lo
+
+            monta la engine a partir de `data.chave_pix`. `pix_vinculado`
+
+            dice cuál de los dos.
+
+
+            Es el mismo campo que `POST /cobranca` devuelve en el camino `on`
+
+            (C6, Sicoob, Inter, Itaú). Sin él, un QR solo es pagable por quien
+
+            logra apuntar la cámara a otra pantalla.
+
+            '
+          example: 00020126360014br.gov.bcb.pix01141122233300018152040000530398654061.005802BR5906E LTDA6006BRASIL62070503***63048B92
+        pix_vinculado:
+          type: boolean
+          nullable: true
+          description: "¿El QR del boleto **liquida el título**?\n\n- `true` — **Bolepix**: el EMV vino\
+            \ del banco (`data.pix_copia_cola`),\n  es dinámico y está vinculado al título; pagar por\
+            \ él da de baja.\n- `false` — QR **suelto**, montado de `data.chave_pix`. Es estático:\n \
+            \ acredita la clave y el título queda **en abierto**, con riesgo de segunda\n  cobranza o\
+            \ de protesto de un boleto ya pagado.\n- `null` — boleto sin PIX.\n"
+          example: false
+    NossoNumeroResponse:
+      type: object
+      required:
+      - bank
+      - nosso_numero
+      - nosso_numero_formatado
+      - nosso_numero_dv
+      properties:
+        bank:
+          type: string
+          example: banco_brasil
+        nosso_numero:
+          type: string
+          example: '123'
+        nosso_numero_formatado:
+          type: string
+          example: '12345670000000123'
+        nosso_numero_dv:
+          type: string
+          description: Vacío en los bancos que embeben el DV en el formateado.
+          example: ''
+    ValidationSuccess:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Dados do boleto são válidos
+    ValidationError:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          example: false
+        validation_errors:
+          type: array
+          description: 'Lista plana — **un ítem por campo violado** (contrato de la engine
+
+            PyCobrança ≥ 1.0.1, que expone `BoletoInvalido.erros`). Mapee cada
+
+            string al campo del formulario. Nunca es un objeto por clave.
+
+            '
+          items:
+            type: string
+          example:
+          - 'carteira ''999'' não suportada (use uma de: 104, 109, 112, 115, 175, 177, 188)'
+          - agência deve ter no máximo 4 dígitos
+          - conta deve ter no máximo 5 dígitos
+        hint:
+          type: string
+          example: Corrija os erros de validação antes de gerar o boleto
+    RemessaRequest:
+      type: object
+      description: 'Payload JSON para la generación de remesa CNAB.
+
+
+        > **Atención:** los campos varían según el banco.
+
+        > Ver la tabla completa en [docs/fields/all-banks.md](../docs/fields/all-banks.md).
+
+        '
+      required:
+      - empresa_mae
+      - documento_cedente
+      - agencia
+      - conta_corrente
+      - pagamentos
+      properties:
+        empresa_mae:
+          type: string
+          description: Nombre de la empresa beneficiaria (cedente)
+          example: Empresa LTDA
+        documento_cedente:
+          type: string
+          example: '12345678000100'
+        agencia:
+          type: string
+          example: '3073'
+        conta_corrente:
+          type: string
+          example: '12345678'
+        digito_conta:
+          type: string
+          example: '0'
+        convenio:
+          type: string
+          description: 'Número del convenio (BB, Sicoob, Caixa). NO enviar para Banco C6
+
+            (use `codigo_beneficiario` en su lugar).
+
+            '
+          example: '01234567'
+        carteira:
+          type: string
+          example: '18'
+        variacao_carteira:
+          type: string
+          description: 'Variación de la cartera (Banco do Brasil). NO confundir con
+
+            el campo `variacao` del **boleto** de Sicoob — este campo
+
+            no existe en la clase de remesa CNAB 240 de Sicoob.
+
+            '
+          example: '017'
+        codigo_beneficiario:
+          type: string
+          description: 'Código del cedente/beneficiario. **OBLIGATORIO para Banco C6** (CNAB 400).
+
+            Hasta 10 dígitos, provisto por el banco al beneficiario.
+
+            '
+          example: 0012345678
+        sequencial_remessa:
+          type: integer
+          example: 1
+        pagamentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pagamento'
+    Pagamento:
+      type: object
+      description: 'Un título en la remesa CNAB. Los nombres de los campos del pagador siguen la
+
+        convención de la API (`sacado`, `sacado_documento`, `sacado_endereco`…),
+
+        idéntica a la del boleto — la API traduce al layout internamente.
+
+
+        **Cargos** (multa, intereses/mora, descuento, IOF, rebaja) son
+
+        opcionales y siguen el modelo de **trío** código/tipo → valor → fecha.
+
+        La unidad (% o R$) y el soporte varían por banco/layout: vea la guía
+
+        [docs/api/encargos.md](https://github.com/Maxwbh/cobranca-api/blob/main/docs/api/encargos.md).
+
+        '
+      required:
+      - nosso_numero
+      - data_vencimento
+      - valor
+      properties:
+        nosso_numero:
+          type: string
+          example: '123456789'
+        numero_documento:
+          type: string
+          description: Número del documento (máx. 10 en el CNAB 400).
+          example: DOC-2026-001
+        data_vencimento:
+          type: string
+          format: date
+          example: '2027-12-31'
+        valor:
+          type: number
+          format: float
+          example: 1500.0
+        sacado:
+          type: string
+          description: Nombre del sacado/pagador.
+          example: João da Silva
+        sacado_documento:
+          type: string
+          description: CPF/CNPJ del pagador (solo dígitos).
+          example: '52998224725'
+        sacado_endereco:
+          type: string
+          example: Rua Teste, 100
+        sacado_bairro:
+          type: string
+          example: Centro
+        sacado_cidade:
+          type: string
+          example: Sao Paulo
+        sacado_uf:
+          type: string
+          example: SP
+        sacado_cep:
+          type: string
+          example: '01000000'
+        codigo_multa:
+          type: string
+          description: 'Tipo de la multa: `0` exento · `1` valor fijo · `2` porcentual. **En el CNAB 400
+            solo `2` es válido** (la multa es siempre porcentual).'
+          enum:
+          - '0'
+          - '1'
+          - '2'
+          example: '2'
+        percentual_multa:
+          type: number
+          format: float
+          description: Porcentaje de multa (cuando `codigo_multa=2`).
+          example: 2.0
+        data_multa:
+          type: string
+          format: date
+          example: '2028-01-01'
+        tipo_mora:
+          type: string
+          description: 'Tipo de los intereses/mora: `1` valor/día · `2` tasa mensual % · `3` exento. **En
+            el CNAB 400 solo `1` es válido** (la mora es valor por día).'
+          enum:
+          - '1'
+          - '2'
+          - '3'
+          example: '1'
+        valor_mora:
+          type: number
+          format: float
+          description: Intereses de mora en R$/día (CNAB 400, o 240 con `tipo_mora=1`).
+          example: 1.5
+        percentual_mora:
+          type: number
+          format: float
+          description: Intereses de mora en % mensual — **solo CNAB 240 con `tipo_mora=2`**. En el CNAB
+            400 no tiene posición y la API responde **400**.
+          example: 1.0
+        data_mora:
+          type: string
+          format: date
+          example: '2028-01-01'
+        cod_desconto:
+          type: string
+          description: Tipo del 1º descuento (`0` exento · `1` valor fijo · …).
+          example: '1'
+        valor_desconto:
+          type: number
+          format: float
+          description: Valor del 1º descuento (R$).
+          example: 50.0
+        data_desconto:
+          type: string
+          format: date
+          example: '2027-12-20'
+        valor_segundo_desconto:
+          type: number
+          format: float
+          description: 2º descuento (R$) — **solo CNAB 240** (y Santander/Citibank 400).
+          example: 30.0
+        valor_terceiro_desconto:
+          type: number
+          format: float
+          description: 3º descuento (R$) — **solo CNAB 240**.
+          example: 10.0
+        valor_iof:
+          type: number
+          format: float
+          description: IOF en R$.
+          example: 3.75
+        valor_abatimento:
+          type: number
+          format: float
+          description: Rebaja en R$.
+          example: 25.0
+        codigo_protesto:
+          type: string
+          description: Código de protesto (por banco).
+          example: '1'
+        dias_protesto:
+          type: integer
+          description: Días para protesto después del vencimiento.
+          example: 5
+    RetornoResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/RetornoItem'
+    RetornoItem:
+      type: object
+      description: '**Un campo sin valor en el archivo no viene en la respuesta** — la clave se omite,
+
+        no viene `null`. `numero_documento` y `data_credito` son los que más
+
+        faltan: en un retorno de liquidación simple, ninguno de los dos suele venir.
+
+
+        Las **fechas salen como el banco las escribió**, sin conversión: `DDMMAA` en el
+
+        CNAB 400 (`"150726"` = 15/07/2026) y `DDMMAAAA` en el CNAB 240. No es
+
+        ISO — convierta antes de comparar con la fecha de su sistema.
+
+        '
+      properties:
+        nosso_numero:
+          type: string
+          description: Nosso número del título
+        numero_documento:
+          type: string
+          description: Su número, cuando el archivo lo trae.
+        data_credito:
+          type: string
+          description: Fecha del crédito, en el formato del layout (`DDMMAA` / `DDMMAAAA`).
+          example: '200726'
+        data_ocorrencia:
+          type: string
+          description: Fecha de la ocurrencia, en el formato del layout.
+          example: '150726'
+        valor_titulo:
+          type: number
+          format: float
+        valor_pago:
+          type: number
+          format: float
+        valor_tarifa:
+          type: number
+          format: float
+        codigo_ocorrencia:
+          type: string
+          description: Código de la ocurrencia bancaria
+        motivo_ocorrencia:
+          type: string
+          description: 'Descripción de la ocurrencia, **en el vocabulario del banco del archivo**.
+
+
+            El mismo código significa cosas opuestas en bancos distintos: el `40`
+
+            es *baja por haber sido liquidado* en el mapa general y *baja de título
+
+            protestado* en **Safra**; el `07` es *liquidación parcial* en el general y
+
+            *cancelado* en **Inter**. En una conciliación, confundir los dos es dar
+
+            por pagado un título protestado.
+
+            '
+        layout_generico:
+          type: boolean
+          description: '⚠️ `true` cuando el archivo fue leído con un **layout de reserva**, y
+
+            no con el mapa del banco — la engine no tiene el layout de ese código.
+
+
+            El archivo se lee hasta el final y **no se levanta ningún error**, pero los
+
+            campos pueden haber venido de posiciones que no son las de ese banco. Es la
+
+            falla más peligrosa del parsing porque la salida es plausible: trate los
+
+            valores como sospechosos y verifique contra el extracto antes de conciliar.
+
+
+            `false` cuando el banco tiene layout propio (16 de los 19).
+
+            '
+          example: false
+    OfxResponse:
+      type: object
+      properties:
+        banco:
+          type: object
+          description: Identificación del banco del extracto
+          properties:
+            org:
+              type: string
+              description: Organización (ORG del OFX)
+              example: SICOOB
+            fid:
+              type: string
+              description: ID del banco (FID del OFX)
+              example: '756'
+        conta:
+          type: object
+          description: Datos de la cuenta bancaria
+          properties:
+            agencia:
+              type: string
+              description: Sucursal (BANKID del OFX)
+              example: '3044'
+            numero:
+              type: string
+              description: Número de la cuenta
+              example: 12345-6
+            tipo:
+              type: string
+              description: Tipo de la cuenta (CHECKING, SAVINGS, etc.)
+              example: CHECKING
+        periodo:
+          type: object
+          description: Período cubierto por el extracto
+          properties:
+            inicio:
+              type: string
+              format: date
+              example: '2025-01-01'
+            fim:
+              type: string
+              format: date
+              example: '2025-01-31'
+        saldo:
+          type: object
+          properties:
+            valor:
+              type: number
+              format: float
+              example: 15420.5
+            data:
+              type: string
+              format: date
+              example: '2025-01-31'
+        transacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfxTransacao'
+        resumo:
+          type: object
+          required:
+          - total_creditos
+          - total_debitos
+          - quantidade
+          properties:
+            total_creditos:
+              type: number
+              format: float
+              description: Suma de los créditos, en reales.
+              example: 3750.0
+            total_debitos:
+              type: number
+              format: float
+              description: 'Suma de los débitos, en reales — siempre positiva. Con
+
+                `somente_creditos=true` vale `0`.
+
+                '
+              example: 530.5
+            quantidade:
+              type: integer
+              description: Transacciones en el extracto, después del filtro.
+              example: 4
+    OfxTransacao:
+      type: object
+      description: 'Seis campos, siempre estos. La página ya prometió `name`, `checknum` y
+
+        `refnum`, que la respuesta no trae, y llamaba al identificador
+
+        `fitid` — viene en **`id`**, y es por él que se deduplica al
+
+        reprocesar el mismo período.
+
+        '
+      required:
+      - tipo
+      - valor
+      - data
+      - memo
+      - id
+      - nosso_numero
+      properties:
+        id:
+          type: string
+          nullable: true
+          description: 'FITID del archivo — identificador único de la transacción en el extracto.
+
+            `null` cuando el archivo no lo trae.
+
+            '
+          example: '202501150001'
+        tipo:
+          type: string
+          enum:
+          - credito
+          - debito
+          description: 'Dirección del movimiento, **normalizada** — no es el TRNTYPE crudo del
+
+            archivo. Sale del TRNTYPE y no del signo, porque la engine devuelve
+
+            `valor` siempre positivo.
+
+            '
+          example: credito
+        data:
+          type: string
+          format: date
+          example: '2025-01-15'
+        valor:
+          type: number
+          format: float
+          description: Valor absoluto (siempre positivo — la dirección está en `tipo`)
+          example: 1250.0
+        memo:
+          type: string
+          description: Descripción de la transacción
+          example: COBRANCA SICOOB 0000012345
+        nosso_numero:
+          type: string
+          nullable: true
+          description: Nosso número extraído del memo con la regla del banco emisor
+          example: '0000012345'
+    OfxError:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          description: 'Mensaje de error. `error` es la clave canónica en toda la superficie;
+
+            esta ruta respondía solo `erro` (en portugués), que sigue presente
+
+            como alias para no romper a quien ya lee por él.
+
+            '
+          example: Arquivo OFX inválido
+        erro:
+          type: string
+          description: Alias de `error` (compatibilidad).
+          example: Arquivo OFX inválido
+        validation_errors:
+          type: array
+          description: Detalle del problema como lista (contrato PyCobrança).
+          items:
+            type: string
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          description: Mensaje de error
+          example: Dados inválidos
+        validation_errors:
+          type: array
+          description: Lista plana — un ítem por campo violado (contrato PyCobrança ≥ 1.0.1).
+          items:
+            type: string
+        details:
+          type: array
+          description: 'Solo en `/api/retorno`, que usa este nombre en lugar de
+
+            `validation_errors` — un ítem por problema del archivo.
+
+            '
+          items:
+            type: string
+        hint:
+          type: string
+          description: Qué hacer, cuando la ruta tiene algo que sugerir.
+          example: Verifique se todos os campos obrigatórios estão preenchidos

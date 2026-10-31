@@ -62,13 +62,15 @@ Todos os bancos herdam de `BancoBase` (pyCobrança) e compartilham campos básic
 
 `documento_cedente` e `cedente_documento` são o **mesmo campo**, e o mesmo vale
 para `sacado_documento` e `documento_sacado` — a engine aceita as duas grafias.
-As mensagens de erro usam a forma `cedente_documento`, então não estranhe ver um
-nome no erro e outro no seu payload.
+As mensagens de erro usam o nome que a API documenta (`documento_cedente`),
+mesmo quando a engine, por dentro, chama o campo de outro jeito.
 
 > **CPF e CNPJ são validados de verdade** (dígito verificador). Documento
 > inventado como `12345678000100` volta `400` com
-> `cedente_documento inválido (CPF/CNPJ)` — é por isso que os exemplos abaixo
-> usam documentos com DV correto.
+> `documento_cedente: CPF/CNPJ brasileiro inválido` — é por isso que os
+> exemplos abaixo usam documentos com DV correto. "Brasileiro" está na
+> mensagem de propósito: cédula, RUC ou CUIT de um pagador estrangeiro não
+> servem — o documento é sempre o CPF/CNPJ dele no Brasil.
 
 ### Recomendados 📝
 
@@ -85,14 +87,18 @@ nome no erro e outro no seu payload.
 
 | Campo | Valor Padrão | Notas |
 |-------|--------------|-------|
-| `moeda` | `'9'` | Código da moeda (9 = Real) |
-| `especie` | `'R$'` | Símbolo da moeda |
-| `aceite` | `'S'` | 'S' = aceite, 'N' = sem aceite |
+| `especie_moeda` | `'R$'` | Rótulo da moeda na ficha. **Só o rótulo**: o valor é sempre em reais |
+| `aceite` | `'N'` | 'S' = aceite, 'N' = sem aceite |
 | `especie_documento` | `'DM'` | DM, DS, NP, RC, etc. |
-| `data_processamento` | hoje | Data de processamento |
-| `quantidade` | `1` | Quantidade |
-| `avalista` | - | Nome do avalista |
-| `avalista_documento` | - | CPF/CNPJ do avalista |
+| `quantidade` | `'001'` | Parcelas do carnê — no Sicoob entra no código de barras |
+| `sacador_avalista` | - | Sacador/avalista, impresso no campo próprio da ficha |
+
+> Esta tabela listava `moeda`, `especie`, `data_processamento`, `avalista` e
+> `avalista_documento`, e dizia que `aceite` valia `'S'` por padrão. Nenhum dos
+> cinco é campo da API — vieram da gem Ruby — e desde que o gateway recusa
+> campo desconhecido, cada um responde **400** (`campo desconhecido em data`).
+> Medido em `GET /api/boleto/validate`; a lista completa dos 63 campos é o
+> schema `BoletoData` do Swagger.
 
 ---
 
