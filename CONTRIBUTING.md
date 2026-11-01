@@ -423,35 +423,12 @@ def test_registra_cobranca(client, cobranca_payload, banco_env, respx_mock):
     respx_mock.post("https://api.banconovo.com.br/v1/boletos").respond(
         201, json={"id": "123", "status": "REGISTRADO"})
     r = client.post("/cobranca", json={
-        "tenant_id": "empresa1", "provider": "banconovo",
+        "tenant_id": "empresa1", "provider": "on", "banco": "banconovo",
         "account_config": {"agencia": "1234", "conta": "56789"},
         "cobranca": cobranca_payload,
     })
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["status"] == "registrado"
-
-  describe 'GET /api/boleto/validate' do
-    it 'valida dados corretos' do
-      get '/api/boleto/validate', {
-        bank: 'banco_novo',
-        data: dados_validos.to_json
-      }
-
-      expect(last_response.status).to eq(200)
-      body = JSON.parse(last_response.body)
-      expect(body['valid']).to be true
-    end
-
-    it 'retorna erro para dados inválidos' do
-      get '/api/boleto/validate', {
-        bank: 'banco_novo',
-        data: {}.to_json
-      }
-
-      expect(last_response.status).to eq(400)
-    end
-  end
-end
 ```
 
 ### Rodando Testes

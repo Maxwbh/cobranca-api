@@ -71,7 +71,7 @@ gera o documento localmente, sem banco e sem credencial.
 
 ### Offline — engine pyCobrança in-process (`/api/*`) · [Swagger publicado](swagger/offline.html) · `/api/docs` no serviço
 
-Boleto, CNAB e OFX **sem chamar banco**: 18 instituições, sem credencial, sem
+Boleto, CNAB e OFX **sem chamar banco**: 19 instituições, sem credencial, sem
 rede. É o caminho para quem registra por arquivo em vez de por API.
 
 ### Endpoints da superfície offline

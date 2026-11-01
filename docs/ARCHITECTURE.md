@@ -1,13 +1,13 @@
 # Arquitetura da Cobranca-API
 
-> **Versão:** 2.1.0 — serviço único, 100% Python.
+> **Versão:** 3.0.0 — serviço único, 100% Python.
 
 Como o serviço é montado por dentro: camadas, módulos, fluxo de uma
 requisição e as decisões que explicam por que está assim.
 
 <p align="center">
   <img src="./assets/arquitetura-camadas.svg" width="100%"
-       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, Inter, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
+       alt="Camadas da Cobranca-API: routers (HTTP) sobre registry (roteamento de provider), sobre providers (C6, Sicoob, Inter, Itaú, offline) e core (cofre, jobs, artefatos, engine pyCobrança)." />
 </p>
 
 ---
@@ -104,6 +104,8 @@ de lista manual que envelhece.
 |---|---|
 | `c6.py` | C6 Bank — boleto, Pix, Bolepix, Pix Automático, extrato, C6 Pay, webhooks |
 | `sicoob.py` | Sicoob — boleto, Pix, Pix Automático, extrato (mensal) |
+| `inter.py` | Banco Inter — boleto híbrido (QR Pix no mesmo documento), Pix, Pix Automático, extrato, webhook |
+| `itau.py` | Itaú — esqueleto de emissão/instrução/consulta, **desligado** por `ITAU_REGISTERED_READY`; sem PDF (quem desenha é a engine) e sem Pix Automático |
 | `offline_engine.py` | `PyCobrancaProvider` — engine local, sem credencial |
 | `bacen_pix.py` | Dialeto Pix comum (BACEN) reaproveitado pelos bancos REST |
 
