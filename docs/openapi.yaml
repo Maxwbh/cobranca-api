@@ -76,7 +76,7 @@ info:
     remessa**: banco sem CNAB aqui emite o boleto, mas não gera remessa por
     esta superfície.
 
-  version: 3.0.0
+  version: 3.0.1
   contact:
     name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
     email: maxwbh@gmail.com
@@ -1646,7 +1646,7 @@ components:
             version:
               type: string
               description: Versão da Cobranca-API
-              example: '3.0.0'
+              example: '3.0.1'
             engine:
               type: string
               example: python

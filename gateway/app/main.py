@@ -113,7 +113,7 @@ class Saude(BaseModel):
 
 app = FastAPI(
     title="Cobranca-API",
-    version="3.0.0",
+    version="3.0.1",
     docs_url=None,  # /docs customizado abaixo (tema visual da plataforma)
     # `contact` e `license_info` saem no cabeçalho do Swagger e no openapi.json —
     # é o "quem mantém isto" para quem chega pela demo sem passar pelo GitHub.

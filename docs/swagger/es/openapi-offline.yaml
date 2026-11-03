@@ -37,7 +37,7 @@ info:
     \ Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para\
     \ los 18. Las otras tres columnas son del **archivo de\nremesa**: un banco sin CNAB aquí emite el\
     \ boleto, pero no genera remesa por\nesta superficie.\n"
-  version: 3.0.0
+  version: 3.0.1
   contact:
     name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
     email: maxwbh@gmail.com
@@ -1901,7 +1901,7 @@ components:
             version:
               type: string
               description: Versión de la Cobranca-API
-              example: 3.0.0
+              example: 3.0.1
             engine:
               type: string
               example: python
