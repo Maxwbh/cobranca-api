@@ -7,6 +7,10 @@
 
 <h1 align="center">Plataforma Open Source de Cobrança Bancária para o Brasil</h1>
 
+<h3 align="center">
+  🇵🇾 🇦🇷 🇺🇾 <a href="https://maxwbh.github.io/cobranca-api/es/">Para o Mercosul → guía en español</a>
+</h3>
+
 <p align="center">
   <a href="https://maxwbh.github.io/cobranca-api/swagger/"><strong>Swagger (gateway) →</strong></a> &nbsp;·&nbsp;
   <a href="https://maxwbh.github.io/cobranca-api/swagger/offline.html"><strong>Swagger (offline) →</strong></a> &nbsp;·&nbsp;
@@ -49,9 +53,6 @@
     referência antes de subir nada. Para executar as chamadas, suba o seu container:
     <code>docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest</code>.
     Não há instância pública — o produto é self-hosted.
-    <br />
-    🇵🇾 🇦🇷 🇺🇾 <a href="https://maxwbh.github.io/cobranca-api/es/"><strong>¿Habla español?</strong></a>
-    Guía, Swagger y mensajes de error en español.
   </sub>
 </p>
 
