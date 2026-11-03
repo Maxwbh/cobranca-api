@@ -61,6 +61,12 @@ online**: C6, Sicoob, Inter e Itaú. El boleto se registra al instante, el Pix
 genera un QR dinámico vinculado al título (**Bolepix**), y la liquidación llega
 por webhook.
 
+> **Itaú, con una salvedad.** El provider existe pero nace **apagado** por la
+> variable `ITAU_REGISTERED_READY`: sin ella, `banco=itau` emite por la engine
+> offline, que tiene el layout 341. El payload de emisión todavía depende del
+> catálogo del banco, que exige login. C6 y Sicoob están homologados; Inter,
+> validado en sandbox. `GET /bancos` dice qué hace **su** instalación con cada uno.
+
 Es el mismo `POST /cobranca`: cambiar de camino es cambiar un campo
 (`provider: "off"` o `"on"`).
 
@@ -121,6 +127,20 @@ una cobranza con PDF, doce boletos de prueba con y sin QR Pix, y una remesa
 CNAB.
 
 ---
+
+## Qué está en español y qué no
+
+| En español | Solo en portugués |
+|---|---|
+| Esta guía y [el argumento comercial](comercial.md) | Las guías en prosa de `docs/api/` (gateway, Pix, cargos CNAB, OFX, troubleshooting) |
+| El **Swagger** completo — [publicado](../swagger/es/) y servido con `?lang=es` o `Accept-Language: es` | Los nombres de campo, que son el contrato |
+| Los **mensajes de error** de toda la API, con el mismo header | El vocabulario del banco en los archivos de retorno |
+| El encabezado del **CSV del retorno** (`formato=csv`) | — |
+
+La regla: lo que se **genera del código** se traduce y queda atado a él por un
+guarda; la prosa suelta no tiene ese mecanismo y envejecería en dos idiomas.
+Para la referencia técnica completa, el Swagger en español alcanza; las guías
+en portugués son lectura complementaria.
 
 ## Glosario — el vocabulario de la API, en español
 

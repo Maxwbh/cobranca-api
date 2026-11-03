@@ -159,3 +159,28 @@ def test_a_pagina_aponta_para_os_exemplos_que_existem():
     for lang in ("php", "python"):
         assert f"examples/{lang})" in _texto(), f"a página deixou de linkar examples/{lang}"
         assert (RAIZ / "examples" / lang / "README.md").is_file(), f"examples/{lang} sem README"
+
+
+def test_a_doc_tecnica_em_portugues_tambem_leva_ate_a_pagina():
+    """Quem entra pela documentação técnica (`docs/README.md`) não descobria a
+    versão em espanhol nem o roadmap Mercosul — revisão externa de 03/11/2026."""
+    doc = (RAIZ / "docs" / "README.md").read_text(encoding="utf-8")
+    assert re.search(r"\]\(es/\)", doc), "docs/README.md não linka `es/`"
+    assert "roadmap-mercosul.md" in doc, "docs/README.md não linka o roadmap Mercosul"
+    assert "examples/php" in doc, "docs/README.md não lista o exemplo em PHP"
+
+
+@pytest.mark.parametrize("pagina", ["index.md", "comercial.md"])
+def test_quatro_bancos_online_vem_com_a_salvedade_do_itau(pagina):
+    """"4 bancos online" sem dizer que o Itaú nasce desligado promete mais do
+    que a instalação entrega. A mesma nota que o README principal tem."""
+    texto = (RAIZ / "docs" / "es" / pagina).read_text(encoding="utf-8")
+    assert "4 bancos" in texto or "4 online" in texto, f"{pagina}: a contagem de bancos online sumiu"
+    assert "ITAU_REGISTERED_READY" in texto, f"{pagina} fala em quatro bancos online sem a salvedade do Itaú"
+
+
+def test_a_pagina_diz_o_que_esta_em_espanhol_e_o_que_nao():
+    texto = _texto()
+    assert "## Qué está en español y qué no" in texto
+    assert "docs/api/" in texto, "a seção tem de nomear o que segue só em português"
+    assert "../swagger/es/" in texto
