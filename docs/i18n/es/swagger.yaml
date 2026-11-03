@@ -150,8 +150,8 @@ textos:
     de cada instituição.
   es: Esquema de credenciales de ESTE banco, para el `POST /credenciais`. El mecanismo es uno solo; los
     campos son de cada institución.
-- pt: 'Só no registro da engine: os 18 slugs do catálogo offline.'
-  es: 'Solo en el registro de la engine: los 18 slugs del catálogo offline.'
+- pt: 'Só no registro da engine: os 19 slugs do catálogo offline.'
+  es: 'Solo en el registro de la engine: los 19 slugs del catálogo offline.'
 - pt: 'Só no registro da engine: quando ela entra sem ninguém pedir.'
   es: 'Solo en el registro de la engine: cuándo entra sin que nadie lo pida.'
 - pt: Cadastrar
@@ -1675,18 +1675,18 @@ textos:
     \n- **Boletos**: Geração de boletos em **PDF** — 19 bancos, sem convênio\n- **Remessa**: Geração de\
     \ arquivos CNAB 240 e 400\n- **Retorno**: Parsing de arquivos de retorno CNAB 240 e 400\n- **OFX**:\
     \ Parsing de extratos bancários OFX v1 (SGML) e v2 (XML) com extração automática de nosso_numero\n\
-    \n## Bancos Suportados\n\nOs 18, como a engine responde hoje. `GET /api/bancos` devolve esta mesma\n\
+    \n## Bancos Suportados\n\nOs 19, como a engine responde hoje. `GET /api/bancos` devolve esta mesma\n\
     matriz por introspecção do código — se as duas discordarem, a resposta\nmanda.\n\n| Banco | Código\
     \ | Boleto | CNAB 240 | CNAB 400 | PIX na remessa |\n|-------|--------|--------|----------|----------|-----|\n\
     | Banco do Brasil | 001 | ✅ | ✅ | ✅ | ✅ |\n| Banco do Nordeste | 004 | ✅ | — | ✅ | — |\n| Banestes\
     \ | 021 | ✅ | — | — | — |\n| Santander | 033 | ✅ | ✅ | ✅ | ✅ |\n| Banrisul | 041 | ✅ | — | ✅ | — |\n\
-    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Ailos | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097\
-    \ | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n| Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco\
-    \ | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — | ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC\
-    \ | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — | — | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n|\
-    \ Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |\n\nBoleto em PDF vale para os\
-    \ 18. As outras três colunas são do **arquivo de\nremessa**: banco sem CNAB aqui emite o boleto, mas\
-    \ não gera remessa por\nesta superfície.\n"
+    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Banco Inter | 077 | ✅ | — | ✅ | — |\n| Ailos\
+    \ | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097 | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n|\
+    \ Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — |\
+    \ ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — |\
+    \ ✅ | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n| Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 |\
+    \ ✅ | ✅ | ✅ | ✅ |\n\nBoleto em PDF vale para os 19. As outras três colunas são do **arquivo de\nremessa**:\
+    \ banco sem CNAB aqui emite o boleto, mas não gera remessa por\nesta superfície.\n"
   es: "Superficie **offline** de la plataforma **Cobranca-API** (servicio único **100% Python**):\ngeneración\
     \ de boletos bancarios brasileños, archivos CNAB y parsing de extractos OFX —\nservida **nativamente**\
     \ por la engine [pyCobrança](https://github.com/Maxwbh/pyCobranca)\ndentro del propio proceso FastAPI\
@@ -1711,18 +1711,18 @@ textos:
     \n- **Boletos**: Generación de boletos en **PDF** — 19 bancos, sin convenio\n- **Remesa**: Generación\
     \ de archivos CNAB 240 y 400\n- **Retorno**: Parsing de archivos de retorno CNAB 240 y 400\n- **OFX**:\
     \ Parsing de extractos bancarios OFX v1 (SGML) y v2 (XML) con extracción automática de nosso_numero\n\
-    \n## Bancos Soportados\n\nLos 18, tal como la engine responde hoy. `GET /api/bancos` devuelve esta\
+    \n## Bancos Soportados\n\nLos 19, tal como la engine responde hoy. `GET /api/bancos` devuelve esta\
     \ misma\nmatriz por introspección del código — si las dos discrepan, la respuesta\nmanda.\n\n| Banco\
     \ | Código | Boleto | CNAB 240 | CNAB 400 | PIX en la remesa |\n|-------|--------|--------|----------|----------|-----|\n\
     | Banco do Brasil | 001 | ✅ | ✅ | ✅ | ✅ |\n| Banco do Nordeste | 004 | ✅ | — | ✅ | — |\n| Banestes\
     \ | 021 | ✅ | — | — | — |\n| Santander | 033 | ✅ | ✅ | ✅ | ✅ |\n| Banrisul | 041 | ✅ | — | ✅ | — |\n\
-    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Ailos | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097\
-    \ | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n| Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco\
-    \ | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — | ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC\
-    \ | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — | — | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n|\
-    \ Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para\
-    \ los 18. Las otras tres columnas son del **archivo de\nremesa**: un banco sin CNAB aquí emite el\
-    \ boleto, pero no genera remesa por\nesta superficie.\n"
+    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Banco Inter | 077 | ✅ | — | ✅ | — |\n| Ailos\
+    \ | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097 | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n|\
+    \ Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — |\
+    \ ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — |\
+    \ ✅ | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n| Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 |\
+    \ ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para los 19. Las otras tres columnas son del **archivo\
+    \ de\nremesa**: un banco sin CNAB aquí emite el boleto, pero no genera remesa por\nesta superficie.\n"
 - pt: Local — `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
   es: Local — `docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:latest`
 - pt: Sua instância hospedada
