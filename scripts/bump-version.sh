@@ -98,6 +98,12 @@ substituir docs/index.md \
     "s|ghcr.io/maxwbh/cobranca-api:${CURRENT_VERSION}|ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}|g" \
     "ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}"
 
+# O mesmo pin, no guia de deploy. Ficou em 3.0.0 no bump para a 3.0.1 por
+# não estar nesta lista — `docs/index.md` estava, e só ele.
+substituir docs/deploy.md \
+    "s|ghcr.io/maxwbh/cobranca-api:${CURRENT_VERSION}|ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}|g" \
+    "ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}"
+
 # Swagger PUBLICADO: `docs/swagger/*` carrega a versão em quatro arquivos
 # gerados. O CI reprova com `--conferir` se ficarem atrás, e o script de
 # geração é a única fonte — não há sed a fazer aqui.

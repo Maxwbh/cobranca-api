@@ -187,7 +187,7 @@ clonar e sem buildar:
 docker run -p 8000:8000 -e LOG_LEVEL=info ghcr.io/maxwbh/cobranca-api:latest
 ```
 
-Em produção, fixe a versão (`ghcr.io/maxwbh/cobranca-api:3.0.0`) em vez de
+Em produção, fixe a versão (`ghcr.io/maxwbh/cobranca-api:3.0.1`) em vez de
 `latest`. Para mexer no código, o caminho é o clone:
 
 ```bash
