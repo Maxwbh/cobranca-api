@@ -21,6 +21,16 @@ por venta.
 > [Swagger](../swagger/) y en la [documentación](../). El glosario de abajo
 > traduce el vocabulario que va a encontrar ahí.
 
+**En esta página**
+
+1. [Lo que necesita antes de empezar](#lo-que-necesita-antes-de-empezar)
+2. [Dos caminos, un solo contrato](#dos-caminos-un-solo-contrato)
+3. [El primer boleto, en cinco minutos](#el-primer-boleto-en-cinco-minutos)
+4. [Qué está en español y qué no](#qué-está-en-español-y-qué-no)
+5. [Glosario — el vocabulario de la API, en español](#glosario--el-vocabulario-de-la-api-en-español)
+6. [Los términos que va a leer en portugués](#los-términos-que-va-a-leer-en-portugués)
+7. [Dónde seguir](#dónde-seguir)
+
 ---
 
 ## Lo que necesita antes de empezar

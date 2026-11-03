@@ -119,3 +119,18 @@ def test_o_readme_nao_manda_para_demo_nem_promete_faixa_preenchida():
 @pytest.mark.parametrize("trecho", ["swagger/es/", "cobranca-api/es/", "?lang=es", "formato=csv"])
 def test_o_readme_aponta_o_que_a_api_passou_a_fazer(trecho):
     assert trecho in README, f"o README não menciona {trecho!r}"
+
+
+def test_o_mercosul_aparece_antes_dos_badges_e_so_uma_vez_no_heroi():
+    """A guia em espanhol era citada cinco vezes no README e nenhuma visível:
+    um <sub> embaixo do herói, um comentário no Quick Start, células de
+    tabela. Decisão de 03/11/2026: UMA linha logo abaixo do H1, em português
+    como o resto do README, apontando para a guia PUBLICADA (os links
+    internos dela só resolvem no site). O <sub> sai — redundante."""
+    h1 = README.index("<h1 ")
+    primeiro_badge = README.index("img.shields.io")
+    heroi = README[h1:primeiro_badge]
+    assert "Para o Mercosul" in heroi, "o subtítulo 'Para o Mercosul' não está entre o H1 e os badges"
+    assert "https://maxwbh.github.io/cobranca-api/es/" in heroi, (
+        "o subtítulo tem de levar à guia publicada no site, não ao .md no repositório")
+    assert "¿Habla español?" not in README, "o <sub> antigo ficou — agora é o subtítulo que chama"
