@@ -24,9 +24,13 @@ venta porque no es un servicio: es un programa.
 | Costo por venta | Porcentaje + tarifa fija, en cada boleto o Pix | **Cero.** Solo lo que su banco cobra por el convenio |
 | Dónde viven los datos | En la plataforma del intermediario | **En su servidor** — un container Docker |
 | Dependencia | De un proveedor, su contrato y su API | Del banco donde está su cuenta. El código es suyo |
-| Bancos | Los que el intermediario eligió | 4 online (C6, Sicoob, Inter, Itaú) y 19 por archivo CNAB |
+| Bancos | Los que el intermediario eligió | 4 online (C6, Sicoob, Inter, Itaú¹) y 19 por archivo CNAB |
 | Integración | SDK del proveedor | **HTTP** desde PHP, Java, C#, Node, Python o lo que use |
 | Cuándo deja de funcionar | Cuando el proveedor cambia de reglas | Cuando usted lo apague |
+
+<sub>¹ El provider de Itaú nace **apagado** por `ITAU_REGISTERED_READY`: sin la variable,
+`banco=itau` emite por la engine offline (layout 341). C6 y Sicoob están homologados;
+Inter, validado en sandbox.</sub>
 
 ---
 
