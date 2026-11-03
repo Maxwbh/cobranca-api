@@ -38,6 +38,11 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY gateway/app ./app
 # Spec OpenAPI da superfície offline (servida em /api/openapi.json|yaml)
 COPY docs/openapi.yaml /docs/openapi.yaml
+# Dicionário PT->ES do Swagger: `/openapi.json?lang=es` e `Accept-Language: es`
+# o leem em runtime (core/i18n_openapi). Sem ele a imagem respondia a spec em
+# português com `Content-Language: es` — e nenhum teste via, porque todos rodam
+# do checkout. O `.dockerignore` já o deixa passar; aqui ele chega ao destino.
+COPY docs/i18n /docs/i18n
 # Renderizador do Swagger (~1,6 MB), servido em /swagger-ui. Sem ele a página
 # busca CSS e JS na unpkg.com, e num deploy self-hosted sem essa saída o
 # Swagger não renderiza — só o cabeçalho aparece. Ausente, a página cai na CDN.

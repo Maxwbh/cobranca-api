@@ -16,6 +16,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não lançado]
 
+## [3.0.1] - 2026-11-03
+
+### Adicionado
+- **Swagger em espanhol.** `/openapi.json` e `/api/openapi.json` respondem em espanhol com `?lang=es` ou `Accept-Language: es`; `/docs?lang=es` e `/api/docs?lang=es` trocam a casca. É a mesma spec com os textos trocados por um dicionário (`docs/i18n/es/swagger.yaml`).
+- **Erros no idioma do chamador.** Com `Accept-Language: es` (ou `lang=es`), as mensagens de erro de toda rota voltam em espanhol — `detail`, `error`, `validation_errors`, `hint` e o `422` do Pydantic. Nome de campo, status e chaves do JSON não mudam; sem o cabeçalho, nada muda.
+- **`POST /api/retorno?formato=csv`**: o retorno CNAB como tabela — as dez colunas do `RetornoItem`, sempre todas, ponto e vírgula, vírgula decimal, cabeçalho em português ou espanhol conforme o `Accept-Language`.
+
+### Corrigido
+- **O erro de documento fala o nome da API.** Dizia `cedente_documento inválido (CPF/CNPJ)` — nome interno da engine, que a API não expõe. Agora: `documento_cedente: CPF/CNPJ brasileiro inválido`; idem para `sacado_documento`.
+
 ## [3.0.0] - 2026-10-25
 
 ### Adicionado

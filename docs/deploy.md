@@ -31,7 +31,7 @@ docker run -p 8000:8000 -e LOG_LEVEL=info ghcr.io/maxwbh/cobranca-api:latest
 Em produção, **fixe a versão** — `latest` muda a cada release:
 
 ```bash
-docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:3.0.0
+docker run -p 8000:8000 ghcr.io/maxwbh/cobranca-api:3.0.1
 ```
 
 Para buildar do código, `docker build -t cobranca-api .` na raiz do repositório.

@@ -42,6 +42,33 @@ TAGLINE = ("Produto <strong>self-hosted</strong>: não há instância pública, 
            '<span class="cmd">docker run -p 8000:8000'
            " ghcr.io/maxwbh/cobranca-api:latest</span>")
 
+#: As mesmas duas frases em espanhol, para `/docs?lang=es` e para a cópia
+#: publicada em `docs/swagger/es/`. A spec vem do dicionário
+#: `docs/i18n/es/swagger.yaml`; a casca vem daqui.
+SUBTITULO_ES = "Boletos, Pix, CNAB 240/400 y OFX — vía API REST"
+TAGLINE_ES = ("Producto <strong>self-hosted</strong>: no hay instancia pública, y el"
+              " <em>Try&nbsp;it&nbsp;out</em> habla con la suya."
+              '<span class="cmd">docker run -p 8000:8000'
+              " ghcr.io/maxwbh/cobranca-api:latest</span>")
+
+#: `<html lang>` acompanha a casca: a página em espanhol declarava `pt-BR` — o
+#: mesmo defeito que o layout do site tinha, corrigido lá e repetido aqui.
+LANG_ES = "es"
+
+
+def casca_no_idioma(request) -> dict:
+    """`?lang=es` explícito troca a casca (tagline/subtítulo/`<html lang>`) e
+    fixa o idioma da spec na URL (`sufixo`). O `Accept-Language` do navegador
+    já faria o XHR da spec sair em espanhol, mas a casca é HTML servido antes,
+    e um link compartilhado tem de abrir igual em qualquer navegador.
+
+    Um lugar só para `/docs`, `/redoc` e `/api/docs`."""
+    if request.query_params.get("lang", "").lower().startswith("es"):
+        return {"tagline": TAGLINE_ES, "subtitulo": SUBTITULO_ES, "sufixo": "?lang=es",
+                "lang": LANG_ES, "es": True}
+    return {"tagline": TAGLINE, "subtitulo": SUBTITULO, "sufixo": "", "lang": "pt-BR", "es": False}
+
+
 #: CSS do cabeçalho, compartilhado pelas três páginas de documentação
 #: (`/docs`, `/api/docs` e `/redoc`) — uma identidade só, num lugar só.
 _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B6D4 · ação #0891B2 */
@@ -102,7 +129,7 @@ _CSS_TOPBAR = """    /* Paleta da plataforma: navy #0F172A/#152449 · ciano #06B
     .cob-mark { flex: none; }"""
 
 _PAGINA = """<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="__LANG__">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -260,7 +287,7 @@ __CSS_TOPBAR__
 
 
 _PAGINA_REDOC = """<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="__LANG__">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -342,11 +369,12 @@ def _ancoras(links: list[tuple[str, str, bool]]) -> str:
 def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
                    tagline: str = TAGLINE, subtitulo: str = SUBTITULO,
                    links: list[tuple[str, str, bool]], spec_url: str,
-                   assets: str = ASSETS_SWAGGER) -> str:
+                   assets: str = ASSETS_SWAGGER, lang: str = "pt-BR") -> str:
     """Monta a página do Swagger. `links` é (rótulo, href, primário?)."""
     ancoras = _ancoras(links)
     return (_PAGINA
             .replace("__TITULO__", titulo)
+            .replace("__LANG__", lang)
             .replace("__CSS_TOPBAR__", _CSS_TOPBAR)
             .replace("__MARCA__", _MARCA)
             .replace("__FAVICON__", _FAVICON)
@@ -361,9 +389,9 @@ def pagina_swagger(*, titulo: str, superficie: str, pill: str, detalhe: str,
 
 
 def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
-                 tagline: str = TAGLINE, subtitulo: str = SUBTITULO,
-                 links: list[tuple[str, str, bool]], spec_url: str,
-                 assets: str = ASSETS_SWAGGER) -> str:
+                   tagline: str = TAGLINE, subtitulo: str = SUBTITULO,
+                   links: list[tuple[str, str, bool]], spec_url: str,
+                   assets: str = ASSETS_SWAGGER, lang: str = "pt-BR") -> str:
     """A mesma casca, com o Redoc no lugar do Swagger UI.
 
     O `/redoc` vinha pronto do FastAPI e era a única pagina de documentacao sem
@@ -373,6 +401,7 @@ def pagina_redoc(*, titulo: str, superficie: str, pill: str, detalhe: str,
     """
     return (_PAGINA_REDOC
             .replace("__TITULO__", titulo)
+            .replace("__LANG__", lang)
             .replace("__CSS_TOPBAR__", _CSS_TOPBAR)
             .replace("__MARCA__", _MARCA)
             .replace("__FAVICON__", _FAVICON)

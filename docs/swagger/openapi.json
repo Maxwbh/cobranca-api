@@ -12,7 +12,7 @@
       "name": "MIT",
       "url": "https://github.com/Maxwbh/cobranca-api/blob/main/LICENSE"
     },
-    "version": "3.0.0"
+    "version": "3.0.1"
   },
   "paths": {
     "/bancos": {
@@ -133,7 +133,7 @@
                               "type": "string"
                             },
                             "type": "array",
-                            "description": "Só no registro da engine: os 18 slugs do catálogo offline."
+                            "description": "Só no registro da engine: os 19 slugs do catálogo offline."
                           },
                           "observacao": {
                             "type": "string",

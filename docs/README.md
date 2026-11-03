@@ -11,7 +11,8 @@ Documentação técnica da **Cobranca-API** — plataforma REST de cobrança ban
 ## Início Rápido
 
 - [README do projeto](https://github.com/Maxwbh/cobranca-api) — Overview, quick start, exemplos
-- [Guia de deploy](deploy.md) — imagem no GHCR, Render, variáveis de ambiente
+- [Guia de deploy](deploy.md) — imagem no GHCR, o que o serviço pede do host, variáveis de ambiente
+- 🇵🇾 🇦🇷 🇺🇾 [**En español**](es/) — guía para empresas del Mercosur que cobran en Brasil: qué necesita antes, los dos caminos, glosario de los 63 campos; y [por qué sin intermediario](es/comercial.md). El Swagger y los mensajes de error también salen en español con `?lang=es` o `Accept-Language: es`
 - [CHANGELOG.md](https://github.com/Maxwbh/cobranca-api/releases) — Histórico de versões
 - [CONTRIBUTING.md](https://github.com/Maxwbh/cobranca-api/blob/main/CONTRIBUTING.md) — Como contribuir
 
@@ -48,7 +49,7 @@ gera o documento localmente, sem banco e sem credencial.
 |---|---|---|---|
 | **Credenciais** | `POST/DELETE /credenciais` | Tokenização `bapi_` — a credencial do banco não trafega a cada chamada | todos |
 | **Catálogo** | `GET /bancos` | Capacidades e esquema de credencial **por introspecção** | todos |
-| **Cobrança** | `POST/GET/PUT/DELETE /cobranca`, `GET /cobranca/{id}/pdf` | Boleto registrado: emitir, consultar, alterar, PDF, baixar | C6, Sicoob, Inter · **alterar só no C6** |
+| **Cobrança** | `POST/GET/PUT/DELETE /cobranca`, `GET /cobranca/{id}/pdf` | Boleto registrado: emitir, consultar, alterar, PDF, baixar | C6, Sicoob, Inter, Itaú¹ · **alterar no C6 e no Itaú** · PDF do banco no C6, Sicoob e Inter (o Itaú não devolve; a engine desenha) |
 | **Pix** | `/pix/*` | Cob imediata, cobv, lote, revisão, recebidos, devoluções | C6, Sicoob, Inter |
 | **Pix Automático** | `/pix-automatico/*` | Recorrência, autorização do pagador, cobrança do ciclo | C6, Sicoob, Inter |
 | **Bolepix** | `/bolepix/*` | Boleto híbrido com QR Pix embutido | C6 |
@@ -59,6 +60,10 @@ gera o documento localmente, sem banco e sem credencial.
 | **Jobs** | `/jobs/*` | Lote assíncrono: boletos e remessas CNAB, com artefatos e webhook | — |
 | **Webhooks** | `/config/webhook-*`, `/webhooks/*` | Cadastro da URL no banco e recepção das notificações, com repasse assinado | C6, Inter · Pix por chave em todos |
 
+> ¹ O Itaú tem provider escrito e nasce **desligado** por `ITAU_REGISTERED_READY`: sem a
+> flag, `banco=itau` emite pela engine, que tem o layout 341. O payload de emissão
+> ainda depende do catálogo do banco, que exige login.
+>
 > A coluna acima é reprodução. A **fonte** é `GET /bancos`, que introspecta as
 > classes de provider — pedir ao banco o que ele não oferece responde `422`
 > dizendo para onde ir, não `500`. Criar (`POST /cobranca`, `/carne`, `/pix`,
@@ -71,7 +76,7 @@ gera o documento localmente, sem banco e sem credencial.
 
 ### Offline — engine pyCobrança in-process (`/api/*`) · [Swagger publicado](swagger/offline.html) · `/api/docs` no serviço
 
-Boleto, CNAB e OFX **sem chamar banco**: 18 instituições, sem credencial, sem
+Boleto, CNAB e OFX **sem chamar banco**: 19 instituições, sem credencial, sem
 rede. É o caminho para quem registra por arquivo em vez de por API.
 
 ### Endpoints da superfície offline
@@ -88,7 +93,7 @@ rede. É o caminho para quem registra por arquivo em vez de por API.
 | `/api/boleto` | GET | PDF + headers `X-Nosso-Numero*`. Com `include_data=true`: JSON + base64 |
 | `/api/boleto/multi` | POST | PDF multi + headers `X-Boletos-Info`. Com `include_data=true`: JSON + base64 |
 | `/api/remessa` | POST | Arquivo CNAB 240/400 |
-| `/api/retorno` | POST | JSON com pagamentos parseados |
+| `/api/retorno` | POST | JSON com pagamentos parseados; `formato=csv` devolve a tabela para a contabilidade, com cabeçalho em pt ou es (`Accept-Language`) |
 | `/api/ofx/parse` | POST | JSON com transacoes do extrato OFX |
 | `/api/render/boleto` | POST | Corpo JSON → dados + PDF base64 (engine p/ o gateway) |
 | `/api/render/carne` | POST | Corpo JSON → carnê 3-vias A4 em PDF base64 |
@@ -114,6 +119,7 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Estrutura modular, services, middleware, fluxos
 - [development/roadmap-providers.md](development/roadmap-providers.md) — **Roadmap online**: próximos providers REST (bancos e PSP)
+- [development/roadmap-mercosul.md](development/roadmap-mercosul.md) — **Roadmap Mercosul**: empresa paraguaia cobrando no Brasil — o que foi medido, o que entrou (espanhol na doc, no Swagger e nos erros; PHP; CSV) e o que ficou de fora
 - [development/plano-jobs-lote.md](development/plano-jobs-lote.md) — Processamento em **lote/assíncrono** (contrato pyCobrança doc 12)
 - [development/servicos-online-por-banco.md](development/servicos-online-por-banco.md) — **Serviços online dos 19 bancos**: quem tem API de boleto registrado e de Pix, um a um
 - [development/pix-automatico.md](development/pix-automatico.md) — **Pix Automático por banco**: o que está validado, e o que a evidência prova
@@ -133,6 +139,7 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 - [examples/oracle/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/oracle) — **PL/SQL**: pacote `COBRANCA_API`, ACL/wallet, boleto, CNAB, lote e checkout de cartão
 - [examples/apex/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/apex) — **Oracle APEX**: emissão, download de PDF, lote com progresso, checkout com cartão
 - [examples/python/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/python) — Python (scripts executáveis)
+- [examples/php/](https://github.com/Maxwbh/cobranca-api/tree/main/examples/php) — PHP puro, sem Composer: os mesmos três scripts do Python, rota a rota
 
 ## Recursos Externos
 

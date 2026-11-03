@@ -220,7 +220,7 @@ _SCHEMA_BANCO = {
                                        "`POST /credenciais`. O mecanismo é um só; os campos "
                                        "são de cada instituição."},
         "bancos_cnab": {"type": "array", "items": {"type": "string"},
-                        "description": "Só no registro da engine: os 18 slugs do catálogo offline."},
+                        "description": "Só no registro da engine: os 19 slugs do catálogo offline."},
         "observacao": {"type": "string",
                        "description": "Só no registro da engine: quando ela entra sem ninguém pedir."},
         "sandbox": {"type": "string"},

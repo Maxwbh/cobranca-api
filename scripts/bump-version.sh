@@ -85,9 +85,22 @@ substituir docs/ARCHITECTURE.md \
     "s/^| | v${CURRENT_VERSION} |$/| | v${NEW_VERSION} |/" \
     "^| | v${NEW_VERSION} |$"
 
+# E o cabeçalho do PRÓPRIO arquivo ("> **Versão:** X"), que ficou em 2.1.0 por
+# duas versões enquanto a tabela, três telas abaixo, dizia 3.0.0 — a linha de
+# cima não estava nesta lista nem no guarda. Revisão externa de 01/11/2026.
+substituir docs/ARCHITECTURE.md \
+    "s/^> \*\*Versão:\*\* ${CURRENT_VERSION} —/> **Versão:** ${NEW_VERSION} —/" \
+    "^> \*\*Versão:\*\* ${NEW_VERSION} —"
+
 # Exemplo de pin em produção. Este é instrução, não enfeite: parado, manda
 # fixar uma imagem antiga.
 substituir docs/index.md \
+    "s|ghcr.io/maxwbh/cobranca-api:${CURRENT_VERSION}|ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}|g" \
+    "ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}"
+
+# O mesmo pin, no guia de deploy. Ficou em 3.0.0 no bump para a 3.0.1 por
+# não estar nesta lista — `docs/index.md` estava, e só ele.
+substituir docs/deploy.md \
     "s|ghcr.io/maxwbh/cobranca-api:${CURRENT_VERSION}|ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}|g" \
     "ghcr.io/maxwbh/cobranca-api:${NEW_VERSION}"
 

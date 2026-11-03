@@ -113,7 +113,7 @@ def test_valor_deve_ser_positivo(client):
 
 def test_documento_cedente_e_sacado_validados(client):
     e1 = _validate(client, "itau", documento_cedente="123").json()["validation_errors"]
-    assert any("cedente_documento" in e.lower() for e in e1), e1
+    assert any("documento_cedente" in e.lower() for e in e1), e1
     e2 = _validate(client, "itau", sacado_documento="111").json()["validation_errors"]
     assert any("sacado_documento" in e.lower() for e in e2), e2
 
@@ -170,4 +170,4 @@ def test_cnpj_alfanumerico_dv_invalido_recusado(client):
     """A validação é real: DV errado (alfa ou numérico) é recusado."""
     for doc in ("12ABC34501DE99", "11222333000199"):
         erros = _validate(client, "itau", documento_cedente=doc).json()["validation_errors"]
-        assert any("cedente_documento" in e.lower() for e in erros), (doc, erros)
+        assert any("documento_cedente" in e.lower() for e in erros), (doc, erros)

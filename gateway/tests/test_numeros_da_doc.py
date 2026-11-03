@@ -134,7 +134,14 @@ def _providers_rest() -> int:
 
 @pytest.mark.parametrize("doc,padrao", [
     ("docs/ARCHITECTURE.md", r"^\| \| v(\d+\.\d+\.\d+) \|$"),
+    # O cabeçalho do MESMO arquivo ficou em 2.1.0 por duas versões enquanto a
+    # linha de cima prendia a tabela, três telas abaixo. Inventário parcial de
+    # novo — e quem viu foi uma revisão externa.
+    ("docs/ARCHITECTURE.md", r"^> \*\*Versão:\*\* (\d+\.\d+\.\d+) —"),
     ("docs/index.md", r"ghcr\.io/maxwbh/cobranca-api:(\d+\.\d+\.\d+)"),
+    # O mesmo exemplo de pin vive em `docs/deploy.md`, e ficou em 3.0.0 no bump
+    # para a 3.0.1: o script e este guarda cobriam só o `docs/index.md`.
+    ("docs/deploy.md", r"ghcr\.io/maxwbh/cobranca-api:(\d+\.\d+\.\d+)"),
 ])
 def test_a_versao_citada_na_doc_e_a_do_VERSION(doc, padrao):
     """Versão escrita na doc × `VERSION`.
@@ -311,3 +318,28 @@ def test_toda_rota_offline_tem_request_na_colecao():
     assert not sem_request, (
         f"rotas /api/* sem request na coleção: {sem_request}. "
         "Acrescente um BC-xxx — o guarda de cobertura também vai reprovar.")
+
+
+def test_todo_provider_rest_esta_na_tabela_do_architecture():
+    """A tabela "Provider | Cobre" listava c6, sicoob, offline e o mixin BACEN —
+    o Inter e o Itaú entraram no código e a tabela não soube. A contagem "4"
+    da tabela de números já era guardada; a lista de arquivos, não."""
+    texto = (RAIZ / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    nao_sao_banco = {"__init__", "base"}
+    arquivos = sorted(p.name for p in (RAIZ / "gateway" / "app" / "providers").glob("*.py")
+                      if p.stem not in nao_sao_banco)
+    faltam = [a for a in arquivos if f"`{a}`" not in texto]
+    assert not faltam, f"ARCHITECTURE.md não lista {faltam} na tabela de providers"
+
+
+@pytest.mark.parametrize("doc", ["docs/README.md", "docs/development/servicos-online-por-banco.md"])
+def test_a_contagem_de_instituicoes_offline_na_doc_e_a_da_engine(doc):
+    """"18 instituições" sobreviveu ao 18→19 do Inter em dois arquivos que o
+    guarda de contagem não lia — a varredura dele procurava "bancos", e aqui a
+    palavra é "instituições"."""
+    from app.core import pycob
+    real = len(pycob.bancos_suportados())
+    texto = (RAIZ / doc).read_text(encoding="utf-8")
+    achados = [int(n) for n in re.findall(r"\b(\d+) instituições\b", texto)]
+    assert achados, f"{doc}: a frase com 'N instituições' mudou — reveja o guarda"
+    assert set(achados) == {real}, f"{doc} diz {achados} instituições; a engine tem {real}"

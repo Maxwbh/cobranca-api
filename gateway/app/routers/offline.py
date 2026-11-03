@@ -179,10 +179,15 @@ def _carregar_spec() -> tuple[bytes, dict[str, Any], str]:
     return _cache_spec[1], _cache_spec[2], _cache_spec[3]
 
 
-def _resposta_condicional(request: Request, etag: str) -> Response | None:
-    """304 quando o navegador já tem esta versão — o Swagger reabre muito."""
+def _resposta_condicional(request: Request, etag: str,
+                          extras: dict[str, str] | None = None) -> Response | None:
+    """304 quando o navegador já tem esta versão — o Swagger reabre muito.
+
+    `extras` (Content-Language, Vary) vai no 304 também: um cache compartilhado
+    que revalida sem `Vary` pode servir a entidade em português a quem pediu
+    espanhol na próxima vez."""
     if request.headers.get("if-none-match") == f'"{etag}"':
-        return Response(status_code=304, headers=_cabecalhos_spec(etag))
+        return Response(status_code=304, headers=_cabecalhos_spec(etag) | (extras or {}))
     return None
 
 
@@ -465,10 +470,26 @@ async def remessa(bank: str, type: str, data: UploadFile = File(...),
 
 
 @router.post("/api/retorno", include_in_schema=False)
-async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
+async def retorno(request: Request, bank: str, type: str, data: UploadFile = File(...),
+                  formato: str = "json") -> Any:
+    # `formato=csv`: a mesma lista, numa tabela para a contabilidade — com o
+    # cabeçalho no idioma do chamador (`Accept-Language`/`lang`). Conferido
+    # ANTES de ler o arquivo: formato errado não merece o parse.
+    if formato not in ("json", "csv"):
+        return JSONResponse(status_code=400, content={
+            "error": "Erro ao processar retorno",
+            "validation_errors": [f"`formato` deve ser 'json' ou 'csv' — recebi {formato!r}"]})
+    # `bank` validado ANTES de qualquer uso. Ele só era conferido contra o
+    # header do arquivo quando o slug era conhecido; desconhecido, passava — e
+    # no CSV ia parar no `Content-Disposition`: um acento dava 500 (header é
+    # latin-1) e um CRLF na query entrava no cabeçalho da resposta.
+    if bank not in pycob.bancos_suportados():
+        return JSONResponse(status_code=400, content={
+            "error": "Erro ao processar retorno",
+            "validation_errors": [f"bank {bank!r} não corresponde a banco suportado"]})
     try:
-        return pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type,
-                                   bank=bank)
+        itens = pycob.parse_retorno(await _ler_upload(data, "data"), layout_hint=type,
+                                    bank=bank)
     except ArquivoGrandeDemais as e:
         return e.resposta()
     except pycob.DadosInvalidos as e:
@@ -478,6 +499,14 @@ async def retorno(bank: str, type: str, data: UploadFile = File(...)) -> Any:
         return JSONResponse(status_code=400, content={
             "error": "Erro ao processar retorno",
             "validation_errors": e.erros, "details": e.erros})
+    if formato == "json":
+        return itens
+    from app.core.i18n_openapi import idioma_do_request
+    from app.core.retorno_csv import retorno_csv
+    idioma = idioma_do_request(request)
+    return Response(content=retorno_csv(itens, idioma), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename=retorno-{bank}.csv",
+                             "Content-Language": idioma, "Vary": "Accept-Language"})
 
 
 # ------------------------------------------------------------------ OFX
@@ -665,11 +694,36 @@ async def render_remessa(body: dict) -> Any:
 
 
 # ------------------------------------------------------------------ docs offline
+#: A spec offline em espanhol, por (etag da spec, idioma): a MESMA árvore com
+#: os textos trocados pelo dicionário (`core.i18n_openapi`). `/api/openapi.yaml`
+#: fica só em português — promete o arquivo byte a byte, e reserializar YAML
+#: traduzido seria outro arquivo.
+_cache_spec_traduzida: dict[tuple[str, str], tuple[bytes, str]] = {}
+
+
+def _spec_json_no_idioma(idioma: str) -> tuple[bytes, str]:
+    from app.core.i18n_openapi import traduzir_spec
+    _, arvore, etag = _carregar_spec()
+    chave = (etag, idioma)
+    if chave not in _cache_spec_traduzida:
+        corpo = json.dumps(traduzir_spec(arvore, idioma), ensure_ascii=False).encode()
+        _cache_spec_traduzida.clear()  # a spec mudou: o que havia é de outra versão
+        _cache_spec_traduzida[chave] = (corpo, f"{etag}-{idioma}")
+    return _cache_spec_traduzida[chave]
+
+
 @router.get("/api/openapi.json", include_in_schema=False)
 def api_openapi_json(request: Request) -> Response:
-    _, arvore, etag = _carregar_spec()
-    return _resposta_condicional(request, etag) or JSONResponse(
-        content=arvore, headers=_cabecalhos_spec(etag))
+    from app.core.i18n_openapi import idioma_do_request
+    idioma = idioma_do_request(request)
+    extras = {"Content-Language": idioma, "Vary": "Accept-Language"}
+    if idioma == "pt":
+        _, arvore, etag = _carregar_spec()
+        return _resposta_condicional(request, etag, extras) or JSONResponse(
+            content=arvore, headers=_cabecalhos_spec(etag) | extras)
+    corpo, etag = _spec_json_no_idioma(idioma)
+    return _resposta_condicional(request, etag, extras) or Response(
+        content=corpo, media_type="application/json", headers=_cabecalhos_spec(etag) | extras)
 
 
 @router.get("/api/openapi.yaml", include_in_schema=False)
@@ -685,13 +739,17 @@ def api_docs(request: Request) -> HTMLResponse:
     # A página só existe para exibir a spec: sem ela, um 200 entregaria um
     # Swagger que nunca carrega e o operador ficaria olhando tela em branco.
     _carregar_spec()
+    # `?lang=es`: casca em espanhol e idioma da spec fixo na URL (swagger_tema.casca_no_idioma).
+    from app.core.swagger_tema import casca_no_idioma
+    casca = casca_no_idioma(request)
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Offline (Swagger)",
         superficie="Offline · pyCobrança",
-        pill="19 bancos · sem convênio",
+        pill="19 bancos · sin convenio" if casca["es"] else "19 bancos · sem convênio",
         detalhe=f"v{request.app.version} · pycobranca {pycob.versao()}",
+        tagline=casca["tagline"], subtitulo=casca["subtitulo"], lang=casca["lang"],
         links=[("pyCobranca", "https://github.com/Maxwbh/pyCobranca", False),
-               ("Gateway REST →", "/docs", True)],
-        spec_url="/api/openapi.json",
+               ("Gateway REST →", "/docs" + casca["sufixo"], True)],
+        spec_url="/api/openapi.json" + casca["sufixo"],
     ))
 

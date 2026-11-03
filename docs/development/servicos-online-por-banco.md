@@ -1,6 +1,6 @@
 ---
 title: Serviços online por banco — os 18 do catálogo offline
-description: Catálogo completo de serviços online de cada uma das 18 instituições do caminho offline — boleto, Pix, extrato, pagamentos, webhook — com o que cabe no produto e o que não cabe.
+description: Catálogo completo de serviços online de cada uma das 19 instituições do caminho offline — boleto, Pix, extrato, pagamentos, webhook — com o que cabe no produto e o que não cabe.
 ---
 
 # Serviços online, banco a banco
