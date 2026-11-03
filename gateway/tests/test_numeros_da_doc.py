@@ -139,6 +139,9 @@ def _providers_rest() -> int:
     # novo — e quem viu foi uma revisão externa.
     ("docs/ARCHITECTURE.md", r"^> \*\*Versão:\*\* (\d+\.\d+\.\d+) —"),
     ("docs/index.md", r"ghcr\.io/maxwbh/cobranca-api:(\d+\.\d+\.\d+)"),
+    # O mesmo exemplo de pin vive em `docs/deploy.md`, e ficou em 3.0.0 no bump
+    # para a 3.0.1: o script e este guarda cobriam só o `docs/index.md`.
+    ("docs/deploy.md", r"ghcr\.io/maxwbh/cobranca-api:(\d+\.\d+\.\d+)"),
 ])
 def test_a_versao_citada_na_doc_e_a_do_VERSION(doc, padrao):
     """Versão escrita na doc × `VERSION`.
