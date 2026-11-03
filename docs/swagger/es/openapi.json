@@ -133,7 +133,7 @@
                               "type": "string"
                             },
                             "type": "array",
-                            "description": "Solo en el registro de la engine: los 18 slugs del catálogo offline."
+                            "description": "Solo en el registro de la engine: los 19 slugs del catálogo offline."
                           },
                           "observacao": {
                             "type": "string",

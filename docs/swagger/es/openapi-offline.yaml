@@ -25,18 +25,18 @@ info:
     \n- **Boletos**: Generación de boletos en **PDF** — 19 bancos, sin convenio\n- **Remesa**: Generación\
     \ de archivos CNAB 240 y 400\n- **Retorno**: Parsing de archivos de retorno CNAB 240 y 400\n- **OFX**:\
     \ Parsing de extractos bancarios OFX v1 (SGML) y v2 (XML) con extracción automática de nosso_numero\n\
-    \n## Bancos Soportados\n\nLos 18, tal como la engine responde hoy. `GET /api/bancos` devuelve esta\
+    \n## Bancos Soportados\n\nLos 19, tal como la engine responde hoy. `GET /api/bancos` devuelve esta\
     \ misma\nmatriz por introspección del código — si las dos discrepan, la respuesta\nmanda.\n\n| Banco\
     \ | Código | Boleto | CNAB 240 | CNAB 400 | PIX en la remesa |\n|-------|--------|--------|----------|----------|-----|\n\
     | Banco do Brasil | 001 | ✅ | ✅ | ✅ | ✅ |\n| Banco do Nordeste | 004 | ✅ | — | ✅ | — |\n| Banestes\
     \ | 021 | ✅ | — | — | — |\n| Santander | 033 | ✅ | ✅ | ✅ | ✅ |\n| Banrisul | 041 | ✅ | — | ✅ | — |\n\
-    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Ailos | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097\
-    \ | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n| Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco\
-    \ | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — | ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC\
-    \ | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — | — | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n|\
-    \ Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para\
-    \ los 18. Las otras tres columnas son del **archivo de\nremesa**: un banco sin CNAB aquí emite el\
-    \ boleto, pero no genera remesa por\nesta superficie.\n"
+    | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |\n| Banco Inter | 077 | ✅ | — | ✅ | — |\n| Ailos\
+    \ | 085 | ✅ | ✅ | — | — |\n| CrediSIS | 097 | ✅ | — | ✅ | — |\n| Caixa | 104 | ✅ | ✅ | — | ✅ |\n|\
+    \ Unicred | 136 | ✅ | ✅ | ✅ | — |\n| Bradesco | 237 | ✅ | — | ✅ | ✅ |\n| Banco C6 | 336 | ✅ | — |\
+    \ ✅ | ✅ |\n| Itaú | 341 | ✅ | — | ✅ | ✅ |\n| HSBC | 399 | ✅ | — | — | — |\n| Safra | 422 | ✅ | — |\
+    \ ✅ | — |\n| Citibank | 745 | ✅ | — | ✅ | — |\n| Sicredi | 748 | ✅ | ✅ | — | — |\n| Sicoob | 756 |\
+    \ ✅ | ✅ | ✅ | ✅ |\n\nEl boleto en PDF vale para los 19. Las otras tres columnas son del **archivo\
+    \ de\nremesa**: un banco sin CNAB aquí emite el boleto, pero no genera remesa por\nesta superficie.\n"
   version: 3.0.1
   contact:
     name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
@@ -161,7 +161,7 @@ paths:
                 properties:
                   total:
                     type: integer
-                    example: 18
+                    example: 19
                   engine:
                     type: string
                     example: pycobranca

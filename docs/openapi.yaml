@@ -47,7 +47,7 @@ info:
 
     ## Bancos Suportados
 
-    Os 18, como a engine responde hoje. `GET /api/bancos` devolve esta mesma
+    Os 19, como a engine responde hoje. `GET /api/bancos` devolve esta mesma
     matriz por introspecção do código — se as duas discordarem, a resposta
     manda.
 
@@ -59,6 +59,7 @@ info:
     | Santander | 033 | ✅ | ✅ | ✅ | ✅ |
     | Banrisul | 041 | ✅ | — | ✅ | — |
     | BRB — Banco de Brasília | 070 | ✅ | — | ✅ | — |
+    | Banco Inter | 077 | ✅ | — | ✅ | — |
     | Ailos | 085 | ✅ | ✅ | — | — |
     | CrediSIS | 097 | ✅ | — | ✅ | — |
     | Caixa | 104 | ✅ | ✅ | — | ✅ |
@@ -67,12 +68,12 @@ info:
     | Banco C6 | 336 | ✅ | — | ✅ | ✅ |
     | Itaú | 341 | ✅ | — | ✅ | ✅ |
     | HSBC | 399 | ✅ | — | — | — |
-    | Safra | 422 | ✅ | — | — | — |
+    | Safra | 422 | ✅ | — | ✅ | — |
     | Citibank | 745 | ✅ | — | ✅ | — |
     | Sicredi | 748 | ✅ | ✅ | — | — |
     | Sicoob | 756 | ✅ | ✅ | ✅ | ✅ |
 
-    Boleto em PDF vale para os 18. As outras três colunas são do **arquivo de
+    Boleto em PDF vale para os 19. As outras três colunas são do **arquivo de
     remessa**: banco sem CNAB aqui emite o boleto, mas não gera remessa por
     esta superfície.
 
@@ -198,7 +199,7 @@ paths:
                 properties:
                   total:
                     type: integer
-                    example: 18
+                    example: 19
                   engine:
                     type: string
                     example: pycobranca
