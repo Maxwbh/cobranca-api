@@ -10,6 +10,9 @@ boletos via API, cobrança registrada, Bolepix, Pix Automático, remessa e
 retorno CNAB 240/400 e conciliação por OFX — consumido por HTTP de qualquer
 linguagem: Java, PHP, C#, Node, Go, Delphi, Oracle APEX, PL/SQL ou Python.
 
+> 🇵🇾 🇦🇷 🇺🇾 **¿Habla español?** Empresa del Mercosur cobrando en Brasil:
+> [guía en español](es/), con glosario de todos los campos del boleto.
+
 <p class="selos">
   <img src="https://img.shields.io/github/v/release/Maxwbh/cobranca-api?style=flat-square&label=vers%C3%A3o&labelColor=0F172A&color=1E40AF" alt="Última versão publicada" />
   <img src="https://img.shields.io/github/actions/workflow/status/Maxwbh/cobranca-api/ci.yml?branch=main&style=flat-square&label=build&labelColor=0F172A" alt="Status do build" />

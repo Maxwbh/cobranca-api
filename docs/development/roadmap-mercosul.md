@@ -98,38 +98,56 @@ engine passa. O reporte à pyCobrança segue em aberto.
 
 | Item | Esforço | Guarda |
 |---|---|---|
-| **Página de entrada em espanhol** (`/es/`): o que precisa antes, os dois caminhos, primeiro boleto em 5 min, **glossário dos 63 campos** | rascunho pronto | todo campo do `BoletoData` no glossário; nenhum campo inventado; os 6 obrigatórios na seção certa; links resolvem; sem instância pública |
-| **`<html lang>` por página** no layout | 1 linha | o layout lê `page.lang` |
-| **Exemplo em PHP** (`examples/php/`), espelho do `examples/python` | pequeno | o exemplo cobre as mesmas rotas que o de Python |
-| **Link na capa** para `/es/` | 1 linha | — |
+| ✅ **Página de entrada em espanhol** (`/es/`): o que precisa antes, os dois caminhos, primeiro boleto em 5 min, **glossário dos 63 campos** | feito | todo campo do `BoletoData` no glossário; nenhum campo inventado; os 6 obrigatórios na seção certa; a mensagem de erro citada é a que a API emite; as contagens de banco são as do serviço; links resolvem; sem instância pública |
+| ✅ **`<html lang>` por página** no layout | 1 linha | o layout lê `page.lang` antes de `site.lang` |
+| ✅ **Exemplo em PHP** (`examples/php/`), espelho do `examples/python` | feito | cada script PHP chama as mesmas rotas que o par em Python; lê `API`; sai ≠ 0 na falha; `php -l` passa |
+| ✅ **Link na capa** para `/es/` | 1 linha | a capa linka `es/` |
 
 A página em espanhol diz, sobre o regulatório, que **a M&S acompanha a
 abertura de empresa, conta e convênio no Brasil** — a barreira vira serviço.
 
-### 🔌 Fase 2 — Só com lead real
+Medido ao fazer: o `generate_test_boletos.py` que o PHP espelharia **não
+rodava** — mandava `moeda` e `especie`, campos que a API recusa, e os 12
+boletos saíam 400. Corrigido antes de espelhar; os `.rem` gerados pelos dois
+exemplos saem idênticos byte a byte (C6) ou diferem só no horário de geração
+que o layout CNAB 240 carrega (Sicoob).
 
-| Item | Esforço | Por que esperar |
+### 🔌 Fase 2 — Feita antes do lead, por decisão
+
+A regra era "só com lead real". A decisão foi fazer tudo de uma vez, no
+mesmo PR — e o custo de manutenção que justificava esperar foi resolvido
+pelo mecanismo, não pela espera: **nada abaixo é uma segunda cópia que pode
+divergir.**
+
+| Item | Como ficou | Guarda |
 |---|---|---|
-| **Swagger em espanhol** — descrições de API, rotas e campos | 3.890 palavras + mecanismo de geração bilíngue a partir das docstrings | Custo de manutenção contínua; sem demanda vira ativo que envelhece |
-| **Erros por `Accept-Language: es`** | medir quantas mensagens existem; mapa PT→ES | Toca a API (aditivo); só vale com alguém lendo |
-| **Landing comercial** "cobre en Brasil sin intermediario" — o argumento é o modelo: MIT, self-hosted, sem percentual por venda | texto | Depende de saber como a M&S quer vender |
-| **Segundo exemplo** na stack do lead | pequeno | Só se não for PHP nem Python |
+| ✅ **Swagger em espanhol** | A **mesma spec** com os textos trocados por um dicionário PT→ES (`docs/i18n/es/swagger.yaml`, **647 textos distintos**, 13,6 mil palavras — não as 16 mil brutas: `tenant_id` e "Successful Response" repetem dezenas de vezes). Servido em `/openapi.json` e `/api/openapi.json` por `?lang=es` ou `Accept-Language`; `/docs?lang=es` e `/api/docs?lang=es` trocam a casca; publicado em `docs/swagger/es/` pelo mesmo script | Todo texto das duas specs tem par; nenhuma tradução órfã; a estrutura (rotas, campos, `required`) é idêntica; cópias publicadas em dia; casca sem `docker run` repetido |
+| ✅ **Erros por `Accept-Language: es`** | Um middleware reescreve o corpo de toda resposta de erro em JSON (e do `201` com `status: "erro"`), com um catálogo de **~110 regras** — gateway, engine e Pydantic — mais um vocabulário de reserva que preserva crases, aspas e nomes de banco. Nome de campo, status e chave do JSON não mudam | Cada regra casa com o exemplo que a motivou e sai sem português; requisições reais com dados ruins voltam em espanhol com o cabeçalho e em português sem ele |
+| ✅ **Landing comercial** (`/es/comercial`) | "Cobre en Brasil sin intermediario": o argumento é o modelo (MIT, no servidor do cliente, sem percentual por venda), a barreira regulatória explícita, e a M&S como quem acompanha a abertura | `lang: es`; sem instância pública; links resolvem |
+| — **Segundo exemplo** na stack do lead | Não entra: a condição era "só se não for PHP nem Python", e os dois já existem | — |
 
-### 🕓 Fase 3 — Avaliar
+### 🕓 Fase 3 — Avaliada
 
-- **Argentina e Uruguai como leitores**: a mesma página em espanhol serve;
-  diferença é só o documento de identidade de origem, que não entra na API.
-- **Exportação de liquidações com cabeçalho em espanhol** — o que o retorno
-  CNAB e o `/conciliacao` já devolvem, num CSV para a contabilidade de lá.
-  Medir o que existe antes de prometer.
-- **Trilho paraguaio** (SIP / QR Hub): reavaliar quando houver API pública
-  publicada pelo BCP **e** um cliente que receba em guaraníes. Hoje nenhuma das
-  duas.
+- ✅ **Argentina e Uruguai como leitores**: a página em espanhol cita Posadas e
+  Rivera, CUIT ao lado de CI/RUC, e Transferencias 3.0 ao lado do SIP. Nada
+  mais era preciso — o documento de origem não entra na API.
+- ✅ **Exportação de liquidações com cabeçalho em espanhol**: medido primeiro.
+  `/conciliacao` devolve itens **crus do banco**, cada um no seu shape — não há
+  cabeçalho a traduzir sem inventar um. O retorno CNAB tem contrato fixo
+  (`RetornoItem`, dez campos), então foi ele: `POST /api/retorno?formato=csv`
+  devolve CSV com as dez colunas sempre presentes, ponto e vírgula, vírgula
+  decimal, e cabeçalho no idioma do chamador. **Valores não se traduzem**: a
+  ocorrência fica no vocabulário do banco, as datas como ele as gravou.
+  Guarda: colunas = `RetornoItem` da spec; rótulos nos dois idiomas; CSV
+  medido contra a fixture real do Banco do Brasil.
+- ⏸ **Trilho paraguaio** (SIP / QR Hub): reavaliado em 30/10/2026 — segue sem
+  API pública do BCP e sem cliente que receba em guaraníes. Fora.
 
 ## Fora de escopo (decidido)
 
 - Integrar SIP, QR Hub, Transferencias 3.0 ou qualquer trilho vizinho.
-- Traduzir a documentação inteira (57 mil palavras).
+- Traduzir a documentação inteira (57 mil palavras). A spec entrou porque é
+  gerada e guardada; os guias em prosa não têm esse mecanismo.
 - Traduzir nomes de campo.
 - Campo de moeda de referência, cotação ou conversão.
 - Pix internacional — não existe para aderir.

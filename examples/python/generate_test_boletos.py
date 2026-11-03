@@ -28,8 +28,10 @@ BASE_C6 = {
   "numero_documento": "INV-2026-001",
   "valor": 2750.00,
   "data_vencimento": "2026/12/31",
-  "moeda": "9",
-  "especie": "R$",
+  # `moeda` e `especie` eram da gem Ruby e NÃO são campos da API: desde que o
+  # gateway recusa campo desconhecido, os 12 boletos deste script saíam 400 —
+  # e o README ao lado continuava prometendo os PDFs. O rótulo da moeda, se
+  # quiser mudá-lo, é `especie_moeda` (padrão `R$`).
   "especie_documento": "DM",
   "aceite": "N",
   "local_pagamento": "Pagavel em qualquer banco",
@@ -52,8 +54,6 @@ BASE_SICOOB = {
   "numero_documento": "NF-2025-1234",
   "valor": 2500.00,
   "data_vencimento": "2027/12/31",
-  "moeda": "9",
-  "especie": "R$",
   "especie_documento": "DM",
   "aceite": "N",
   "local_pagamento": "Pagavel em qualquer banco ate o vencimento",

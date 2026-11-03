@@ -383,26 +383,42 @@ _ROTAS_SUBSTITUIDAS = {app.openapi_url, app.redoc_url}
 app.router.routes = [r for r in app.router.routes
                      if getattr(r, "path", None) not in _ROTAS_SUBSTITUIDAS]
 
-_spec_serializada: tuple[int, bytes, str] | None = None
+# A mesma spec em espanhol: `?lang=es` ou `Accept-Language: es`. O Swagger UI
+# busca `/openapi.json` por XHR com o `Accept-Language` do navegador, então quem
+# abre `/docs` de um navegador em espanhol já lê as descrições traduzidas — sem
+# segunda página, sem segunda spec. Estrutura idêntica; só o texto muda
+# (`core.i18n_openapi`). Cache por idioma, pelo mesmo motivo do cache original:
+# o que pesa é serializar.
+from app.core.i18n_erros import ErrosNoIdiomaDoChamador  # noqa: E402
+from app.core.i18n_openapi import idioma_do_request, traduzir_spec  # noqa: E402
+from app.core.swagger_tema import casca_no_idioma  # noqa: E402
+
+_spec_serializada: dict[str, tuple[int, bytes, str]] = {}
 
 
-def _spec_bytes() -> tuple[bytes, str]:
-    global _spec_serializada
+def _spec_bytes(idioma: str = "pt") -> tuple[bytes, str]:
     schema = app.openapi()
-    if _spec_serializada is None or _spec_serializada[0] != id(schema):
-        corpo = json.dumps(schema, ensure_ascii=False).encode()
-        _spec_serializada = (id(schema), corpo,
-                             hashlib.sha256(corpo).hexdigest()[:32])
-    return _spec_serializada[1], _spec_serializada[2]
+    atual = _spec_serializada.get(idioma)
+    if atual is None or atual[0] != id(schema):
+        corpo = json.dumps(traduzir_spec(schema, idioma), ensure_ascii=False).encode()
+        atual = (id(schema), corpo, hashlib.sha256(corpo).hexdigest()[:32])
+        _spec_serializada[idioma] = atual
+    return atual[1], atual[2]
 
 
 @app.get(app.openapi_url, include_in_schema=False)
 def openapi_json(request: Request) -> Response:
-    corpo, etag = _spec_bytes()
-    cabecalhos = {"ETag": f'"{etag}"', "Cache-Control": "no-cache"}
+    idioma = idioma_do_request(request)
+    corpo, etag = _spec_bytes(idioma)
+    cabecalhos = {"ETag": f'"{etag}"', "Cache-Control": "no-cache",
+                  "Content-Language": idioma, "Vary": "Accept-Language"}
     if request.headers.get("if-none-match") == f'"{etag}"':
         return Response(status_code=304, headers=cabecalhos)
     return Response(content=corpo, media_type="application/json", headers=cabecalhos)
+
+
+# Erros no idioma do chamador — um ponto só, para toda rota (ver o módulo).
+app.add_middleware(ErrosNoIdiomaDoChamador)
 
 app.include_router(bancos.router)
 app.include_router(credenciais.router)
@@ -581,30 +597,34 @@ if VENDOR_SWAGGER is not None:
 
 
 @app.get("/docs", include_in_schema=False)
-def swagger_ui() -> HTMLResponse:
+def swagger_ui(request: Request) -> HTMLResponse:
     """Swagger UI do gateway com a identidade visual da plataforma."""
+    casca = casca_no_idioma(request)
     return HTMLResponse(pagina_swagger(
         titulo="Cobranca-API — Gateway (Swagger)",
         superficie="Gateway REST · multi-banco",
         pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · C6 · Sicoob · Inter · Itaú · Pix BACEN",
+        tagline=casca["tagline"], subtitulo=casca["subtitulo"], lang=casca["lang"],
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
-               ("Offline / pyCobrança →", "/api/docs", True)],
-        spec_url="/openapi.json",
+               ("Offline / pyCobrança →", "/api/docs" + casca["sufixo"], True)],
+        spec_url="/openapi.json" + casca["sufixo"],
     ))
 
 
 @app.get("/redoc", include_in_schema=False)
-def redoc_ui() -> HTMLResponse:
+def redoc_ui(request: Request) -> HTMLResponse:
     """A mesma spec do `/docs`, em leitura linear — útil numa spec de 67 rotas."""
+    casca = casca_no_idioma(request)
     return HTMLResponse(pagina_redoc(
         titulo="Cobranca-API — Gateway (Redoc)",
         superficie="Gateway REST · referência",
         pill="4 bancos ON · 19 OFF",
         detalhe=f"v{app.version} · leitura linear da mesma spec",
+        tagline=casca["tagline"], subtitulo=casca["subtitulo"], lang=casca["lang"],
         links=[("GitHub", "https://github.com/Maxwbh/cobranca-api", False),
-               ("Swagger →", "/docs", True)],
-        spec_url=app.openapi_url,
+               ("Swagger →", "/docs" + casca["sufixo"], True)],
+        spec_url=app.openapi_url + casca["sufixo"],
     ))
 
 

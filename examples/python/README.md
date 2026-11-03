@@ -105,7 +105,7 @@ Armadilhas mais comuns — cada uma medida contra a engine, não lembrada:
 | **`201` com `status: "erro"`** | `POST /cobranca` recusado pela regra do banco | O engano mais comum: **é 201**. Os campos recusados estão em `raw.validation_errors` |
 | `422 item_id duplicado` | Dois itens do lote com o mesmo identificador | Corrija o payload — seriam o mesmo título emitido duas vezes |
 | `413` | Lote acima de `LOTE_MAX_ITENS` | Quebre o lote ou ajuste a variável de ambiente |
-| Timeout no primeiro request | Free tier do Render hiberna | Repita — a primeira chamada leva ~50s |
+| Timeout no primeiro request | Hospedagem que hiberna sem tráfego (plano gratuito de PaaS) | Repita — a primeira chamada acorda o container |
 
 ## 📖 Próximos passos
 
