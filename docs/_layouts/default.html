@@ -2,6 +2,11 @@
 <!-- `page.lang` primeiro: a página em espanhol (`/es/`) declara `lang: es` no
      front matter, e sem isto o <html> saía rotulado como pt-BR — o Google e o
      leitor de tela liam espanhol como português. -->
+{%- assign es = false -%}{%- if page.lang == 'es' -%}{%- assign es = true -%}{%- endif -%}
+<!-- `es` troca a CASCA de idioma junto com o conteúdo: skip link, botões do
+     cabeçalho, rodapé e o botão "copiar" saíam em português na página /es/
+     (revisão externa de 03/11/2026). O Swagger do cabeçalho passa a apontar
+     para a cópia em espanhol. -->
 <html lang="{{ page.lang | default: site.lang | default: 'en-US' }}">
   <head>
     <meta charset="UTF-8">
@@ -15,7 +20,7 @@
     {% include head-custom.html %}
   </head>
   <body>
-    <a id="skip-to-content" href="#content">Pular para o conteúdo.</a>
+    <a id="skip-to-content" href="#content">{% if es %}Saltar al contenido.{% else %}Pular para o conteúdo.{% endif %}</a>
 
     <!-- Cabeçalho próprio: sobrepõe o do tema Cayman para usar o MESMO banner
          do README — uma identidade só, do repositório ao site. O h1 continua
@@ -29,10 +34,17 @@
              alt="Cobranca-API — boletos, Pix, CNAB 240/400 e OFX via API REST. 4 bancos online (C6, Sicoob, Inter, Itaú) e 19 offline, 100% Python, licença MIT.">
       </picture>
       <div class="acoes-cabecalho">
+{% if es %}
+        <a href="{{ '/swagger/es/' | relative_url }}" class="btn btn-primario">Swagger de la API</a>
+        <a href="{{ '/es/' | relative_url }}#el-primer-boleto-en-cinco-minutos" class="btn">Cómo ejecutar</a>
+        <a href="{{ '/es/' | relative_url }}#glosario--el-vocabulario-de-la-api-en-español" class="btn">Glosario</a>
+        <a href="{{ site.github.repository_url }}" class="btn">Código en GitHub</a>
+{% else %}
         <a href="{{ '/swagger/' | relative_url }}" class="btn btn-primario">Swagger da API</a>
         <a href="{{ '/' | relative_url }}#como-rodar" class="btn">Como rodar</a>
         <a href="{{ '/' | relative_url }}#referencia" class="btn">Documentação</a>
         <a href="{{ site.github.repository_url }}" class="btn">Código no GitHub</a>
+{% endif %}
       </div>
     </header>
 
@@ -41,7 +53,7 @@
 
       <footer class="site-footer">
         <span class="site-footer-owner">
-          <a href="{{ site.github.repository_url }}">cobranca-api</a> — MIT, mantido por
+          <a href="{{ site.github.repository_url }}">cobranca-api</a> — MIT, {% if es %}mantenido por{% else %}mantido por{% endif %}
           <a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a> ·
           <a href="https://msbrasil.inf.br">M&amp;S do Brasil LTDA</a>.
         </span>
@@ -52,17 +64,19 @@
       // Botão "copiar" em todo bloco de código. Progressivo: sem JS ou sem
       // clipboard (http puro), simplesmente não aparece — nada quebra.
       if (navigator.clipboard) {
+        var rotuloCopiar = 'copiar';  // a mesma palavra nas duas línguas
+        var rotuloCopiado = {% if es %}'¡copiado!'{% else %}'copiado!'{% endif %};
         document.querySelectorAll('.main-content pre').forEach(function (pre) {
           var b = document.createElement('button');
           b.className = 'botao-copiar';
           b.type = 'button';
-          b.textContent = 'copiar';
+          b.textContent = rotuloCopiar;
           b.addEventListener('click', function () {
             var codigo = pre.querySelector('code');
             var texto = (codigo ? codigo.innerText : pre.innerText);
             navigator.clipboard.writeText(texto).then(function () {
-              b.textContent = 'copiado!';
-              setTimeout(function () { b.textContent = 'copiar'; }, 1600);
+              b.textContent = rotuloCopiado;
+              setTimeout(function () { b.textContent = rotuloCopiar; }, 1600);
             });
           });
           pre.appendChild(b);

@@ -184,3 +184,75 @@ def test_a_pagina_diz_o_que_esta_em_espanhol_e_o_que_nao():
     assert "## Qué está en español y qué no" in texto
     assert "docs/api/" in texto, "a seção tem de nomear o que segue só em português"
     assert "../swagger/es/" in texto
+
+
+# --- Revisão externa de 03/11/2026, da página publicada -------------------
+#
+# Dois pontos sobraram depois de medir os cinco contra o site: a casca do
+# layout (skip link, botões do cabeçalho, rodapé, botão "copiar") saía em
+# português na página em espanhol, e a página — sete seções, 270 linhas — não
+# tinha menu interno. Os outros três já estavam resolvidos no publicado.
+
+#: Texto da casca que o layout emite em português. Cada um tem de estar
+#: dentro de um `{% if es %}…{% else %}AQUI{% endif %}` — fora de bloco, sai
+#: em português na página em espanhol.
+#: ("copiar" fica de fora: é a mesma palavra nas duas línguas.)
+CASCA_PT = ["Pular para o conteúdo", "Swagger da API", "Como rodar", "Documentação",
+            "Código no GitHub", "mantido por", "'copiado!'"]
+BLOCO_ES = re.compile(r"\{%-?\s*if es\s*-?%\}(.*?)\{%-?\s*else\s*-?%\}(.*?)\{%-?\s*endif\s*-?%\}", re.S)
+
+
+def test_a_casca_do_layout_fala_espanhol_na_pagina_em_espanhol():
+    html = LAYOUT.read_text(encoding="utf-8")
+    # `assign es = page.lang == 'es'` NÃO é Liquid válido (o parser estrito
+    # recusa a comparação dentro de assign, e o permissivo a ignora em
+    # silêncio) — visto ao renderizar com a gem liquid. A forma é if/assign.
+    assert re.search(r"\{%-?\s*if page\.lang == ['\"]es['\"]\s*-?%\}\s*\{%-?\s*assign es = true\s*-?%\}", html), (
+        "o layout não define `es` a partir de `page.lang` — a casca não tem como trocar de idioma")
+    blocos = BLOCO_ES.findall(html)
+    fora = BLOCO_ES.sub("", html)
+    for pt in CASCA_PT:
+        assert pt not in fora, f"{pt!r} está fora de um bloco `if es` — sai em português na página /es/"
+        bloco = next((b for b in blocos if pt in b[1]), None)
+        assert bloco, f"{pt!r} não está no ramo `else` de nenhum bloco `if es`"
+        assert bloco[0].strip() and pt not in bloco[0], f"o ramo `if es` do bloco de {pt!r} não traduz nada"
+
+
+#: ids que o Jekyll do GitHub Pages gerou para os h2 da página — medidos no
+#: site publicado em 03/11/2026. São o oráculo da regra abaixo: se a regra
+#: reproduz estes sete, as âncoras do menu apontam para onde o site aponta.
+IDS_PUBLICADOS = {
+    "Lo que necesita antes de empezar": "lo-que-necesita-antes-de-empezar",
+    "Dos caminos, un solo contrato": "dos-caminos-un-solo-contrato",
+    "El primer boleto, en cinco minutos": "el-primer-boleto-en-cinco-minutos",
+    "Qué está en español y qué no": "qué-está-en-español-y-qué-no",
+    "Glosario — el vocabulario de la API, en español": "glosario--el-vocabulario-de-la-api-en-español",
+    "Los términos que va a leer en portugués": "los-términos-que-va-a-leer-en-portugués",
+    "Dónde seguir": "dónde-seguir",
+}
+
+
+def _id_kramdown(titulo: str) -> str:
+    """A regra de `auto_ids` do kramdown como o GitHub Pages a aplica: minúsculas,
+    só letras (com acento), dígitos, espaço, hífen e sublinhado; espaço vira
+    hífen. O travessão some e deixa hífen duplo — é assim que o site gera."""
+    t = re.sub(r"[^\w\s-]", "", titulo.lower())
+    return re.sub(r"\s", "-", t).lstrip("-0123456789")
+
+
+def test_a_regra_de_ancora_reproduz_os_ids_que_o_site_gerou():
+    for titulo, id_ in IDS_PUBLICADOS.items():
+        assert _id_kramdown(titulo) == id_, (titulo, _id_kramdown(titulo))
+
+
+def test_o_menu_interno_cobre_todas_as_secoes_e_so_elas():
+    texto = _texto()
+    h2 = re.findall(r"^## (.+?)\s*$", texto, re.MULTILINE)
+    assert len(h2) >= 5, "a página perdeu seções — reveja o guarda"
+    primeiro_h2 = texto.index("\n## ")
+    ancoras = re.findall(r"\]\(#([^)]+)\)", texto[:primeiro_h2])
+    assert ancoras, "a página não tem menu interno antes da primeira seção"
+    esperadas = [_id_kramdown(t) for t in h2]
+    assert ancoras == esperadas, (
+        f"menu interno: {ancoras}\nseções:       {esperadas}\n"
+        "toda seção entra no menu, na ordem, e o menu não aponta para seção que não existe")
