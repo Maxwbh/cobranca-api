@@ -132,7 +132,8 @@ class PostgresStore(CredentialStore):
             raise ValueError("CREDENTIAL_DB_SCHEMA inválido (use [a-z0-9_])")
         self._table = f'"{schema}".credential_tokens'
         with self._conn() as c:
-            c.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+            from psycopg import sql
+            c.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema)))
             c.execute(_SCHEMA.format(blob="BYTEA").replace(
                 "CREATE TABLE IF NOT EXISTS credential_tokens",
                 f"CREATE TABLE IF NOT EXISTS {self._table}",
