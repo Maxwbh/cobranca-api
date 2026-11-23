@@ -59,3 +59,18 @@ defaults:
       path: ""
     values:
       image: /assets/social-preview.png
+  # Fora do sitemap.xml (revisão externa de 03/11/2026): o arquivo de
+  # verificação do Search Console existe para o Google LER, não indexar; e
+  # `assets/README.md` vira `/assets/` pelo readme-index — notas de manutenção
+  # da identidade visual, não documentação. O `jekyll-sitemap` só respeita
+  # `sitemap: false`, e em arquivo estático e README isso se declara aqui
+  # (front matter num README aparece como tabela no GitHub). Os dois seguem
+  # publicados; só não entram na lista. Guarda: test_sitemap_do_site.py.
+  - scope:
+      path: "googlec2394c0afd3e8857.html"
+    values:
+      sitemap: false
+  - scope:
+      path: "assets/README.md"
+    values:
+      sitemap: false
