@@ -180,4 +180,4 @@ em `9292`, a porta do antigo Banking Core Ruby.
 
 ---
 
-**Desenvolvido por Maxwell da Silva Oliveira — M&S do Brasil Ltda**
+**Desenvolvido por Maxwell da Silva Oliveira — [M&S do Brasil](https://msbrasil.inf.br)**

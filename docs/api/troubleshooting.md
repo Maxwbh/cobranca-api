@@ -442,4 +442,4 @@ Se ainda assim houver problemas, reporte um issue com arquivo de exemplo.
 
 ---
 
-**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) - M&S do Brasil LTDA
+**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) — [M&S do Brasil](https://msbrasil.inf.br)

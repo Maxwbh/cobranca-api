@@ -334,7 +334,7 @@ dados dos seus clientes na infra de terceiro — este projeto existe para isso.
 
 ## Por que usar?
 
-Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar pagamentos via OFX** no Brasil, esta API resolve tudo via HTTP — sem instalar nada além de um container.
+Se você precisa **gerar boletos**, **processar arquivos CNAB** ou **conciliar pagamentos via OFX** no Brasil, esta API faz as três por HTTP — sem instalar nada além de um container.
 
 | Problema | Solução |
 |----------|---------|
@@ -616,13 +616,16 @@ Créditos históricos completos no arquivo [LICENSE](./LICENSE).
 
 <p align="center">
   Desenvolvido por <strong><a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a></strong>
-  — <a href="https://msbrasil.inf.br"><strong>M&S do Brasil LTDA</strong></a>
+  — <a href="https://msbrasil.inf.br"><strong>M&S do Brasil</strong></a>
   <br />
   <a href="https://github.com/Maxwbh">GitHub</a> ·
   <a href="https://www.linkedin.com/in/maxwbh">LinkedIn</a> ·
   <a href="mailto:maxwbh@gmail.com">maxwbh@gmail.com</a>
   <br /><br />
-  Consultoria e desenvolvimento em integração bancária, Oracle APEX e Python —
+  <strong>M&S do Brasil</strong> · Desenvolvimento de sistemas
+  <br />
+  Desenvolve, moderniza e sustenta sistemas Oracle que já estão em produção,
+  e integra a Cobranca-API a ERP, Oracle APEX ou sistema legado —
   <a href="https://msbrasil.inf.br">msbrasil.inf.br</a>
   <br /><br />
   ⭐ Se este projeto foi útil, considere dar uma estrela!

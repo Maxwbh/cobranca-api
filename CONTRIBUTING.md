@@ -578,4 +578,4 @@ Obrigado por dedicar seu tempo para contribuir! Cada contribuição, grande ou p
 
 ---
 
-**Desenvolvido por Maxwell da Silva Oliveira - M&S do Brasil Ltda**
+**Desenvolvido por Maxwell da Silva Oliveira — [M&S do Brasil](https://msbrasil.inf.br)**

@@ -39,7 +39,7 @@ info:
     \ de\nremesa**: un banco sin CNAB aquí emite el boleto, pero no genera remesa por\nesta superficie.\n"
   version: 3.0.1
   contact:
-    name: Maxwell da Silva Oliveira — M&S do Brasil LTDA
+    name: Maxwell da Silva Oliveira — M&S do Brasil
     email: maxwbh@gmail.com
     url: https://msbrasil.inf.br
   license:

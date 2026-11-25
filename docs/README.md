@@ -149,4 +149,4 @@ Todos os endpoints de boleto retornam **3 campos** (nunca `nosso_numero_boleto`)
 
 ---
 
-**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) - M&S do Brasil LTDA
+**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) — [M&S do Brasil](https://msbrasil.inf.br)
