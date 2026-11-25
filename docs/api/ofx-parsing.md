@@ -262,4 +262,4 @@ Veja [openapi.yaml](../openapi.yaml) — schemas `OfxResponse`, `OfxTransacao` e
 
 ---
 
-**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) - M&S do Brasil LTDA
+**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) — [M&S do Brasil](https://msbrasil.inf.br)

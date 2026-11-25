@@ -167,4 +167,4 @@ Não é o PIX. Os dois layouts exigem campos que a validação não cobre:
 
 ---
 
-**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) — M&S do Brasil LTDA
+**Mantido por:** Maxwell da Silva Oliveira ([@maxwbh](https://github.com/maxwbh)) — [M&S do Brasil](https://msbrasil.inf.br)

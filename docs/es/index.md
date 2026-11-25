@@ -278,5 +278,5 @@ sorprenda.
 - [Código en GitHub](https://github.com/Maxwbh/cobranca-api)
 
 Desarrollado por **Maxwell da Silva Oliveira** —
-[M&S do Brasil LTDA](https://msbrasil.inf.br). Consultas sobre integración
+[M&S do Brasil](https://msbrasil.inf.br). Consultas sobre integración
 bancaria en Brasil, Oracle APEX y Python: [hablemos](https://msbrasil.inf.br).

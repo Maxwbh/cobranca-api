@@ -220,8 +220,9 @@ Projeto sob licença MIT. A engine de cálculo e renderização é a
 
 Desenvolvido por **[Maxwell da Silva Oliveira](https://www.linkedin.com/in/maxwbh)**
 ([GitHub](https://github.com/Maxwbh) · [maxwbh@gmail.com](mailto:maxwbh@gmail.com)),
-da **[M&S do Brasil LTDA](https://msbrasil.inf.br)** — consultoria e
-desenvolvimento em integração bancária, Oracle APEX e Python.
+da **[M&S do Brasil](https://msbrasil.inf.br)** — desenvolvimento de sistemas.
+A M&S do Brasil desenvolve, moderniza e sustenta sistemas Oracle que já estão
+em produção.
 
-Precisa de ajuda para integrar a Cobranca-API ao seu ERP, Oracle APEX ou
-sistema legado? [Fale com a gente](https://msbrasil.inf.br).
+Precisa integrar a Cobranca-API ao seu ERP, Oracle APEX ou sistema legado?
+[Fale com a gente](https://msbrasil.inf.br).
