@@ -118,7 +118,7 @@ app = FastAPI(
     # `contact` e `license_info` saem no cabeçalho do Swagger e no openapi.json —
     # é o "quem mantém isto" para quem chega pela demo sem passar pelo GitHub.
     contact={
-        "name": "Maxwell da Silva Oliveira — M&S do Brasil LTDA",
+        "name": "Maxwell da Silva Oliveira — M&S do Brasil",
         "url": "https://msbrasil.inf.br",
         "email": "maxwbh@gmail.com",
     },

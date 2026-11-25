@@ -94,6 +94,6 @@ ejemplos listos en PHP y Python.
 - [Ejemplos en PHP](https://github.com/Maxwbh/cobranca-api/tree/main/examples/php) y en [Python](https://github.com/Maxwbh/cobranca-api/tree/main/examples/python)
 - [Código en GitHub](https://github.com/Maxwbh/cobranca-api) — licencia MIT
 
-**Para hablar de la integración:** [M&S do Brasil LTDA](https://msbrasil.inf.br),
+**Para hablar de la integración:** [M&S do Brasil](https://msbrasil.inf.br),
 de Maxwell da Silva Oliveira — integración bancaria en Brasil, Oracle APEX y
 Python.
