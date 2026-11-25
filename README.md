@@ -608,24 +608,39 @@ uvicorn app.main:app --reload --port 8000
 
 [MIT](./LICENSE) — use livremente em projetos comerciais e open-source.
 
+A MIT cobre o código e a documentação; **não cobre o nome nem a marca da M&S do
+Brasil**, em [`docs/assets/ms`](./docs/assets/ms/README.md), que identificam a
+empresa e não se usam fora do endosso abaixo sem autorização.
+
 Projeto independente e **100% Python**: gateway multi-banco, Pix, jobs em lote e
 engine offline [PyCobrança](https://github.com/Maxwbh/pyCobranca) próprios.
 Créditos históricos completos no arquivo [LICENSE](./LICENSE).
 
 ---
 
+<!-- Endosso pela arquitetura de marcas da M&S do Brasil (kit v0.7): em
+     repositório o produto vem primeiro e a empresa assina no rodapé, "um
+     projeto M&S do Brasil". "um projeto" fica em parágrafo próprio para não
+     entrar na área de proteção da assinatura (1/3 da altura). 32 px de
+     altura: o mínimo em tela é 28. As duas variantes, porque a imagem não
+     acompanha o tema do GitHub sozinha. Os SVG não se editam à mão. -->
+<p align="center">um projeto</p>
 <p align="center">
-  Desenvolvido por <strong><a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a></strong>
-  — <a href="https://msbrasil.inf.br"><strong>M&S do Brasil</strong></a>
-  <br />
-  <a href="https://github.com/Maxwbh">GitHub</a> ·
+  <a href="https://msbrasil.inf.br">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/ms/ms-assinatura-horizontal-fundo-escuro.svg" />
+      <img src="./docs/assets/ms/ms-assinatura-horizontal-fundo-claro.svg" alt="M&S do Brasil" height="32" />
+    </picture>
+  </a>
+</p>
+<p align="center">
+  Engenharia de software para sistemas que não podem parar.
+  <br /><br />
+  Desenvolvido por <strong><a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a></strong> ·
   <a href="https://www.linkedin.com/in/maxwbh">LinkedIn</a> ·
   <a href="mailto:maxwbh@gmail.com">maxwbh@gmail.com</a>
-  <br /><br />
-  <strong>M&S do Brasil</strong> · Desenvolvimento de sistemas
   <br />
-  Desenvolve, moderniza e sustenta sistemas Oracle que já estão em produção,
-  e integra a Cobranca-API a ERP, Oracle APEX ou sistema legado —
+  Integração da Cobranca-API a ERP, Oracle APEX ou sistema legado:
   <a href="https://msbrasil.inf.br">msbrasil.inf.br</a>
   <br /><br />
   ⭐ Se este projeto foi útil, considere dar uma estrela!

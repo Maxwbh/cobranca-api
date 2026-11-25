@@ -57,6 +57,13 @@
           <a href="https://github.com/Maxwbh">Maxwell da Silva Oliveira</a> ·
           <a href="https://msbrasil.inf.br">M&amp;S do Brasil</a>.
         </span>
+        <!-- Endosso (kit v0.7 da M&S do Brasil): o produto vem primeiro, a
+             empresa assina no rodapé. Variante de fundo claro, porque o site
+             não tem tema escuro. 32 px de altura: o mínimo em tela é 28, e a
+             28 a largura ficava abaixo dos 101 px que o manual cita. -->
+        <span class="site-footer-endosso">{% if es %}un proyecto{% else %}um projeto{% endif %}
+          <a href="https://msbrasil.inf.br"><img src="{{ '/assets/ms/ms-assinatura-horizontal-fundo-claro.svg' | relative_url }}" alt="M&amp;S do Brasil" height="32"></a>
+        </span>
       </footer>
     </main>
 

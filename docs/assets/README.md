@@ -66,41 +66,51 @@ A ordem importa: o navegador que entende SVG pega o primeiro e ignora o resto.
 
 ## Família M&S do Brasil
 
-A Cobranca-API é produto da M&S do Brasil. O estudo de marca da empresa
-(v0.4, novembro de 2026, proposta em validação) diz o que a família
-compartilha e o que cada marca guarda:
+A Cobranca-API é um projeto da M&S do Brasil. O kit de marca da empresa (v0.7,
+novembro de 2026: conceito visual congelado, ainda sem INPI nem prova de
+impressão) aprovou a **arquitetura de marcas endossadas**: cada produto mantém
+nome e desenho e assina "um projeto M&S do Brasil".
 
 | | M&S do Brasil | Cobranca-API |
 |---|---|---|
-| Desenho | losangos entrelaçados, traço fino, serifa | barras e chevron, formas cheias |
+| Desenho | dois losangos entrelaçados, nome em Inter | barras e chevron, formas cheias |
 | Ciano | `#06B6D4` sobre escuro, `#0891B2` sobre claro | o mesmo par, hex por hex |
 | Marinho | `#0D1B4B` | `#0F172A` |
 | Vermelho | fora da identidade | fora da identidade |
 
-**O ciano é o elo.** O estudo chama `#06B6D4` de "ciano elo" e `#0891B2` de
-"ciano elo claro", e diz que os tirou das marcas dos produtos. A regra de
-contraste é a mesma desta pasta: `#06B6D4` nunca em texto sobre branco. Trocar
-o ciano daqui desamarra o produto da empresa; `gateway/tests/test_marca_ms.py`
-prende os dois hex.
+**O produto vem primeiro.** Em repositório e documentação técnica, a
+Cobranca-API abre a página e a M&S assina no rodapé: no README e no rodapé do
+site, "um projeto" e a assinatura horizontal da empresa. No site e no material
+comercial da M&S, a ordem se inverte. A marca do produto nunca entra na área
+de proteção da assinatura da empresa.
+
+**O símbolo dos losangos é só da empresa.** Os arquivos dela ficam em
+[`ms/`](./ms/README.md), tirados do kit sem alteração e conferidos byte a byte
+por `gateway/tests/test_marca_ms.py`. **A licença MIT do repositório não se
+aplica a eles**: o kit separa marca de código aberto. Nada desta pasta usa os
+losangos.
+
+**O ciano é o elo.** O kit chama `#06B6D4` de "ciano" e `#0891B2` de "ciano
+escuro", e diz que os tirou das marcas dos produtos. A regra de contraste é a
+mesma desta pasta: `#06B6D4` nunca em texto sobre branco. Trocar o ciano daqui
+desamarra o produto da empresa; o mesmo guarda prende os dois hex.
 
 **Vermelho não entra**, nem como destaque, para manter distância visual da
-Oracle. Nenhum SVG desta pasta nem o gerador de banners usa vermelho hoje, e o
-mesmo guarda impede que entre.
+Oracle. Vale também para o vermelho funcional do kit (`--ms-erro`, `#B42318`),
+que é de interface e nunca de identidade. Nenhum SVG desta pasta nem o gerador
+de banners usa vermelho, e o guarda impede que entre.
 
-**O marinho é diferente, e fica.** O estudo fala em "o par marinho e ciano"
-para as três marcas, mas o marinho da empresa veio do site da M&S, e o desta
-pasta já está em banner, favicon, social preview e site. Unificar é decisão de
-marca, não de documentação: em aberto.
+**O marinho é diferente, e fica.** O kit diz que marinho e ciano são comuns às
+três marcas, mas o marinho da empresa veio do site da M&S, e o desta pasta já
+está em banner, favicon, social preview e site. Unificar é decisão de marca,
+não de documentação: em aberto.
 
 **O nome se escreve "M&S do Brasil".** Assim no README, no site, nas duas specs
-e nos rodapés da documentação, com "Desenvolvimento de sistemas" como texto de
-apoio. A razão social, "M&S do Brasil LTDA", só aparece onde é dado: o
-`legalName` do JSON-LD.
-
-**O emblema da M&S não está neste repositório.** O estudo ainda pede validação
-do emblema, busca de anterioridade no INPI e prova de cor, e põe a publicação
-do kit no GitHub como último passo. Quando o kit sair, os SVG entram aqui com
-a área de proteção e a redução mínima do manual.
+e nos rodapés da documentação. A razão social, "M&S do Brasil LTDA", só aparece
+onde é dado: o `legalName` do JSON-LD. Na documentação técnica, a empresa se
+apresenta pelo posicionamento permanente do kit, "Engenharia de software para
+sistemas que não podem parar"; a especialização Oracle é mensagem comercial e
+fica fora daqui.
 
 ## Banners
 
