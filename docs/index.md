@@ -220,9 +220,8 @@ Projeto sob licença MIT. A engine de cálculo e renderização é a
 
 Desenvolvido por **[Maxwell da Silva Oliveira](https://www.linkedin.com/in/maxwbh)**
 ([GitHub](https://github.com/Maxwbh) · [maxwbh@gmail.com](mailto:maxwbh@gmail.com)),
-da **[M&S do Brasil](https://msbrasil.inf.br)** — desenvolvimento de sistemas.
-A M&S do Brasil desenvolve, moderniza e sustenta sistemas Oracle que já estão
-em produção.
+da **[M&S do Brasil](https://msbrasil.inf.br)**. A Cobranca-API é um projeto
+M&S do Brasil. Engenharia de software para sistemas que não podem parar.
 
 Precisa integrar a Cobranca-API ao seu ERP, Oracle APEX ou sistema legado?
 [Fale com a gente](https://msbrasil.inf.br).

@@ -74,3 +74,9 @@ defaults:
       path: "assets/README.md"
     values:
       sitemap: false
+  # Nota de uso da marca da M&S do Brasil (kit v0.7), que vira `/assets/ms/`:
+  # é aviso de licença, não documentação do produto.
+  - scope:
+      path: "assets/ms/README.md"
+    values:
+      sitemap: false

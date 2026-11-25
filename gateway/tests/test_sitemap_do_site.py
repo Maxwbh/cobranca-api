@@ -26,6 +26,7 @@ CONFIG = yaml.safe_load((SITE / "_config.yml").read_text(encoding="utf-8"))
 FORA_DO_SITEMAP = {
     "googlec2394c0afd3e8857.html",  # verificação do Search Console
     "assets/README.md",             # notas de manutenção da identidade visual → /assets/
+    "assets/ms/README.md",          # aviso de uso da marca da M&S do Brasil → /assets/ms/
 }
 
 #: O que TEM de continuar no sitemap — a porta de entrada de cada público.
